@@ -1,0 +1,7 @@
+# Wokwi project config — Panda Firmware
+# Khi compile firmware thật (Arduino CLI / PlatformIO), trỏ elf vào file .elf
+# tương ứng để mô phỏng LOCAL trong IDE. Hôm nay dùng Wokwi web thì chưa cần elf.
+[wokwi]
+version = 1
+elf = "build/panda_firmware.ino.elf"
+firmware = "build/panda_firmware.ino.bin"

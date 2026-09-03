@@ -1,0 +1,1117 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Panda Dashboard — Premium UI
+   Font: Inter (Google Fonts)
+   Theme: Dark glassmorphism, cyan accent
+═══════════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ─── Design Tokens ──────────────────────────────────────────────────────── */
+:root {
+    --bg:           #080c12;
+    --bg-2:         #0d1117;
+    --panel:        #111720;
+    --panel-hover:  #151d29;
+    --border:       #1e2733;
+    --border-light: #2a3441;
+    --text:         #cdd9e5;
+    --text-muted:   #6e7f8d;
+    --text-dim:     #3d4f5e;
+    --accent:       #00d2ff;
+    --accent-dim:   rgba(0, 210, 255, 0.12);
+    --accent-glow:  rgba(0, 210, 255, 0.35);
+    --purple:       #a29bfe;
+    --purple-dim:   rgba(162, 155, 254, 0.12);
+    --green:        #2ed573;
+    --green-dim:    rgba(46, 213, 115, 0.1);
+    --red:          #ff4757;
+    --orange:       #f0883e;
+    --radius-sm:    8px;
+    --radius-md:    12px;
+    --radius-lg:    18px;
+    --shadow:       0 8px 32px rgba(0,0,0,0.5);
+    --transition:   0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Reset & Base ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ─── Layout ─────────────────────────────────────────────────────────────── */
+.container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 20px 28px 32px;
+}
+
+main {
+    display: grid;
+    grid-template-columns: 320px 1fr 300px;
+    gap: 20px;
+    align-items: start;
+}
+
+@media (max-width: 1200px) {
+    main { grid-template-columns: 1fr 1fr; }
+    .monitor-panel { grid-column: 1 / -1; }
+}
+
+@media (max-width: 768px) {
+    main { grid-template-columns: 1fr; }
+    .container { padding: 12px 16px; }
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────────── */
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 0 18px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.header-left { display: flex; align-items: center; gap: 16px; }
+.header-right { display: flex; align-items: center; gap: 14px; }
+
+.logo {
+    font-size: 38px;
+    filter: drop-shadow(0 0 14px rgba(0,210,255,0.5));
+    animation: logo-float 4s ease-in-out infinite;
+    line-height: 1;
+}
+
+@keyframes logo-float {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-5px); }
+}
+
+h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.3px;
+}
+h1 span { color: var(--accent); }
+
+.header-subtitle {
+    margin: 3px 0 0;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 400;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+}
+
+/* ─── Connection Status ──────────────────────────────────────────────────── */
+.status-indicator { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+
+.dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.dot.online  { background: var(--green); box-shadow: 0 0 8px var(--green); animation: dot-pulse 2s ease-in-out infinite; }
+.dot.offline { background: var(--red);   box-shadow: 0 0 8px var(--red); }
+
+@keyframes dot-pulse {
+    0%, 100% { box-shadow: 0 0 6px var(--green); }
+    50%       { box-shadow: 0 0 14px var(--green); }
+}
+
+/* ─── Voice State Badge ──────────────────────────────────────────────────── */
+.voice-state-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px;
+    border-radius: 99px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    transition: all var(--transition);
+}
+
+.voice-state-badge[data-state="standby"]   { color: var(--text-muted); border-color: var(--border); }
+.voice-state-badge[data-state="listening"] {
+    color: var(--green); border-color: var(--green);
+    background: var(--green-dim);
+    box-shadow: 0 0 16px rgba(46,213,115,0.2);
+    animation: badge-glow-green 1.4s ease-in-out infinite;
+}
+.voice-state-badge[data-state="thinking"]  { color: var(--purple); border-color: var(--purple); background: var(--purple-dim); }
+.voice-state-badge[data-state="speaking"]  { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 16px var(--accent-glow); }
+
+@keyframes badge-glow-green {
+    0%, 100% { box-shadow: 0 0 10px rgba(46,213,115,0.15); }
+    50%       { box-shadow: 0 0 22px rgba(46,213,115,0.4); }
+}
+
+/* ─── Panel ──────────────────────────────────────────────────────────────── */
+.panel {
+    background: var(--panel);
+    border-radius: var(--radius-lg);
+    padding: 22px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+}
+
+h2 {
+    margin: 0 0 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+h2 .lucide { width: 15px; height: 15px; opacity: 0.7; }
+
+h3 {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 12px;
+}
+
+.control-group  { margin-bottom: 24px; }
+.visual-group   { margin-bottom: 24px; }
+
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
+button {
+    background: rgba(255,255,255,0.04);
+    color: var(--text);
+    border: 1px solid var(--border-light);
+    padding: 9px 16px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    white-space: nowrap;
+}
+
+.lucide { width: 16px; height: 16px; }
+
+button:hover {
+    background: rgba(0,210,255,0.08);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 12px rgba(0,210,255,0.15);
+    transform: translateY(-1px);
+}
+
+button:active { transform: translateY(0); }
+
+.btn-stop {
+    background: rgba(255,71,87,0.1);
+    border-color: rgba(255,71,87,0.4);
+    color: var(--red);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+.btn-stop:hover {
+    background: var(--red);
+    color: #fff;
+    border-color: var(--red);
+    box-shadow: 0 0 18px rgba(255,71,87,0.4);
+}
+
+.button-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* ─── D-Pad ──────────────────────────────────────────────────────────────── */
+.d-pad {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.d-pad-middle { display: flex; gap: 6px; align-items: center; }
+
+.d-pad button {
+    width: 52px;
+    height: 52px;
+    font-size: 20px;
+    padding: 0;
+    border-radius: 10px;
+}
+
+/* ─── Vision Status ──────────────────────────────────────────────────────── */
+.vision-status-box {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.status-item .label { font-size: 13px; color: var(--text-muted); }
+.status-item .val   {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--accent);
+    text-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ─── OLED Face ──────────────────────────────────────────────────────────── */
+.led-wrapper {
+    background: rgba(10, 14, 20, 0.6);   /* bezel nhạt — không đen tuyệt đối để không nuốt màn hình */
+    padding: 24px;
+    border-radius: var(--radius-md);
+    display: flex;
+    justify-content: center;
+    border: 1px solid #1a1a2e;
+    box-shadow: inset 0 0 30px rgba(0,210,255,0.05), 0 0 0 1px rgba(0,210,255,0.04);
+}
+
+.oled-face {
+    background: #000;
+    width: min(100%, 430px);          /* màn hình 2:1 gọn, không full-width */
+    aspect-ratio: 2 / 1;
+    height: auto;
+    margin: 0 auto;
+    position: relative;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 0 0 2px #101418, 0 0 22px rgba(0, 210, 255, 0.10);
+}
+
+/* Eyes layer */
+.oled-eyes {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 26px;
+    transition: opacity 0.3s ease;
+}
+
+.eye {
+    width: 50px; height: 70px;
+    background: var(--accent);
+    border-radius: 18px;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 0 18px rgba(0,210,255,0.7);
+}
+.eye .pupil { display: none; }
+
+/* Emotions */
+@keyframes idle-breathe {
+    0%, 100% { transform: translateY(0); height: 70px; }
+    15%  { transform: translateY(0); height: 70px; }
+    17%  { transform: translateY(2px); height: 5px; }
+    19%  { transform: translateY(0); height: 70px; }
+    50%  { transform: translateY(4px); height: 66px; }
+    65%  { transform: translateY(4px); height: 66px; }
+    67%  { transform: translateY(2px); height: 5px; }
+    69%  { transform: translateY(4px); height: 66px; }
+}
+.oled-face.neutral .eye { animation: idle-breathe 7s infinite ease-in-out; }
+
+/* ─── Autonomous idle: micro-behaviors tự chủ khi rảnh (kiểu Vector) ──────── */
+.oled-face.idle-look-left  .eye { animation: none; transform: translateX(-16px); }
+.oled-face.idle-look-right .eye { animation: none; transform: translateX(16px); }
+.oled-face.idle-look-up    .eye { animation: none; transform: translateY(-12px); }
+.oled-face.idle-curious    .eye { animation: none; }
+.oled-face.idle-curious    .eye.left  { transform: scale(1.18) translateY(-3px); }
+.oled-face.idle-curious    .eye.right { transform: scale(0.85); }
+.oled-face.idle-happy      .eye { animation: none; height: 45px; border-radius: 25px 25px 10px 10px; transform: translateY(-8px); }
+.oled-face.idle-squint     .eye { animation: none; height: 26px; }
+.oled-face.idle-sleepy     .eye { animation: none; height: 12px; border-radius: 6px; }
+
+/* ── Kho biểu cảm tự chủ mở rộng ── */
+.oled-face.idle-wink .eye.left  { animation: none; }
+.oled-face.idle-wink .eye.right { animation: none; height: 8px; width: 48px; border-radius: 4px; transform: translateY(12px) rotate(8deg); }
+.oled-face.idle-cross .eye.left  { animation: none; transform: translateX(14px); }
+.oled-face.idle-cross .eye.right { animation: none; transform: translateX(-14px); }
+.oled-face.idle-wide .eye { animation: none; width: 62px; height: 82px; border-radius: 30px; transform: translateY(-4px); }
+.oled-face.idle-shy  .eye { animation: none; height: 40px; transform: translateY(14px) translateX(6px); }
+.oled-face.idle-scan .eye { animation: idle-scan 1.6s ease-in-out; }
+@keyframes idle-scan {
+    0%   { transform: translateX(0); }
+    30%  { transform: translateX(-20px); }
+    60%  { transform: translateX(18px); }
+    100% { transform: translateX(0); }
+}
+.oled-face.idle-bounce .eye { animation: idle-bounce 0.9s ease-in-out; }
+@keyframes idle-bounce {
+    0%, 100% { transform: translateY(0); }
+    25%      { transform: translateY(-12px); }
+    50%      { transform: translateY(0); }
+    75%      { transform: translateY(-6px); }
+}
+.oled-face.idle-roll .eye { animation: idle-roll 1.2s ease-in-out; }
+@keyframes idle-roll {
+    0%   { transform: translateY(0); }
+    40%  { transform: translateY(-16px) scaleY(0.6); }
+    70%  { transform: translateY(-16px) scaleY(0.6); }
+    100% { transform: translateY(0); }
+}
+.oled-face.idle-grumpy .eye { animation: none; height: 46px; background: #ff6b6b; border-radius: 12px 12px 6px 6px; }
+.oled-face.idle-grumpy .eye.left  { transform: rotate(-14deg); }
+.oled-face.idle-grumpy .eye.right { transform: rotate(14deg); }
+.oled-face.idle-teary .eye { animation: none; height: 44px; background: #74b9ff; border-radius: 14px 14px 24px 24px; transform: translateY(8px); }
+.oled-face.idle-heart .eye.left { animation: none; }
+.oled-face.idle-heart .eye.right { animation: none; width: 50px; height: 46px; background: #ff3385;
+    clip-path: path('M 25,13 C 25,13 20,0 10,0 C 3,0 0,6 0,14 C 0,26 25,45 25,45 C 25,45 50,26 50,14 C 50,6 47,0 40,0 C 30,0 25,13 25,13 Z'); }
+.oled-face.idle-dizzy1 .eye.left  { animation: none; }
+.oled-face.idle-dizzy1 .eye.right { animation: dizzy-wobble 1.4s linear; }
+
+/* ── Bộ biểu cảm idle đầy đủ 11 emotion ── */
+.oled-face.idle-surprised .eye { animation: none; height: 85px; width: 65px; border-radius: 35px; background: #ffaa00; box-shadow: 0 0 20px rgba(255,170,0,0.8); transform: translateY(-5px); }
+.oled-face.idle-cool .eye { animation: none; height: 40px; width: 58px; background: linear-gradient(135deg, #111 20%, var(--accent) 100%); border-radius: 4px 4px 18px 18px; border: 2px solid var(--accent); box-shadow: 0 0 18px rgba(0,210,255,0.7); }
+.oled-face.idle-cool .eye.left  { transform: translateY(-4px) skewY(5deg); }
+.oled-face.idle-cool .eye.right { transform: translateY(-4px) skewY(-5deg); }
+.oled-face.idle-cute .eye { animation: cute-glow 2s infinite; width: 58px; height: 75px; border-radius: 28px; background: #ff7675; }
+.oled-face.idle-sad .eye { animation: none; height: 52px; background: #ff3838; box-shadow: 0 0 20px rgba(255,56,56,0.8); }
+.oled-face.idle-sad .eye.left  { transform: rotate(-16deg) translateY(4px); }
+.oled-face.idle-sad .eye.right { transform: rotate(16deg) translateY(4px); }
+.oled-face.idle-angry .eye { animation: none; height: 50px; background: #0088aa; box-shadow: 0 0 10px rgba(0,136,170,0.6); }
+.oled-face.idle-angry .eye.left  { transform: rotate(14deg) translateY(10px); }
+.oled-face.idle-angry .eye.right { transform: rotate(-14deg) translateY(10px); }
+.oled-face.idle-love .eye { animation: heart-beat 0.85s infinite ease-in-out; width: 55px; height: 50px; background: #ff3385; box-shadow: 0 0 25px rgba(255,51,133,0.9); clip-path: path('M 27.5,14 C 27.5,14 22,0 11,0 C 3.5,0 0,7 0,15 C 0,29 27.5,50 27.5,50 C 27.5,50 55,26 55,15 C 55,7 51.5,0 44,0 C 33,0 27.5,14 27.5,14 Z'); }
+
+.oled-face.happy .eye { height: 45px; border-radius: 25px 25px 10px 10px; transform: translateY(-10px); }
+.oled-face.happy .eye.left  { transform: translateY(-10px) rotate(-10deg); }
+.oled-face.happy .eye.right { transform: translateY(-10px) rotate(10deg); }
+
+.oled-face.sad .eye { height: 52px; background: #ff3838; box-shadow: 0 0 20px rgba(255,56,56,0.8); }
+.oled-face.sad .eye.left  { transform: rotate(-16deg) translateY(4px); }
+.oled-face.sad .eye.right { transform: rotate(16deg) translateY(4px); }
+
+.oled-face.surprised .eye { height: 85px; width: 65px; border-radius: 35px; background: #ffaa00; box-shadow: 0 0 20px rgba(255,170,0,0.8); transform: translateY(-5px); }
+
+.oled-face.angry .eye { height: 50px; background: #0088aa; box-shadow: 0 0 10px rgba(0,136,170,0.6); }
+.oled-face.angry .eye.left  { transform: rotate(14deg) translateY(10px); border-radius: 12px 18px 20px 20px; }
+.oled-face.angry .eye.right { transform: rotate(-14deg) translateY(10px); border-radius: 18px 12px 20px 20px; }
+
+@keyframes heart-beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+.oled-face.love .eye { width: 55px; height: 50px; background: #ff3385; box-shadow: 0 0 25px rgba(255,51,133,0.9); clip-path: path('M 27.5,14 C 27.5,14 22,0 11,0 C 3.5,0 0,7 0,15 C 0,29 27.5,50 27.5,50 C 27.5,50 55,29 55,15 C 55,7 51.5,0 44,0 C 33,0 27.5,14 27.5,14 Z'); animation: heart-beat 0.85s infinite ease-in-out; }
+
+.oled-face.wink .eye.left  { height: 45px; border-radius: 25px 25px 10px 10px; transform: translateY(-10px) rotate(-10deg); background: #00f2fe; box-shadow: 0 0 18px rgba(0,242,254,0.8); }
+.oled-face.wink .eye.right { height: 8px; width: 48px; border-radius: 4px; transform: translateY(12px) rotate(8deg); background: #00f2fe; box-shadow: 0 0 15px rgba(0,242,254,0.8); }
+
+@keyframes sleepy-drift { 0%, 100% { transform: translateY(16px); opacity: 0.6; } 50% { transform: translateY(10px); opacity: 1; } }
+.oled-face.sleepy .eye { height: 10px; width: 52px; border-radius: 5px; background: #a29bfe; box-shadow: 0 0 15px rgba(162,155,254,0.8); animation: sleepy-drift 3.5s infinite ease-in-out; }
+
+@keyframes dizzy-wobble { 0% { transform: rotate(0deg) scale(1); } 25% { transform: rotate(90deg) scale(0.9); } 50% { transform: rotate(180deg) scale(1.1); } 75% { transform: rotate(270deg) scale(0.9); } 100% { transform: rotate(360deg) scale(1); } }
+.oled-face.dizzy .eye { width: 48px; height: 48px; background: #fdcb6e; box-shadow: 0 0 20px rgba(253,203,110,0.9); animation: dizzy-wobble 2.5s linear infinite; clip-path: polygon(20% 0%, 0% 20%, 30% 50%, 0% 80%, 20% 100%, 50% 70%, 80% 100%, 100% 80%, 70% 50%, 100% 20%, 80% 0%, 50% 30%); }
+
+.oled-face.cool .eye { height: 40px; width: 58px; background: linear-gradient(135deg, #111 20%, var(--accent) 100%); border-radius: 4px 4px 18px 18px; border: 2px solid var(--accent); box-shadow: 0 0 18px rgba(0,210,255,0.7); }
+.oled-face.cool .eye.left  { transform: translateY(-4px) skewY(5deg); }
+.oled-face.cool .eye.right { transform: translateY(-4px) skewY(-5deg); }
+
+@keyframes cute-glow { 0%, 100% { transform: scale(1); box-shadow: 0 0 15px rgba(255,118,117,0.7); } 50% { transform: scale(1.08); box-shadow: 0 0 25px rgba(255,118,117,1); } }
+.oled-face.cute .eye { width: 58px; height: 75px; border-radius: 28px; background: #ff7675; animation: cute-glow 2s infinite ease-in-out; }
+
+/* ─── Camera Box ─────────────────────────────────────────────────────────── */
+.camera-box {
+    background: #000;
+    aspect-ratio: 4/3;
+    width: 100%;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cam-content   { display: flex; flex-direction: column; align-items: center; z-index: 2; gap: 6px; }
+.cam-no-signal { color: var(--red); font-size: 18px; font-weight: 700; letter-spacing: 2px; text-shadow: 0 0 10px rgba(255,71,87,0.6); }
+.cam-mock      { color: var(--text-dim); font-size: 11px; }
+
+.scanline {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 8px;
+    background: rgba(255,255,255,0.06);
+    animation: scanline 4s linear infinite;
+    z-index: 1;
+}
+@keyframes scanline { 0% { top: -5%; } 100% { top: 105%; } }
+
+/* ─── Voice Box ──────────────────────────────────────────────────────────── */
+.voice-box {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 64px;
+    transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.voice-box.listening {
+    border-color: var(--green);
+    box-shadow: 0 0 14px rgba(46,213,115,0.15);
+}
+
+/* Waveform */
+.voice-waveform {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 28px;
+    min-width: 30px;
+    flex-shrink: 0;
+}
+
+.voice-waveform span {
+    display: block; width: 3px; height: 5px;
+    border-radius: 2px;
+    background: var(--accent);
+    opacity: 0.3;
+    transition: height 0.15s ease;
+}
+
+.voice-waveform.active span { opacity: 1; animation: waveform-bar 0.9s ease-in-out infinite; }
+.voice-waveform.active span:nth-child(1) { animation-delay: 0.00s; }
+.voice-waveform.active span:nth-child(2) { animation-delay: 0.15s; }
+.voice-waveform.active span:nth-child(3) { animation-delay: 0.30s; }
+.voice-waveform.active span:nth-child(4) { animation-delay: 0.15s; }
+.voice-waveform.active span:nth-child(5) { animation-delay: 0.00s; }
+
+@keyframes waveform-bar { 0%, 100% { height: 4px; } 50% { height: 20px; } }
+
+.voice-text-container { flex: 1; overflow: hidden; }
+
+.voice-text {
+    color: #58a6ff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    transition: color 0.2s, text-shadow 0.2s;
+}
+
+.voice-text.flash {
+    color: var(--green);
+    text-shadow: 0 0 12px rgba(46,213,115,0.6);
+}
+
+/* ─── AI Chat Panel ──────────────────────────────────────────────────────── */
+.ai-chat-group h3 {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--text);
+    font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 12px;
+}
+.panda-icon-h3 { font-size: 16px; }
+
+.ai-chat-panel {
+    background: linear-gradient(160deg, #0d1117, #10151e);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 18px;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+}
+
+.ai-chat-panel::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, rgba(0,210,255,0.04), rgba(162,155,254,0.03), transparent 60%);
+    pointer-events: none;
+}
+
+/* Idle */
+.ai-idle-hint {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px; padding: 24px;
+    color: var(--text-dim);
+    text-align: center; flex: 1;
+}
+.ai-idle-icon { font-size: 30px; opacity: 0.4; animation: idle-icon-float 3s ease-in-out infinite; }
+@keyframes idle-icon-float {
+    0%, 100% { transform: translateY(0) rotate(-5deg); opacity: 0.35; }
+    50%       { transform: translateY(-5px) rotate(5deg); opacity: 0.6; }
+}
+.ai-idle-hint p { margin: 0; font-size: 13px; line-height: 1.6; }
+.ai-idle-hint p strong { color: var(--accent); font-weight: 600; }
+.ai-idle-sub { font-size: 11px !important; color: var(--text-dim) !important; }
+
+/* Bubbles */
+.ai-bubble {
+    border-radius: var(--radius-md);
+    padding: 12px 15px;
+    animation: bubble-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes bubble-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.bubble-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+    text-transform: uppercase; margin-bottom: 7px;
+    display: flex; align-items: center; gap: 5px; opacity: 0.7;
+}
+.bubble-text { font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+
+.user-bubble { background: rgba(88,166,255,0.07); border: 1px solid rgba(88,166,255,0.18); }
+.user-bubble .bubble-label { color: #58a6ff; }
+.user-bubble .bubble-text  { color: #cdd9e5; }
+
+.panda-bubble { background: rgba(162,155,254,0.07); border: 1px solid rgba(162,155,254,0.18); }
+.panda-bubble .bubble-label { color: var(--purple); }
+.panda-bubble .bubble-text  { color: #e2defe; }
+
+.bubble-cursor {
+    display: inline; color: var(--purple);
+    font-size: 15px; margin-left: 2px;
+    animation: blink-cursor 0.8s step-end infinite;
+}
+@keyframes blink-cursor { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+/* Thinking bar */
+.ai-thinking {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: rgba(162,155,254,0.05);
+    border: 1px solid rgba(162,155,254,0.12);
+    border-radius: var(--radius-sm);
+    animation: bubble-in 0.25s ease;
+}
+.thinking-dots { display: flex; gap: 5px; align-items: center; }
+.thinking-dots span {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    animation: thinking-bounce 1.2s ease-in-out infinite;
+}
+.thinking-dots span:nth-child(1) { animation-delay: 0.0s; }
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes thinking-bounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1.2); opacity: 1; } }
+.thinking-label { font-size: 12px; color: var(--purple); font-style: italic; font-weight: 500; }
+
+/* Clear history button */
+.btn-clear-history {
+    margin-top: 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    align-self: flex-end;
+    display: flex; align-items: center; gap: 5px;
+}
+.btn-clear-history:hover {
+    border-color: var(--red); color: var(--red);
+    background: rgba(255,71,87,0.06);
+    box-shadow: none; transform: none;
+}
+.btn-clear-history .lucide { width: 12px; height: 12px; }
+
+/* ─── Sensor Cards ───────────────────────────────────────────────────────── */
+.sensor-cards { display: flex; gap: 14px; margin-bottom: 20px; }
+
+.card {
+    background: var(--bg-2);
+    padding: 18px 16px;
+    border-radius: var(--radius-md);
+    flex: 1; text-align: center;
+    border: 1px solid var(--border);
+    transition: border-color var(--transition);
+}
+.card:hover { border-color: var(--border-light); }
+.card h4 { margin: 0 0 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; }
+.card .value { font-size: 26px; font-weight: 700; color: var(--accent); text-shadow: 0 0 12px var(--accent-glow); font-family: 'JetBrains Mono', monospace; }
+
+/* ─── Terminal Log ───────────────────────────────────────────────────────── */
+.log-section h3 { margin-bottom: 12px; }
+
+.terminal {
+    background: #05080d;
+    color: #3fb950;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 16px;
+    height: 420px;
+    overflow-y: auto;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    font-size: 12px;
+}
+
+.terminal p { margin: 3px 0; line-height: 1.5; }
+
+.log-time        { color: var(--text-dim); font-size: 10px; margin-right: 6px; }
+.log-cmd         { color: #58a6ff; }
+.log-status      { color: #d2a8ff; }
+.log-voice       { color: var(--orange); }
+.log-ai-state    { color: var(--purple); }
+.log-ai-response { color: #6ee7b7; }
+.log-sys         { color: var(--text-muted); font-style: italic; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OLED Face — AI Mode Overlays (Vector-style)
+   Modes: questioning | hearing | ai-thinking | speaking
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Base overlay layer ─────────────────────────────────────────────────── */
+.oled-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+}
+
+/* Hide elements inside overlay by default */
+.oled-ring,
+.oled-icon,
+.oled-dots,
+.oled-bars,
+.oled-waves,
+.oled-core { display: none; }
+
+/* ─── Text layer (hearing mode) ──────────────────────────────────────────── */
+.oled-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 16px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+    text-align: center;
+    line-height: 1.4;
+    text-shadow: 0 0 12px var(--accent-glow), 0 0 4px var(--accent);
+    word-break: break-word;
+    overflow: hidden;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODE 1: questioning — ? + spinning ring
+   Triggered: wake-word detected
+═══════════════════════════════════════════════════════════════════════════ */
+.oled-face.questioning .oled-eyes { opacity: 0; }
+.oled-face.questioning .oled-overlay { opacity: 1; }
+.oled-face.questioning .oled-ring { display: block; }
+.oled-face.questioning .oled-icon { display: flex; }
+.oled-face.questioning .oled-waves { display: block; }
+
+/* Spinning ring + radar ping tỏa ra ngoài */
+.oled-ring {
+    position: absolute;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    border-top-color: var(--accent);
+    border-right-color: rgba(0, 210, 255, 0.3);
+    box-shadow: 0 0 16px var(--accent-glow),
+                inset 0 0 10px rgba(0, 210, 255, 0.08);
+    animation: oled-spin 1.1s linear infinite;
+}
+
+/* Radar ping: vòng sóng tỏa ra rồi tan — cảm giác 'sonar đang quét' */
+.oled-ring::before {
+    content: '';
+    position: absolute;
+    inset: -12px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    opacity: 0;
+    animation: oled-ping 1.6s ease-out infinite;
+}
+@keyframes oled-ping {
+    0%   { transform: scale(0.6); opacity: 0.8; }
+    100% { transform: scale(1.3); opacity: 0;   }
+}
+
+/* Secondary inner ring — opposite direction */
+.oled-ring::after {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-bottom-color: rgba(0, 210, 255, 0.5);
+    animation: oled-spin-rev 1.8s linear infinite;
+}
+
+@keyframes oled-spin     { to { transform: rotate(360deg);  } }
+@keyframes oled-spin-rev { to { transform: rotate(-360deg); } }
+
+/* ? icon inside ring — lắc lư + glow đổi màu */
+.oled-icon {
+    position: absolute;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(0, 210, 255, 0.07);
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--accent);
+    text-shadow: 0 0 12px var(--accent);
+    font-family: 'Inter', sans-serif;
+    animation: oled-icon-wobble 1.4s ease-in-out infinite;
+}
+
+@keyframes oled-icon-wobble {
+    0%, 100% { transform: scale(1)   rotate(-8deg); text-shadow: 0 0 8px  var(--accent); }
+    50%       { transform: scale(1.12) rotate(8deg);  text-shadow: 0 0 22px var(--green);  }
+}
+
+/* Sound-wave arcs hai bên — 'tai' đang hứng âm thanh */
+.oled-waves { position: absolute; inset: 0; }
+.oled-waves span {
+    position: absolute;
+    top: 50%;
+    width: 16px;
+    height: 34px;
+    border: 3px solid transparent;
+    border-radius: 50%;
+    transform: translateY(-50%);
+}
+.oled-waves span:nth-child(1) { left: 12%;  border-left-color:  var(--green); animation: oled-wave 1.2s ease-out infinite; }
+.oled-waves span:nth-child(2) { left: 22%;  border-left-color:  var(--accent); animation: oled-wave 1.2s ease-out 0.25s infinite; }
+.oled-waves span:nth-child(3) { right: 22%; border-right-color: var(--accent); animation: oled-wave 1.2s ease-out 0.25s infinite; }
+.oled-waves span:nth-child(4) { right: 12%; border-right-color: var(--green); animation: oled-wave 1.2s ease-out infinite; }
+@keyframes oled-wave {
+    0%   { opacity: 0;   transform: translateY(-50%) scale(0.7); }
+    35%  { opacity: 1; }
+    100% { opacity: 0;   transform: translateY(-50%) scale(1.2); }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODE 2: hearing — hiển thị transcript text
+   Triggered: nhận transcript từ Groq
+═══════════════════════════════════════════════════════════════════════════ */
+.oled-face.hearing .oled-eyes { opacity: 0; }
+.oled-face.hearing .oled-text { opacity: 1; }
+
+/* Border pulse xanh lá khi đang nghe */
+.oled-face.hearing {
+    box-shadow: 0 0 0 2px var(--green),
+                0 0 20px rgba(46, 213, 115, 0.3);
+    animation: oled-listen-pulse 1.2s ease-in-out infinite;
+}
+
+/* REC dot đỏ nhấp nháy trước chữ + cursor gõ sau chữ */
+.oled-text::before {
+    content: '●';
+    color: #ff4757;
+    font-size: 9px;
+    margin-right: 8px;
+    animation: oled-blink 1s steps(2, start) infinite;
+}
+.oled-text::after {
+    content: '▋';
+    color: var(--green);
+    margin-left: 4px;
+    animation: oled-blink 0.7s steps(2, start) infinite;
+}
+@keyframes oled-blink { 50% { opacity: 0; } }
+
+@keyframes oled-listen-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px var(--green), 0 0 14px rgba(46,213,115,0.2); }
+    50%       { box-shadow: 0 0 0 2px var(--green), 0 0 28px rgba(46,213,115,0.5); }
+}
+
+/* Scroll marquee nếu text dài */
+.oled-text.long-text {
+    white-space: nowrap;
+    animation: oled-text-scroll 5s linear infinite;
+}
+@keyframes oled-text-scroll {
+    0%   { transform: translateX(50%);  }
+    100% { transform: translateX(-110%); }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODE 3: ai-thinking — 3 dots bounce
+   Triggered: gửi lên LLM
+═══════════════════════════════════════════════════════════════════════════ */
+.oled-face.ai-thinking .oled-eyes   { opacity: 0; }
+.oled-face.ai-thinking .oled-overlay { opacity: 1; }
+.oled-face.ai-thinking .oled-dots   { display: block; }
+.oled-face.ai-thinking .oled-core   { display: block; }
+
+/* Orbit: 3 dots quay quanh lõi như electron */
+.oled-dots {
+    display: none;
+    position: absolute;
+    width: 74px;
+    height: 74px;
+    animation: oled-orbit 1.5s linear infinite;
+}
+
+.oled-dots span {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    animation: oled-electron 0.9s ease-in-out infinite alternate;
+}
+.oled-dots span:nth-child(1) { top: 0;    left: 50%; margin-left: -6px; background: var(--purple); box-shadow: 0 0 14px rgba(162,155,254,0.9); }
+.oled-dots span:nth-child(2) { bottom: 8px; left: 8px;  background: var(--accent); box-shadow: 0 0 14px rgba(0,210,255,0.9);   animation-delay: 0.3s; }
+.oled-dots span:nth-child(3) { bottom: 8px; right: 8px; background: #ff6b81;       box-shadow: 0 0 14px rgba(255,107,129,0.9); animation-delay: 0.6s; }
+
+@keyframes oled-orbit   { to { transform: rotate(360deg); } }
+@keyframes oled-electron { from { transform: scale(0.7); } to { transform: scale(1.25); } }
+
+/* Lõi năng lượng nhấp nháy ở giữa */
+.oled-core {
+    display: none;
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--purple);
+    box-shadow: 0 0 20px var(--purple), 0 0 6px #fff inset;
+    animation: oled-core-pulse 1s ease-in-out infinite;
+}
+@keyframes oled-core-pulse {
+    0%, 100% { transform: scale(0.8); opacity: 0.7; }
+    50%       { transform: scale(1.3); opacity: 1;   }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODE 4: speaking — audio bars (equalizer)
+   Triggered: TTS đang phát
+═══════════════════════════════════════════════════════════════════════════ */
+.oled-face.speaking .oled-eyes    { opacity: 0; }
+.oled-face.speaking .oled-overlay  { opacity: 1; }
+.oled-face.speaking .oled-bars    { display: flex; }
+
+.oled-bars {
+    display: none;
+    align-items: flex-end;
+    gap: 5px;
+    height: 56px;
+    padding-bottom: 4px;
+    animation: oled-hue 3s linear infinite;   /* equalizer đổi màu cầu vồng */
+}
+@keyframes oled-hue { to { filter: hue-rotate(360deg); } }
+
+.oled-bars span {
+    width: 8px;
+    border-radius: 4px 4px 2px 2px;
+    background: linear-gradient(to top, var(--accent), rgba(0,210,255,0.4));
+    box-shadow: 0 0 8px rgba(0, 210, 255, 0.5);
+    animation: oled-bar-eq 0.7s ease-in-out infinite alternate;
+}
+
+.oled-bars span:nth-child(1) { height: 18px; animation-duration: 0.55s; animation-delay: 0.00s; }
+.oled-bars span:nth-child(2) { height: 32px; animation-duration: 0.70s; animation-delay: 0.10s; }
+.oled-bars span:nth-child(3) { height: 48px; animation-duration: 0.60s; animation-delay: 0.05s; }
+.oled-bars span:nth-child(4) { height: 56px; animation-duration: 0.45s; animation-delay: 0.15s; }
+.oled-bars span:nth-child(5) { height: 48px; animation-duration: 0.65s; animation-delay: 0.08s; }
+.oled-bars span:nth-child(6) { height: 30px; animation-duration: 0.72s; animation-delay: 0.12s; }
+.oled-bars span:nth-child(7) { height: 16px; animation-duration: 0.50s; animation-delay: 0.03s; }
+
+@keyframes oled-bar-eq {
+    from { transform: scaleY(0.3); opacity: 0.5; }
+    to   { transform: scaleY(1.0); opacity: 1.0; }
+}
+
+/* Đảm bảo khi quay về neutral → reset tất cả */
+.oled-face.neutral .oled-overlay { opacity: 0; }
+.oled-face.neutral .oled-text    { opacity: 0; }
+.oled-face.neutral .oled-eyes    { opacity: 1; }
+.oled-face.neutral               { box-shadow: none; animation: none; }
+
+/* ─── Topic emoji: OLED "hiểu bạn đang hỏi gì" ───────────────────────────── */
+.oled-topic {
+    position: absolute;
+    top: 50%;
+    margin-top: -17px;               /* căn giữa trục dọc (icon 34px) */
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 24px;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 3;
+    filter: drop-shadow(0 0 10px rgba(0, 210, 255, 0.9));
+    animation: topic-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes topic-pop {
+    from { transform: translateX(-50%) scale(0.3) rotate(-20deg); }
+    to   { transform: translateX(-50%) scale(1)   rotate(0deg);  }
+}
+
+/* ─── Topic icon: line-art neon (lucide) — cùng chất OLED ─────────────────── */
+.oled-topic svg {
+    width: 34px;
+    height: 34px;
+    stroke-width: 1.6;
+    filter: drop-shadow(0 0 6px currentColor)
+            drop-shadow(0 0 16px rgba(0, 210, 255, 0.35));
+}
+.oled-face.speaking.has-topic .oled-topic svg { width: 54px; height: 54px; }
+@keyframes oled-crt {
+    0%, 88%, 94%, 100% { opacity: 1;   }
+    90%                { opacity: 0.55; }
+}
+/* Icon nhún nhịp mặc định khi có chủ đề (màu do JS set theo chủ đề) */
+.oled-face.has-topic .oled-topic svg {
+    animation: icon-bob 0.7s ease-in-out infinite alternate;
+}
+@keyframes icon-bob {
+    from { transform: translateY(0)    scale(1);    }
+    to   { transform: translateY(-4px) scale(1.06); }
+}
+
+/* ─── Vi-animation riêng từng chủ đề — mỗi chủ đề một "tính cách" ─────────── */
+.oled-face.topic-time      .oled-topic svg { animation: anim-tick 1s steps(2) infinite; }
+.oled-face.topic-weather   .oled-topic svg { animation: anim-rain 0.9s ease-in-out infinite; }
+.oled-face.topic-music     .oled-topic svg { animation: anim-bop 0.55s ease-in-out infinite; }
+.oled-face.topic-food      .oled-topic svg { animation: anim-bop 0.8s ease-in-out infinite; }
+.oled-face.topic-game      .oled-topic svg { animation: anim-bop 0.5s ease-in-out infinite; }
+.oled-face.topic-sport     .oled-topic svg { animation: anim-bounce 0.8s cubic-bezier(.5,0,.5,1) infinite; }
+.oled-face.topic-animal    .oled-topic svg { animation: anim-bounce 1s ease-in-out infinite; }
+.oled-face.topic-emotion   .oled-topic svg,
+.oled-face.topic-health    .oled-topic svg { animation: anim-beat 0.9s ease-in-out infinite; }
+.oled-face.topic-money     .oled-topic svg { animation: anim-coin 1.2s ease-in-out infinite; }
+.oled-face.topic-movie     .oled-topic svg { animation: anim-clap 1s steps(2) infinite; }
+.oled-face.topic-space     .oled-topic svg,
+.oled-face.topic-science   .oled-topic svg,
+.oled-face.topic-story     .oled-topic svg,
+.oled-face.topic-place     .oled-topic svg { animation: anim-float 1.6s ease-in-out infinite; }
+.oled-face.topic-geography .oled-topic svg { animation: anim-spin 7s linear infinite; }
+.oled-face.topic-tech      .oled-topic svg { animation: anim-flick 1.4s steps(1) infinite; }
+
+@keyframes anim-rain   { 0%,100% { transform: translateY(0); }    50% { transform: translateY(3px); } }
+@keyframes anim-bounce { 0%,100% { transform: translateY(0); }    40% { transform: translateY(-7px); } }
+@keyframes anim-bop    { 0%,100% { transform: rotate(-8deg); }    50% { transform: rotate(8deg); } }
+@keyframes anim-beat   { 0%,100% { transform: scale(1); }         30% { transform: scale(1.18); } }
+@keyframes anim-coin   { 0%,100% { transform: scaleX(1); }        50% { transform: scaleX(0.25); } }
+@keyframes anim-clap   { 0%,100% { transform: rotate(0); }        50% { transform: rotate(-10deg); } }
+@keyframes anim-float  { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-5px) rotate(3deg); } }
+@keyframes anim-spin   { to { transform: rotate(360deg); } }
+@keyframes anim-tick   { 0%,100% { transform: rotate(-6deg); }    50% { transform: rotate(6deg); } }
+@keyframes anim-flick  { 0%,100% { opacity: 1; }                  92% { opacity: 0.5; } }
+@keyframes topic-bob {
+    from { transform: translateX(-50%) translateY(0)    scale(1);    }
+    to   { transform: translateX(-50%) translateY(-5px) scale(1.08); }
+}
+
+/* Caption dữ liệu thật dưới emoji (vd: 23:16 / 29°C / TOÁN) */
+.oled-cap {
+    position: absolute;
+    top: 50%;
+    margin-top: 20px;                /* ngay dưới trục giữa — không dãn theo màn hình */
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--accent);
+    text-shadow: 0 0 10px var(--accent-glow), 0 0 4px var(--accent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 3;
+}
+
+/* Khi có chủ đề: ẨN sóng âm — icon + caption là nhân vật chính (kiểu Vector) */
+.oled-face.speaking.has-topic .oled-bars  { display: none; }
+.oled-face.speaking.has-topic .oled-topic { margin-top: -64px; }  /* icon nhô trên trục, caption dưới */
+
+/* ─── Browser push-to-talk mic button ─────────────────────────────────────── */
+.btn-browser-mic {
+    width: 100%;
+    margin: 10px 0 6px;
+    padding: 10px 14px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    background: rgba(0, 210, 255, 0.08);
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
+}
+.btn-browser-mic:hover { background: rgba(0, 210, 255, 0.18); }
+.btn-browser-mic.recording {
+    border-color: #ff4757;
+    background: rgba(255, 71, 87, 0.15);
+    color: #ff4757;
+    animation: mic-pulse 1s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.5); }
+    50%      { box-shadow: 0 0 0 8px rgba(255, 71, 87, 0); }
+}

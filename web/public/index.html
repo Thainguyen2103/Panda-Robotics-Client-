@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Panda Robot Dashboard — điều khiển và giám sát robot Panda thời gian thực">
+    <title>Panda Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=20260902">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <div class="logo">🐼</div>
+                <div>
+                    <h1>Panda <span>Dashboard</span></h1>
+                    <p class="header-subtitle">Robot Intelligence System</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="status-indicator">
+                    <span class="dot offline" id="connection-dot"></span>
+                    <span id="connection-status">Offline</span>
+                </div>
+                <!-- Voice AI State Badge -->
+                <div class="voice-state-badge" id="voice-state-badge" data-state="standby">
+                    <span class="voice-state-icon">🎙️</span>
+                    <span id="voice-state-label">Standby</span>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- ═══ LEFT: Controls ═══════════════════════════════════════════ -->
+            <section class="panel control-panel">
+                <h2><i data-lucide="sliders-horizontal"></i> Controls & AI Vision</h2>
+
+                <div class="control-group">
+                    <h3>AI Vision Status</h3>
+                    <div class="vision-status-box">
+                        <div class="status-item">
+                            <span class="label">Emotion:</span>
+                            <span class="val" id="cv-emotion">N/A</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Action:</span>
+                            <span class="val" id="cv-action">N/A</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3>Movement</h3>
+                    <div class="d-pad">
+                        <button id="btn-forward" onclick="sendCommand('panda/cmd/move', 'forward')">↑</button>
+                        <div class="d-pad-middle">
+                            <button id="btn-left" onclick="sendCommand('panda/cmd/move', 'left')">←</button>
+                            <button id="btn-stop" class="btn-stop" onclick="sendCommand('panda/cmd/move', 'stop')">STOP</button>
+                            <button id="btn-right" onclick="sendCommand('panda/cmd/move', 'right')">→</button>
+                        </div>
+                        <button id="btn-back" onclick="sendCommand('panda/cmd/move', 'back')">↓</button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3>Arm & Face</h3>
+                    <div class="button-row">
+                        <button id="btn-wave" onclick="sendCommand('panda/cmd/arm', 'wave')"><i data-lucide="hand"></i> Wave</button>
+                        <button id="btn-arm-up" onclick="sendCommand('panda/cmd/arm', 'up')"><i data-lucide="arrow-up"></i> Up</button>
+                        <button id="btn-arm-down" onclick="sendCommand('panda/cmd/arm', 'down')"><i data-lucide="arrow-down"></i> Down</button>
+                    </div>
+                    <div class="button-row">
+                        <button id="btn-face-happy" onclick="sendCommand('panda/cmd/face', 'happy')"><i data-lucide="smile"></i> Happy</button>
+                        <button id="btn-face-sad" onclick="sendCommand('panda/cmd/face', 'sad')"><i data-lucide="frown"></i> Sad</button>
+                        <button id="btn-face-angry" onclick="sendCommand('panda/cmd/face', 'angry')"><i data-lucide="flame"></i> Angry</button>
+                        <button id="btn-face-surprised" onclick="sendCommand('panda/cmd/face', 'surprised')"><i data-lucide="scan-face"></i> Wow</button>
+                        <button id="btn-face-love" onclick="sendCommand('panda/cmd/face', 'love')"><i data-lucide="heart"></i> Love</button>
+                        <button id="btn-face-wink" onclick="sendCommand('panda/cmd/face', 'wink')"><i data-lucide="smile-plus"></i> Wink</button>
+                        <button id="btn-face-sleepy" onclick="sendCommand('panda/cmd/face', 'sleepy')"><i data-lucide="moon"></i> Sleepy</button>
+                        <button id="btn-face-dizzy" onclick="sendCommand('panda/cmd/face', 'dizzy')"><i data-lucide="zap"></i> Dizzy</button>
+                        <button id="btn-face-cool" onclick="sendCommand('panda/cmd/face', 'cool')"><i data-lucide="glasses"></i> Cool</button>
+                        <button id="btn-face-cute" onclick="sendCommand('panda/cmd/face', 'cute')"><i data-lucide="sparkles"></i> Cute</button>
+                        <button id="btn-face-neutral" onclick="sendCommand('panda/cmd/face', 'neutral')"><i data-lucide="meh"></i> Neutral</button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3>Misc</h3>
+                    <div class="button-row">
+                        <button id="btn-buzz-on" onclick="sendCommand('panda/cmd/buzz', 'on')"><i data-lucide="bell"></i> Buzz ON</button>
+                        <button id="btn-buzz-off" onclick="sendCommand('panda/cmd/buzz', 'off')"><i data-lucide="bell-off"></i> Buzz OFF</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ═══ CENTER: Visuals + AI Chat ════════════════════════════════ -->
+            <section class="panel visual-panel">
+                <h2><i data-lucide="eye"></i> Visuals</h2>
+
+                <div class="visual-group">
+                    <h3>OLED Face</h3>
+                    <div class="led-wrapper">
+                        <div id="oled-face" class="oled-face neutral">
+                            <!-- Eyes layer (default) -->
+                            <div class="oled-eyes">
+                                <div class="eye left"><div class="pupil"></div></div>
+                                <div class="eye right"><div class="pupil"></div></div>
+                            </div>
+                            <!-- AI overlay layer -->
+                            <div class="oled-overlay">
+                                <!-- Spinning ring (questioning mode) -->
+                                <div class="oled-ring"></div>
+                                <!-- Sound-wave arcs hai bên (questioning) -->
+                                <div class="oled-waves"><span></span><span></span><span></span><span></span></div>
+                                <!-- Center icon -->
+                                <div class="oled-icon" id="oled-icon">?</div>
+                                <!-- Thinking orbit: core + 3 dots quỹ đạo -->
+                                <div class="oled-core"></div>
+                                <!-- Thinking dots -->
+                                <div class="oled-dots">
+                                    <span></span><span></span><span></span>
+                                </div>
+                                <!-- Speaking bars -->
+                                <div class="oled-bars">
+                                    <span></span><span></span><span></span>
+                                    <span></span><span></span><span></span><span></span>
+                                </div>
+                            </div>
+                            <!-- Text layer (hearing mode) -->
+                            <div class="oled-text" id="oled-text"></div>
+                            <!-- Topic emoji (thinking/speaking) -->
+                            <div class="oled-topic" id="oled-topic"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="visual-group">
+                    <h3>Camera</h3>
+                    <div class="camera-box" style="padding: 0;">
+                        <div class="scanline"></div>
+                        <img id="cam-image" src="" alt="Camera Feed" style="width:100%; height:100%; object-fit:contain; display:none; position:absolute; top:0; left:0; z-index:0;" />
+                        <div class="cam-content" id="cam-placeholder">
+                            <span class="cam-no-signal">🔴 NO SIGNAL</span>
+                            <span class="cam-mock">[Waiting for stream...]</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Voice Transcript box đã được tích hợp trực tiếp lên OLED Face và Panda AI Chat -->
+
+
+                <!-- ✨ PANDA AI CHAT PANEL (NEW) -->
+                <div class="visual-group ai-chat-group">
+                    <h3><span class="panda-icon-h3">🐼</span> Panda AI</h3>
+
+                    <div class="ai-chat-panel" id="ai-chat-panel">
+
+                        <!-- Trạng thái mặc định: chờ wake-word -->
+                        <div class="ai-idle-hint" id="ai-idle-hint">
+                            <div class="ai-idle-icon">🎙️</div>
+                            <p>Nói <strong>"Panda..."</strong> để bắt đầu hội thoại</p>
+                            <p class="ai-idle-sub">Sau 3 giây im lặng, Panda sẽ trả lời</p>
+                        </div>
+
+                        <!-- Bubble câu hỏi người dùng -->
+                        <div class="ai-bubble user-bubble" id="ai-user-bubble" style="display:none">
+                            <div class="bubble-label"><i data-lucide="user"></i> Bạn hỏi</div>
+                            <div class="bubble-text" id="ai-user-text"></div>
+                        </div>
+
+                        <!-- Thinking indicator -->
+                        <div class="ai-thinking" id="ai-thinking-bar" style="display:none">
+                            <div class="thinking-dots">
+                                <span></span><span></span><span></span>
+                            </div>
+                            <span class="thinking-label" id="ai-thinking-label">Panda đang suy nghĩ...</span>
+                        </div>
+
+                        <!-- Bubble câu trả lời Panda -->
+                        <div class="ai-bubble panda-bubble" id="ai-panda-bubble" style="display:none">
+                            <div class="bubble-label"><span>🐼</span> Panda trả lời</div>
+                            <div class="bubble-text" id="ai-panda-text"></div>
+                            <div class="bubble-cursor" id="ai-cursor">▋</div>
+                        </div>
+
+                    </div>
+
+                    <!-- Browser push-to-talk: dùng mic của trình duyệt (cùng mic Google Translate) -->
+                    <button class="btn-browser-mic" id="mic-btn" onclick="toggleBrowserMic()">
+                        🎤 Nói qua trình duyệt
+                    </button>
+
+                    <!-- Live mic: nghe liên tục với DSP AEC+NS+AGC kiểu Google Dịch -->
+                    <button class="btn-browser-mic" id="mic-live-btn" onclick="toggleLiveMic()">
+                        🎙️ Nghe liên tục qua trình duyệt
+                    </button>
+
+                    <!-- History button -->
+                    <button class="btn-clear-history" id="btn-clear-history" onclick="clearAiHistory()">
+                        <i data-lucide="trash-2"></i> Xóa lịch sử
+                    </button>
+                </div>
+            </section>
+
+            <!-- ═══ RIGHT: Monitor ═══════════════════════════════════════════ -->
+            <section class="panel monitor-panel">
+                <h2><i data-lucide="activity"></i> Monitor</h2>
+
+                <div class="sensor-cards">
+                    <div class="card">
+                        <h4>Distance</h4>
+                        <div class="value" id="val-dist">-- cm</div>
+                    </div>
+                    <div class="card">
+                        <h4>Button</h4>
+                        <div class="value" id="val-btn">--</div>
+                    </div>
+                </div>
+
+                <div class="log-section">
+                    <h3>Activity Log</h3>
+                    <div class="terminal" id="terminal-log">
+                        <!-- Logs go here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js?v=20260902"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

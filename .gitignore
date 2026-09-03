@@ -1,0 +1,32 @@
+# ═══ Python ═══
+__pycache__/
+*.pyc
+*.pyo
+server/venv/
+venv/
+
+# ═══ Node ═══
+web/node_modules/
+
+# ═══ SECRETS — không bao giờ push ═══
+config/secrets.py
+.env
+*.key
+
+# ═══ Model weights (tải riêng, xem README) ═══
+*.onnx
+*.caffemodel
+*.pt
+# master_face.npy = dữ liệu sinh trắc học khuôn mặt — tuyệt đối không push
+*.npy
+
+# ═══ File test/ghi âm cá nhân ═══
+_test_*.wav
+_rt.mp3
+diag_*.py
+
+# ═══ IDE / OS ═══
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
