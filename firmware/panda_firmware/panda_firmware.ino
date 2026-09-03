@@ -70,32 +70,43 @@ String faceMode = "neutral";
 unsigned long lastStatus = 0;
 unsigned long lastAnim = 0;
 int animFrame = 0;
+unsigned long lastCmd = 0, lastCycle = 0;   // auto-cycle demo face
+int cycleIdx = -1;
+const char* FACE_LIST[] = { "neutral", "happy", "sad", "angry", "surprised", "love", "wink",
+                            "sleepy", "cool", "cute", "dizzy", "questioning", "thinking", "speaking" };
 
-// ── Vẽ mặt OLED (trắng/đen, mô phỏng dashboard) ──
-void eye(int x, int y, int w, int h) { d.fillRoundRect(x, y, w, h, 7, WHITE); }
+// ── Vẽ mặt OLED giống dashboard (trắng/đen) ──
+void eye(int x, int y, int w, int h) { d.fillRoundRect(x, y, w, h, 9, WHITE); }
+void mouth(int cx, int cy, bool smile) {   // cung miệng 3 đoạn
+  if (smile) { d.drawLine(cx - 8, cy, cx - 3, cy + 4, WHITE); d.drawLine(cx - 3, cy + 4, cx + 3, cy + 4, WHITE); d.drawLine(cx + 3, cy + 4, cx + 8, cy, WHITE); }
+  else       { d.drawLine(cx - 8, cy + 4, cx - 3, cy, WHITE); d.drawLine(cx - 3, cy, cx + 3, cy, WHITE); d.drawLine(cx + 3, cy, cx + 8, cy + 4, WHITE); } }
+void heart(int cx, int cy) {
+  d.fillCircle(cx - 5, cy - 4, 6, WHITE); d.fillCircle(cx + 5, cy - 4, 6, WHITE);
+  d.fillTriangle(cx - 11, cy - 2, cx + 11, cy - 2, cx, cy + 11, WHITE); }
+void cross(int cx, int cy) {
+  d.drawLine(cx - 7, cy - 7, cx + 7, cy + 7, WHITE); d.drawLine(cx - 7, cy + 7, cx + 7, cy - 7, WHITE); }
 
 void drawFace() {
   d.clearDisplay();
-  int L = 32, R = 76, Y = 17, W = 20, H = 30;
+  const int L = 30, R = 76, Y = 14, W = 22, H = 32;
   if (faceMode == "neutral") { eye(L, Y, W, H); eye(R, Y, W, H); }
-  else if (faceMode == "happy") { eye(L, Y + 8, W, 16); eye(R, Y + 8, W, 16); }
-  else if (faceMode == "sad") { eye(L, Y + 10, W, 18); eye(R, Y + 10, W, 18);
-    d.drawLine(L, Y + 4, L + W, Y + 10, WHITE); d.drawLine(R + W, Y + 4, R, Y + 10, WHITE); }
-  else if (faceMode == "angry") { eye(L, Y, W, H); eye(R, Y, W, H);
-    d.drawLine(L, Y + 10, L + W, Y + 2, WHITE); d.drawLine(R + W, Y + 10, R, Y + 2, WHITE); }
-  else if (faceMode == "surprised") { d.fillCircle(L + 10, 32, 12, WHITE); d.fillCircle(R + 10, 32, 12, WHITE); }
-  else if (faceMode == "sleepy") { d.fillRoundRect(L, Y + 20, W, 5, 2, WHITE); d.fillRoundRect(R, Y + 20, W, 5, 2, WHITE); }
-  else if (faceMode == "wink") { eye(L, Y, W, H); d.fillRoundRect(R, Y + 14, W, 5, 2, WHITE); }
-  else if (faceMode == "love") { d.fillCircle(L + 6, Y + 8, 7, WHITE); d.fillCircle(L + 14, Y + 8, 7, WHITE);
-    d.fillTriangle(L - 1, Y + 12, L + 21, Y + 12, L + 10, Y + 28, WHITE);
-    d.fillCircle(R + 6, Y + 8, 7, WHITE); d.fillCircle(R + 14, Y + 8, 7, WHITE);
-    d.fillTriangle(R - 1, Y + 12, R + 21, Y + 12, R + 10, Y + 28, WHITE); }
-  else if (faceMode == "cool") { d.fillRect(L - 2, Y + 8, W + 4, 12, WHITE); d.fillRect(R - 2, Y + 8, W + 4, 12, WHITE);
-    d.drawLine(L + W, Y + 10, R, Y + 10, WHITE); }
-  else if (faceMode == "cute") { eye(L - 2, Y - 2, W + 4, H + 4); eye(R - 2, Y - 2, W + 4, H + 4); }
-  else if (faceMode == "dizzy") { d.setTextSize(2); d.setCursor(L + 2, Y + 6); d.print("X");
-    d.setCursor(R + 2, Y + 6); d.print("X"); }
-  else if (faceMode == "questioning") { d.setTextSize(3); d.setCursor(56, 20); d.print("?"); }
+  else if (faceMode == "happy") { eye(L, Y + 9, W, 20); eye(R, Y + 9, W, 20); mouth(64, 48, true); }
+  else if (faceMode == "sad") { eye(L, Y + 8, W, 22); eye(R, Y + 8, W, 22);
+    d.drawLine(L, Y + 4, L + W, Y - 2, WHITE); d.drawLine(R + W, Y + 4, R, Y - 2, WHITE); mouth(64, 50, false); }
+  else if (faceMode == "angry") { eye(L, Y + 4, W, 26); eye(R, Y + 4, W, 26);
+    d.drawLine(L, Y - 2, L + W, Y + 4, WHITE); d.drawLine(R + W, Y - 2, R, Y + 4, WHITE); mouth(64, 50, false); }
+  else if (faceMode == "surprised") { d.fillCircle(L + 11, 28, 12, WHITE); d.fillCircle(R + 11, 28, 12, WHITE);
+    d.drawCircle(64, 51, 5, WHITE); }
+  else if (faceMode == "sleepy") { d.fillRoundRect(L, Y + 22, W, 5, 2, WHITE); d.fillRoundRect(R, Y + 22, W, 5, 2, WHITE);
+    d.setTextSize(1); d.setCursor(104, 8); d.print("zZ"); }
+  else if (faceMode == "wink") { eye(L, Y, W, H); d.fillRoundRect(R, Y + 15, W, 5, 2, WHITE); mouth(64, 48, true); }
+  else if (faceMode == "love") { heart(L + 11, 26); heart(R + 11, 26); mouth(64, 48, true); }
+  else if (faceMode == "cool") { d.fillRect(L - 3, Y + 8, W + 6, 12, WHITE); d.fillRect(R - 3, Y + 8, W + 6, 12, WHITE);
+    d.drawLine(L + W, Y + 12, R, Y + 12, WHITE); mouth(64, 48, true); }
+  else if (faceMode == "cute") { eye(L - 2, Y - 2, W + 4, H + 4); eye(R - 2, Y - 2, W + 4, H + 4);
+    d.fillCircle(64, 51, 3, WHITE); }
+  else if (faceMode == "dizzy") { cross(L + 11, 28); cross(R + 11, 28); mouth(64, 50, false); }
+  else if (faceMode == "questioning") { d.setTextSize(4); d.setCursor(52, 16); d.print("?"); }
   else if (faceMode == "thinking") { for (int i = 0; i < 3; i++)
       if ((animFrame / 3) % 3 == i) d.fillCircle(44 + i * 20, 32, 6, WHITE); else d.drawCircle(44 + i * 20, 32, 6, WHITE); }
   else if (faceMode == "speaking") { for (int i = 0; i < 5; i++) {
@@ -196,9 +207,17 @@ void loop() {
   if (Serial.available()) {
     String line = Serial.readStringUntil('\n'); line.trim();
     int sp = line.indexOf(' ');
-    if (sp > 0) handleCmd("panda/cmd/" + line.substring(0, sp), line.substring(sp + 1));
+    if (sp > 0) { handleCmd("panda/cmd/" + line.substring(0, sp), line.substring(sp + 1)); lastCmd = millis(); }
   }
 #endif
+  // DEMO WOKWI: không có lệnh 8s → tự diễn vòng 14 mặt, mỗi 2.5s
+  if (millis() - lastCmd > 8000 && millis() - lastCycle > 2500) {
+    lastCycle = millis();
+    cycleIdx = (cycleIdx + 1) % 14;
+    faceMode = FACE_LIST[cycleIdx];
+    Serial.println("[FACE] " + faceMode);
+    drawFace();
+  }
   // face động (thinking/speaking) ~10fps
   if (millis() - lastAnim > 100) { lastAnim = millis(); animFrame++;
     if (faceMode == "thinking" || faceMode == "speaking") drawFace(); }
