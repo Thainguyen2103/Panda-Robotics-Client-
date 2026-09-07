@@ -13,8 +13,9 @@ màn OLED theo phong cách robot Vector (Anki).
   từng câu) — độ trễ wake→tiếng đầu tiên ~2-3s.
 - **Phân loại 24 chủ đề** (hybrid: keyword 0ms + LLM enum fallback, benchmark 15/15)
   → OLED hiển thị icon + caption + màu riêng từng chủ đề.
-- **Thị giác máy**: YuNet (face) + SFace (nhận diện chủ nhân) + FER (cảm xúc) +
-  YOLOv8-pose (tư thế) — chạy trên laptop/VPS, robot chỉ mang camera.
+- **Thị giác máy**: YuNet (face) + SFace (chủ nhân đã đăng ký) + FER+ (biểu cảm) +
+  YOLOv8-pose (khớp cánh tay, giơ/vẫy tay), MediaPipe (góc đầu và tín hiệu biểu cảm). Tối ưu cho người
+  đối diện, thấy đầu–vai–tay; xem [hướng dẫn và giới hạn CV](docs/vision.md).
 - **Màn hình cảm xúc**: 11 biểu cảm + 4 trạng thái AI + 25 hành vi idle tự chủ,
   biểu cảm kết thúc chọn theo ngữ cảnh hội thoại.
 - **Kiến trúc MQTT tách rời**: não (Python) ↔ dashboard (web) ↔ thân robot (ESP32)
@@ -70,7 +71,8 @@ icon chủ đề và trả lời bằng giọng nói.
 | `panda/status` | robot → brain | `{dist, btn}` sonar + nút |
 | `panda/ai/state\|thinking\|response\|topic` | brain → dashboard | trạng thái AI + chủ đề |
 | `panda/ai/clip`, `panda/ai/mic_live` | mic → brain | clip giọng / mic trực tiếp |
-| `panda/camera` | cam → vision | khung hình |
+| `panda/camera` | vision → dashboard | JPEG base64 |
+| `panda/vision/status` | vision → dashboard | danh tính, biểu cảm, cử chỉ, tình trạng mô hình |
 
 ## 📦 Model assets (KHÔNG nằm trong repo — tải riêng)
 
@@ -79,10 +81,11 @@ icon chủ đề và trả lời bằng giọng nói.
 | `face_detection_yunet_2023mar.onnx` | [opencv_zoo](https://github.com/opencv/opencv_zoo) |
 | `face_recognition_sface_2021dec.onnx` | [opencv_zoo](https://github.com/opencv/opencv_zoo) |
 | `emotion-ferplus-8.onnx` | ONNX Model Zoo |
+| `face_landmarker.task` | MediaPipe, xem [hướng dẫn CV](docs/vision.md) |
 | `res10_300x300_ssd_iter_140000.caffemodel` + `deploy.prototxt` | OpenCV dnn samples |
 | `haarcascade_frontalface_default.xml` | OpenCV data |
 | `yolov8n.pt`, `yolov8n-pose.pt` | Ultralytics (tự tải khi chạy lần đầu) |
-| `master_face.npy` | **tự sinh** bằng cách đăng ký khuôn mặt chủ nhân (dữ liệu sinh trắc — không push) |
+| `master_face.npy` | Đăng ký rõ ràng bằng `tools/enroll_face.py`; không tự lấy người đầu tiên (dữ liệu sinh trắc — không push) |
 
 ## 🔩 Phần cứng (robot thật — thin client)
 

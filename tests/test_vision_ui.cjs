@@ -1,0 +1,26 @@
+const assert = require('node:assert/strict');
+const {VisionPanel} = require('../web/public/vision-ui.js');
+let now = 0;
+const elements = new Map();
+const document = {getElementById(id) {
+    if (!elements.has(id)) elements.set(id,{textContent:'',title:''});
+    return elements.get(id);
+}};
+const panel = new VisionPanel(document,()=>now);
+const base = {status:'ok',person_detected:true,enrolled:true,identity:'Master',emotion:'happy',head_action:'unknown',arm_action:'unknown'};
+const send = (status,t) => {now=t;panel.receive({...base,...status});panel.tick();};
+send({},0); send({},750);
+assert.equal(elements.get('cv-emotion').textContent,'Vui');
+for (let t=1000;t<2500;t+=250) send({emotion:t%500===0?'unknown':'happy'},t);
+assert.equal(elements.get('cv-emotion').textContent,'Vui','brief unknown must not blink');
+send({head_action:'head_nod'},2500);
+send({},3000);
+assert.equal(elements.get('cv-action').textContent,'Gật đầu','short gesture must remain readable');
+send({},4500);
+assert.equal(elements.get('cv-action').textContent,'Chưa rõ');
+send({emotion:'unknown'},4750);send({emotion:'unknown'},6500);
+assert.equal(elements.get('cv-emotion').textContent,'Chưa rõ','persistent uncertainty must expire');
+now=11000;panel.tick();
+assert.equal(elements.get('cv-health').textContent,'Mất kết nối Vision');
+assert.equal(elements.get('cv-identity').textContent,'Chưa rõ');
+console.log('Vision UI: smoothing, event hold, uncertainty expiry and disconnection passed');

@@ -15,6 +15,7 @@ config/secrets.py
 
 # ═══ Model weights (tải riêng, xem README) ═══
 *.onnx
+*.task
 *.caffemodel
 *.pt
 # master_face.npy = dữ liệu sinh trắc học khuôn mặt — tuyệt đối không push
@@ -30,3 +31,6 @@ diag_*.py
 .idea/
 Thumbs.db
 .DS_Store
+
+# ═══ Build firmware (binary local, không push) ═══
+firmware/*/build/

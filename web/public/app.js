@@ -1,6 +1,18 @@
 // ─── Socket.IO setup ──────────────────────────────────────────────────────────
 const socket = io();
 
+const visionPanel = new VisionPanel(document);
+let lastCameraFrame = 0;
+setInterval(() => {
+    visionPanel.tick();
+    if (lastCameraFrame && Date.now() - lastCameraFrame > 3000) {
+        const camera = document.getElementById('cam-image');
+        const placeholder = document.getElementById('cam-placeholder');
+        if (camera) camera.style.display = 'none';
+        if (placeholder) placeholder.style.display = '';
+    }
+}, 250);
+
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 const terminalLog     = document.getElementById('terminal-log');
 const distVal         = document.getElementById('val-dist');
@@ -424,6 +436,7 @@ socket.on('mqtt_message', (data) => {
 
     // ── Camera feed ───────────────────────────────────────────────────────────
     } else if (topic === 'panda/camera') {
+        lastCameraFrame = Date.now();
         const camImg         = document.getElementById('cam-image');
         const camPlaceholder = document.getElementById('cam-placeholder');
         camImg.src           = "data:image/jpeg;base64," + payload;
@@ -436,14 +449,11 @@ socket.on('mqtt_message', (data) => {
         logToTerminal(`RX: ${topic} → ${payload}`, 'status');
 
     // ── CV user status ────────────────────────────────────────────────────────
+    } else if (topic === 'panda/vision/status') {
+        try { visionPanel.receive(JSON.parse(payload)); } catch(e) {}
+
     } else if (topic === 'panda/user_status') {
-        try {
-            const status   = JSON.parse(payload);
-            const cvEmotion = document.getElementById('cv-emotion');
-            const cvAction  = document.getElementById('cv-action');
-            if (cvEmotion) cvEmotion.textContent = status.emotion;
-            if (cvAction)  cvAction.textContent  = status.action;
-        } catch(e) {}
+        // Legacy duplicate of vision/status: do not flood Activity Log every frame.
 
     // ── Topic emoji + caption cho OLED (JSON: {id, cap}) ───────────────────
     } else if (topic === 'panda/ai/topic') {

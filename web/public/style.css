@@ -296,6 +296,31 @@ button:active { transform: translateY(0); }
     text-shadow: 0 0 8px var(--accent-glow);
 }
 
+/* Reserve every row regardless of label length or camera/model state. */
+.vision-status-box .status-item {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    height: 40px;
+    min-height: 40px;
+    gap: 8px;
+}
+.vision-status-box .val {
+    display: -webkit-box;
+    min-width: 0;
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+    line-height: 18px;
+    max-height: 36px;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    font-family: inherit;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    text-shadow: none;
+}
+
 /* ─── OLED Face ──────────────────────────────────────────────────────────── */
 .led-wrapper {
     background: rgba(10, 14, 20, 0.6);   /* bezel nhạt — không đen tuyệt đối để không nuốt màn hình */

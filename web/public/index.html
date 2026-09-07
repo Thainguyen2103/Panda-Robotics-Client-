@@ -43,12 +43,28 @@
                     <h3>AI Vision Status</h3>
                     <div class="vision-status-box">
                         <div class="status-item">
+                            <span class="label">Camera / AI:</span>
+                            <span class="val" id="cv-health">Đang chờ</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Danh tính:</span>
+                            <span class="val" id="cv-identity">Chưa rõ</span>
+                        </div>
+                        <div class="status-item">
                             <span class="label">Emotion:</span>
                             <span class="val" id="cv-emotion">N/A</span>
                         </div>
                         <div class="status-item">
                             <span class="label">Action:</span>
                             <span class="val" id="cv-action">N/A</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Khớp cánh tay:</span>
+                            <span class="val" id="cv-joints">Chưa rõ</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Dấu hiệu mặt:</span>
+                            <span class="val" id="cv-cues">Chưa rõ</span>
                         </div>
                     </div>
                 </div>
@@ -232,7 +248,8 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=20260902"></script>
+    <script src="vision-ui.js?v=20260907b"></script>
+    <script src="app.js?v=20260907b"></script>
     <script>
         lucide.createIcons();
     </script>

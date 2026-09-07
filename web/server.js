@@ -30,6 +30,7 @@ mqttClient.on('connect', () => {
     mqttClient.subscribe('panda/log/voice_partial');
     mqttClient.subscribe('panda/camera');
     mqttClient.subscribe('panda/user_status');
+    mqttClient.subscribe('panda/vision/status');
     mqttClient.subscribe('panda/ai/state');
     mqttClient.subscribe('panda/ai/thinking');
     mqttClient.subscribe('panda/ai/response');

@@ -1,234 +1,429 @@
 /*
- * PANDA FIRMWARE (BODY+HEAD) — ESP32
- * ====================================
- * Chạy được 2 chế độ:
- *   [SIM]  Wokwi / Serial Monitor — gõ lệnh tay, KHÔNG cần MQTT:
- *            face happy
- *            move forward
- *            arm wave
- *            buzz on
- *            text XIN CHAO
- *   [THẬT] Bật USE_MQTT → nối WiFi + broker, subscribe panda/cmd/# y hệt virtual_robot.
+ * PANDA ROBOT FIRMWARE (ESP32) — REPLICA CHUẨN DASHBOARD WEB
+ * ================================================================
+ * Màn hình: ILI9341 TFT-LCD (SPI 320×240 Landscape, Full Color RGB565)
+ * Công nghệ: Off-screen framebuffer (GFXcanvas16) — không xóa/vẽ trực tiếp lên TFT
  *
- * ── BẢNG MẠCH (giống sơ đồ sẽ lắp thật — KHÔNG có tay servo) ───────────
- *   OLED SSD1306 : SDA→21  SCL→22  VCC→3V3  GND→GND
- *   Buzzer       : +→18   -→GND   (SIM: thay bằng LED)
- *   Motor driver : PWMA→25 AIN1→26 AIN2→27 | PWMB→32 BIN1→33 BIN2→14
- *                  (SIM: nối LED vào 25 & 32 làm "đèn motor")
- *   HC-SR04      : TRIG→4 ECHO→5 VCC→5V GND→GND
- *                  (SIM: potentiometer → GPIO34, xoay núm = đổi khoảng cách cm)
- *   Nút bấm      : 1 chân→19, chân kia→GND
- *   (Nếu sau này lắp tay: bật #define HAS_ARM và nối servo SIG→13)
+ * Hỗ trợ 2 chế độ hoạt động:
+ *   [1] Mô phỏng Wokwi / Serial Monitor: Test không cần WiFi/MQTT
+ *   [2] Robot thật: Bật #define USE_MQTT trong Config.h để kết nối WiFi & MQTT
  *
- * ── WOKWI: tạo project ESP32, Libraries thêm:
- *    "Adafruit SSD1306", "Adafruit GFX Library"  (chưa cần ESP32Servo)
- *    Kéo parts: esp32, ssd1306, leds, button, potentiometer
- *    Nối dây đúng bảng trên → paste code → bấm Play → gõ lệnh trong Serial.
+ * Giao thức MQTT đồng bộ 100% với Dashboard:
+ *   Sub: panda/cmd/move    -> forward | back | left | right | stop
+ *   Sub: panda/cmd/face    -> neutral | happy | sad | angry | surprised | love | ...
+ *   Sub: panda/cmd/text    -> kích hoạt trạng thái attentive (không vẽ chữ)
+ *   Sub: panda/cmd/buzz    -> on | off
+ *   Sub: panda/ai/state    -> listening | speaking | thinking | standby
+ *   Sub: panda/ai/thinking -> JSON { "stage": "question", "text": "..." }
+ *   Pub: panda/status      -> JSON { "dist": 25, "btn": 0 } (2Hz)
+ * ================================================================
  */
 
 #include <Arduino.h>
-#include <Wire.h>
+#include <SPI.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Adafruit_ILI9341.h>
+#include <ArduinoJson.h>
 
-// #define HAS_ARM            // ← bật nếu sau này lắp tay servo
-#ifdef HAS_ARM
-#include <ESP32Servo.h>
-#endif
+#include "Config.h"
+#include "FaceRenderer.h"
+#include "RobotMotor.h"
 
-// #define USE_MQTT            // ← BẬT khi nạp vào ESP32 thật
 #ifdef USE_MQTT
 #include <WiFi.h>
 #include <PubSubClient.h>
-const char* WIFI_SSID = "TEN_WIFI";
-const char* WIFI_PASS = "MAT_KHAU";
-const char* MQTT_HOST = "192.168.1.10";   // máy chạy brain
+WiFiClient espClient;
+PubSubClient mqtt(espClient);
 #endif
 
-// ── Pins ──
-#define PIN_SDA 21
-#define PIN_SCL 22
-#define PIN_SERVO 13
-#define PIN_BUZZ 18
-#define PIN_PWMA 25
-#define PIN_AIN1 26
-#define PIN_AIN2 27
-#define PIN_PWMB 32
-#define PIN_BIN1 33
-#define PIN_BIN2 14
-#define PIN_TRIG 4
-#define PIN_ECHO 5
-#define PIN_BTN 19
-#define PIN_POT 34   // SIM: potentiometer giả khoảng cách
+// Khởi tạo đối tượng màn hình ILI9341
+Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
 
-Adafruit_SSD1306 d(128, 64, &Wire, -1);
-#ifdef HAS_ARM
-Servo arm;
-#endif
+// ─── Trạng thái hệ thống ──────────────────────────────────────
+String faceMode     = "neutral";
+String lastFaceMode = "";
+String oledText     = "";
 
-String faceMode = "neutral";
-unsigned long lastStatus = 0;
-unsigned long lastAnim = 0;
-int animFrame = 0;
-unsigned long lastCmd = 0, lastCycle = 0;   // auto-cycle demo face
-int cycleIdx = -1;
-const char* FACE_LIST[] = { "neutral", "happy", "sad", "angry", "surprised", "love", "wink",
-                            "sleepy", "cool", "cute", "dizzy", "questioning", "thinking", "speaking" };
+unsigned long lastAnimMicros = 0;
+unsigned long lastStatus     = 0;
+unsigned long lastCmdTime    = 0;
+unsigned long lastIdleAction = 0;
+unsigned long nextIdleAction = 7000;
+unsigned long lastCycle      = 0;
 
-// ── Vẽ mặt OLED giống dashboard (trắng/đen) ──
-void eye(int x, int y, int w, int h) { d.fillRoundRect(x, y, w, h, 9, WHITE); }
-void mouth(int cx, int cy, bool smile) {   // cung miệng 3 đoạn
-  if (smile) { d.drawLine(cx - 8, cy, cx - 3, cy + 4, WHITE); d.drawLine(cx - 3, cy + 4, cx + 3, cy + 4, WHITE); d.drawLine(cx + 3, cy + 4, cx + 8, cy, WHITE); }
-  else       { d.drawLine(cx - 8, cy + 4, cx - 3, cy, WHITE); d.drawLine(cx - 3, cy, cx + 3, cy, WHITE); d.drawLine(cx + 3, cy, cx + 8, cy + 4, WHITE); } }
-void heart(int cx, int cy) {
-  d.fillCircle(cx - 5, cy - 4, 6, WHITE); d.fillCircle(cx + 5, cy - 4, 6, WHITE);
-  d.fillTriangle(cx - 11, cy - 2, cx + 11, cy - 2, cx, cy + 11, WHITE); }
-void cross(int cx, int cy) {
-  d.drawLine(cx - 7, cy - 7, cx + 7, cy + 7, WHITE); d.drawLine(cx - 7, cy + 7, cx + 7, cy - 7, WHITE); }
+int  animFrame   = 0;
+int  cycleIdx    = -1;
+bool isBlinking  = false;
+uint8_t eyeOpen  = 100;
+bool needRedraw  = true;
+bool autoDemo    = false; // Mặc định tắt auto-demo khi chạy robot thật/mô phỏng chính thức
 
-void drawFace() {
-  d.clearDisplay();
-  const int L = 30, R = 76, Y = 14, W = 22, H = 32;
-  if (faceMode == "neutral") { eye(L, Y, W, H); eye(R, Y, W, H); }
-  else if (faceMode == "happy") { eye(L, Y + 9, W, 20); eye(R, Y + 9, W, 20); mouth(64, 48, true); }
-  else if (faceMode == "sad") { eye(L, Y + 8, W, 22); eye(R, Y + 8, W, 22);
-    d.drawLine(L, Y + 4, L + W, Y - 2, WHITE); d.drawLine(R + W, Y + 4, R, Y - 2, WHITE); mouth(64, 50, false); }
-  else if (faceMode == "angry") { eye(L, Y + 4, W, 26); eye(R, Y + 4, W, 26);
-    d.drawLine(L, Y - 2, L + W, Y + 4, WHITE); d.drawLine(R + W, Y - 2, R, Y + 4, WHITE); mouth(64, 50, false); }
-  else if (faceMode == "surprised") { d.fillCircle(L + 11, 28, 12, WHITE); d.fillCircle(R + 11, 28, 12, WHITE);
-    d.drawCircle(64, 51, 5, WHITE); }
-  else if (faceMode == "sleepy") { d.fillRoundRect(L, Y + 22, W, 5, 2, WHITE); d.fillRoundRect(R, Y + 22, W, 5, 2, WHITE);
-    d.setTextSize(1); d.setCursor(104, 8); d.print("zZ"); }
-  else if (faceMode == "wink") { eye(L, Y, W, H); d.fillRoundRect(R, Y + 15, W, 5, 2, WHITE); mouth(64, 48, true); }
-  else if (faceMode == "love") { heart(L + 11, 26); heart(R + 11, 26); mouth(64, 48, true); }
-  else if (faceMode == "cool") { d.fillRect(L - 3, Y + 8, W + 6, 12, WHITE); d.fillRect(R - 3, Y + 8, W + 6, 12, WHITE);
-    d.drawLine(L + W, Y + 12, R, Y + 12, WHITE); mouth(64, 48, true); }
-  else if (faceMode == "cute") { eye(L - 2, Y - 2, W + 4, H + 4); eye(R - 2, Y - 2, W + 4, H + 4);
-    d.fillCircle(64, 51, 3, WHITE); }
-  else if (faceMode == "dizzy") { cross(L + 11, 28); cross(R + 11, 28); mouth(64, 50, false); }
-  else if (faceMode == "questioning") { d.setTextSize(4); d.setCursor(52, 16); d.print("?"); }
-  else if (faceMode == "thinking") { for (int i = 0; i < 3; i++)
-      if ((animFrame / 3) % 3 == i) d.fillCircle(44 + i * 20, 32, 6, WHITE); else d.drawCircle(44 + i * 20, 32, 6, WHITE); }
-  else if (faceMode == "speaking") { for (int i = 0; i < 5; i++) {
-      int h = 8 + ((animFrame * (i + 3)) % 28); d.fillRect(34 + i * 14, 56 - h, 8, h, WHITE); } }
-  else { eye(L, Y, W, H); eye(R, Y, W, H); }
-  d.display();
-}
+unsigned long blinkStart = 0;
+unsigned long lastBlink  = 0;
+unsigned long nextBlink  = 3500;
 
-// ── Điều khiển ──
-void setMotor(bool fwd, bool bwd, bool left, bool right) {
-  int a1 = fwd ? HIGH : LOW, a2 = bwd ? HIGH : LOW;
-  int b1 = fwd ? HIGH : LOW, b2 = bwd ? HIGH : LOW;
-  if (left)  { a1 = LOW; a2 = HIGH; }   // rẽ: bánh trái quay ngược
-  if (right) { b1 = LOW; b2 = HIGH; }
-  digitalWrite(PIN_AIN1, a1); digitalWrite(PIN_AIN2, a2);
-  digitalWrite(PIN_BIN1, b1); digitalWrite(PIN_BIN2, b2);
-  analogWrite(PIN_PWMA, (fwd || bwd || left || right) ? 200 : 0);
-  analogWrite(PIN_PWMB, (fwd || bwd || left || right) ? 200 : 0);
-}
-
-void handleMove(String m) {
-  if (m == "forward") setMotor(1, 0, 0, 0);
-  else if (m == "back") setMotor(0, 1, 0, 0);
-  else if (m == "left") setMotor(1, 0, 1, 0);
-  else if (m == "right") setMotor(1, 0, 0, 1);
-  else setMotor(0, 0, 0, 0);
-  Serial.println("[PANDA] move " + m);
-}
-
-void handleArm(String a) {
-#ifdef HAS_ARM
-  if (a == "wave") { for (int i = 0; i < 3; i++) { arm.write(20); delay(250); arm.write(90); delay(250); } }
-  else if (a == "up") arm.write(30);
-  else if (a == "down") arm.write(120);
-  else arm.write(90);
-#endif
-  Serial.println("[PANDA] arm " + a);   // robot không tay: chỉ log, không lỗi
-}
-
-void handleCmd(String topic, String payload) {
-  if (topic.endsWith("/move")) handleMove(payload);
-  else if (topic.endsWith("/arm")) handleArm(payload);
-  else if (topic.endsWith("/buzz")) { digitalWrite(PIN_BUZZ, payload == "on" ? HIGH : LOW); }
-  else if (topic.endsWith("/face")) { faceMode = payload; drawFace(); }
-  else if (topic.endsWith("/text")) { d.clearDisplay(); d.setTextSize(1); d.setCursor(4, 28); d.print(payload); d.display(); }
-}
+bool inIdleAction = false;
+unsigned long idleActionStart = 0;
 
 #ifdef USE_MQTT
-WiFiClient wc;
-PubSubClient mqtt(wc);
-void onMqtt(char* t, byte* p, unsigned int n) {
-  String topic = String(t), payload = "";
-  for (unsigned int i = 0; i < n; i++) payload += (char)p[i];
-  handleCmd(topic, payload);
+unsigned long lastMqttAttempt = 0;
+const unsigned long MQTT_RETRY_MS = 5000;
+#endif
+
+const char* DEMO_FACE_LIST[] = {
+  "neutral", "happy", "sad", "angry", "surprised", "love", "wink",
+  "sleepy", "cool", "cute", "dizzy",
+  "questioning", "hearing", "ai-thinking", "speaking"
+};
+const int DEMO_FACE_COUNT = 15;
+
+// ================================================================
+//  XỬ LÝ LỆNH TỪ DASHBOARD & MQTT
+// ================================================================
+
+// 1. Lệnh AI (panda/ai/*) — đồng bộ 100% với hàm setOledAiMode() của dashboard
+void handleAiCmd(String subtopic, String payload) {
+  inIdleAction = false;
+
+  // panda/ai/state — listening | speaking | thinking | standby
+  if (subtopic == "state") {
+    if (payload == "listening") {
+      faceMode = "hearing";
+      oledText = "";
+      Serial.println("[AI] state: listening -> attentive eyes");
+    } else if (payload == "speaking") {
+      faceMode = "speaking";
+      Serial.println("[AI] state: speaking -> face speaking");
+    } else if (payload == "thinking") {
+      faceMode = "ai-thinking";
+      Serial.println("[AI] state: thinking -> thinking eyes");
+    } else { // standby
+      faceMode = "neutral";
+      oledText = "";
+      Serial.println("[AI] state: standby -> face neutral");
+    }
+    needRedraw = true;
+    return;
+  }
+
+  // panda/ai/thinking — JSON stage-based: { "stage": "question", "text": "..." }
+  if (subtopic == "thinking") {
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, payload);
+    if (err) {
+      Serial.println("[AI] JSON Parse Error: " + String(err.c_str()));
+      return;
+    }
+
+    const char* stage = doc["stage"] | "idle";
+    const char* text  = doc["text"]  | "";
+
+    if (strcmp(stage, "listening") == 0) {
+      faceMode = "hearing";
+      oledText = "";
+      Serial.println("[AI] thinking/listening -> attentive eyes");
+    } else if (strcmp(stage, "question") == 0) {
+      faceMode = "questioning";
+      oledText = String(text);
+      Serial.println("[AI] thinking/question -> curious eyes");
+    } else if (strcmp(stage, "thinking") == 0) {
+      faceMode = "ai-thinking";
+      Serial.println("[AI] thinking/thinking -> thinking eyes");
+    } else if (strcmp(stage, "answering") == 0) {
+      // Giữ transcript hoặc chuẩn bị sang speaking
+      Serial.println("[AI] thinking/answering -> face " + faceMode);
+    } else if (strcmp(stage, "done") == 0) {
+      Serial.println("[AI] thinking/done");
+    } else { // idle
+      faceMode = "neutral";
+      oledText = "";
+      Serial.println("[AI] thinking/idle -> face neutral");
+    }
+    needRedraw = true;
+    return;
+  }
+}
+
+// 2. Lệnh chung (panda/cmd/* và Serial)
+void handleGeneralCmd(String topic, String payload) {
+  lastCmdTime = millis();
+  inIdleAction = false;
+
+  // panda/cmd/move -> forward | back | left | right | stop
+  if (topic.endsWith("/move")) {
+    handleMoveCmd(payload);
+  }
+  // panda/cmd/face -> neutral | happy | sad | angry | ...
+  else if (topic.endsWith("/face")) {
+    faceMode = payload;
+    oledText = "";
+    autoDemo = false;
+    needRedraw = true;
+    Serial.println("[PANDA] Set face: " + faceMode);
+  }
+  // panda/cmd/text -> giữ tương thích giao thức; mặt chỉ chuyển sang attentive eyes
+  else if (topic.endsWith("/text")) {
+    faceMode = "hearing";
+    oledText = payload;
+    autoDemo = false;
+    needRedraw = true;
+    Serial.println("[PANDA] Transcript received -> attentive eyes");
+  }
+  // panda/cmd/buzz -> on | off
+  else if (topic.endsWith("/buzz")) {
+    setBuzzer(payload == "on" || payload == "1");
+  }
+  // panda/cmd/arm -> wave | up | down
+  else if (topic.endsWith("/arm")) {
+    handleArmCmd(payload);
+  }
+  // panda/ai/*
+  else if (topic.indexOf("/ai/") >= 0) {
+    int idx = topic.indexOf("/ai/") + 4;
+    handleAiCmd(topic.substring(idx), payload);
+  }
+}
+
+// ================================================================
+//  MQTT CALLBACK & KẾT NỐI
+// ================================================================
+#ifdef USE_MQTT
+void onMqttMessage(char* topic, byte* payload, unsigned int length) {
+  String t = String(topic);
+  String p = "";
+  for (unsigned int i = 0; i < length; i++) p += (char)payload[i];
+  handleGeneralCmd(t, p);
+}
+
+void checkMqttConnection() {
+  if (mqtt.connected()) return;
+
+  unsigned long now = millis();
+  if (lastMqttAttempt != 0 && now - lastMqttAttempt < MQTT_RETRY_MS) return;
+  lastMqttAttempt = now;
+
+  Serial.print("[MQTT] Connecting to Broker...");
+  if (mqtt.connect("PandaRobot_Body")) {
+    Serial.println(" Connected!");
+    mqtt.subscribe("panda/cmd/#");
+    mqtt.subscribe("panda/ai/#");
+  } else {
+    Serial.print(" Failed, rc=");
+    Serial.println(mqtt.state());
+  }
 }
 #endif
 
+// ================================================================
+//  XỬ LÝ LỆNH QUA SERIAL MONITOR (CHO MÔ PHỎNG & DEBUG)
+// ================================================================
+void processSerialInput() {
+  if (!Serial.available()) return;
+
+  String line = Serial.readStringUntil('\n');
+  line.trim();
+  if (line.length() == 0) return;
+
+  // Lệnh bật/tắt auto demo
+  if (line == "demo") {
+    autoDemo = !autoDemo;
+    inIdleAction = false;
+    Serial.println(autoDemo ? "[DEMO] Auto-cycle ON" : "[DEMO] Auto-cycle OFF");
+    return;
+  }
+
+  int sp = line.indexOf(' ');
+  if (sp > 0) {
+    String cmd = line.substring(0, sp);
+    String val = line.substring(sp + 1);
+
+    if (cmd == "face") {
+      handleGeneralCmd("panda/cmd/face", val);
+    } else if (cmd == "text") {
+      handleGeneralCmd("panda/cmd/text", val);
+    } else if (cmd == "move") {
+      handleGeneralCmd("panda/cmd/move", val);
+    } else if (cmd == "arm") {
+      handleGeneralCmd("panda/cmd/arm", val);
+    } else if (cmd == "buzz") {
+      handleGeneralCmd("panda/cmd/buzz", val);
+    } else if (cmd == "ai") {
+      int sp2 = val.indexOf(' ');
+      if (sp2 > 0) {
+        handleGeneralCmd("panda/ai/" + val.substring(0, sp2), val.substring(sp2 + 1));
+      } else {
+        handleGeneralCmd("panda/ai/" + val, "");
+      }
+    }
+  } else {
+    // Lệnh 1 từ: forward, back, left, right, stop
+    if (line == "forward" || line == "back" || line == "left" || line == "right" || line == "stop") {
+      handleGeneralCmd("panda/cmd/move", line);
+    }
+  }
+}
+
+// ================================================================
+//  SETUP HỆ THỐNG
+// ================================================================
 void setup() {
   Serial.begin(115200);
-  Wire.begin(PIN_SDA, PIN_SCL);
-  d.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-#ifdef HAS_ARM
-  arm.attach(PIN_SERVO); arm.write(90);
-#endif
-  pinMode(PIN_BUZZ, OUTPUT);
-  pinMode(PIN_TRIG, OUTPUT); pinMode(PIN_ECHO, INPUT);
-  pinMode(PIN_BTN, INPUT_PULLUP);
-  pinMode(PIN_AIN1, OUTPUT); pinMode(PIN_AIN2, OUTPUT);
-  pinMode(PIN_BIN1, OUTPUT); pinMode(PIN_BIN2, OUTPUT);
-  drawFace();
-  Serial.println("[PANDA] SAN SANG. Lenh: face X | move X | arm X | buzz on/off | text X");
+  delay(150);
+
+  Serial.println("====================================================");
+  Serial.println("  PANDA ROBOT — FIRMWARE REPLICA CHUẨN DASHBOARD");
+  Serial.println("  Hardware: ESP32 + ILI9341 Color Display (SPI)");
+  Serial.println("  Feature : Off-screen Framebuffer Animation");
+  Serial.println("====================================================");
+
+  // 1. Khởi tạo ngoại vi & động cơ
+  initRobotHardware();
+
+  // 2. Khởi tạo màn hình màu ILI9341
+  tft.begin(40000000);
+  tft.setRotation(1); // 1 = Landscape 320×240 (xoay ngang)
+  tft.fillScreen(COLOR_BG);
+
+  if (!initFaceRenderer()) {
+    Serial.println("[DISPLAY] ERROR: Khong du RAM cho face framebuffer");
+  }
+
+  // Màn hình luôn chỉ có hai mắt, kể cả lúc khởi động.
+  renderFaceToDisplay(tft, faceMode, oledText, animFrame, 100);
+  lastFaceMode = faceMode;
+
 #ifdef USE_MQTT
   WiFi.begin(WIFI_SSID, WIFI_PASS);
-  while (WiFi.status() != WL_CONNECTED) { delay(300); }
-  mqtt.setServer(MQTT_HOST, 1883); mqtt.setCallback(onMqtt);
+  Serial.print("[WIFI] Connecting to ");
+  Serial.println(WIFI_SSID);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(250);
+    Serial.print(".");
+  }
+  Serial.println("\n[WIFI] Connected! IP: " + WiFi.localIP().toString());
+  mqtt.setServer(MQTT_HOST, MQTT_PORT);
+  mqtt.setSocketTimeout(1);
+  mqtt.setCallback(onMqttMessage);
 #endif
+
+  Serial.println("[SYSTEM] Ready! Type 'help' or commands (face, move, text, demo)...");
 }
 
-long readDist() {
-#ifndef USE_MQTT
-  // Chế độ mô phỏng: xoay potentiometer để đổi khoảng cách 4–400cm
-  return map(analogRead(PIN_POT), 0, 4095, 4, 400);
-#endif
-  digitalWrite(PIN_TRIG, LOW); delayMicroseconds(2);
-  digitalWrite(PIN_TRIG, HIGH); delayMicroseconds(10);
-  digitalWrite(PIN_TRIG, LOW);
-  long t = pulseIn(PIN_ECHO, HIGH, 30000);
-  return t * 0.0343 / 2;
-}
-
+// ================================================================
+//  MAIN LOOP
+// ================================================================
 void loop() {
+  unsigned long now = millis();
+  unsigned long nowMicros = micros();
+
+  // 1. Đọc lệnh từ Serial & MQTT
+  processSerialInput();
+
 #ifdef USE_MQTT
-  if (!mqtt.connected()) {
-    if (mqtt.connect("panda_body")) mqtt.subscribe("panda/cmd/#");
-  }
+  checkMqttConnection();
   mqtt.loop();
-#else
-  if (Serial.available()) {
-    String line = Serial.readStringUntil('\n'); line.trim();
-    int sp = line.indexOf(' ');
-    if (sp > 0) { handleCmd("panda/cmd/" + line.substring(0, sp), line.substring(sp + 1)); lastCmd = millis(); }
-  }
 #endif
-  // DEMO WOKWI: không có lệnh 8s → tự diễn vòng 14 mặt, mỗi 2.5s
-  if (millis() - lastCmd > 8000 && millis() - lastCycle > 2500) {
-    lastCycle = millis();
-    cycleIdx = (cycleIdx + 1) % 14;
-    faceMode = FACE_LIST[cycleIdx];
-    Serial.println("[FACE] " + faceMode);
-    drawFace();
+
+  // 2. Tự động chuyển mode khi bật chế độ Demo
+  if (autoDemo && now - lastCycle >= 3000) {
+    lastCycle = now;
+    cycleIdx = (cycleIdx + 1) % DEMO_FACE_COUNT;
+    faceMode = DEMO_FACE_LIST[cycleIdx];
+    oledText = (faceMode == "hearing") ? "Hom nay thoi tiet the nao?" : "";
+    needRedraw = true;
+    Serial.println("[DEMO] Face -> " + faceMode);
   }
-  // face động (thinking/speaking) ~10fps
-  if (millis() - lastAnim > 100) { lastAnim = millis(); animFrame++;
-    if (faceMode == "thinking" || faceMode == "speaking") drawFace(); }
-  // status 2Hz
-  if (millis() - lastStatus > 500) { lastStatus = millis();
-    long dist = readDist(); int btn = digitalRead(PIN_BTN) == LOW ? 1 : 0;
-    String s = "{\"dist\":" + String(dist) + ",\"btn\":" + String(btn) + "}";
+
+  // 3. Hành vi tự chủ khi nhàn rỗi (Idle Micro-Behaviors — Giống Robot Vector & Dashboard)
+  // Khi ở mode neutral lâu mà không có lệnh tương tác, robot tự liếc mắt hoặc tò mò
+  if (faceMode == "neutral" && !autoDemo && (now - lastCmdTime > 6000)) {
+    if (!inIdleAction && now - lastIdleAction >= nextIdleAction) {
+      inIdleAction = true;
+      idleActionStart = now;
+      lastIdleAction = now;
+      nextIdleAction = random(5000, 10000); // 5s - 10s làm một trò vui
+
+      int r = random(0, 5);
+      if (r == 0)      faceMode = "idle-look-left";
+      else if (r == 1) faceMode = "idle-look-right";
+      else if (r == 2) faceMode = "idle-curious";
+      else if (r == 3) faceMode = "idle-squint";
+      else             faceMode = "idle-look-up";
+
+      needRedraw = true;
+    }
+  }
+
+  // Kết thúc hành vi nhàn rỗi sau 1.4s -> Trở về neutral
+  if (inIdleAction && (now - idleActionStart >= 1400)) {
+    inIdleAction = false;
+    faceMode = "neutral";
+    needRedraw = true;
+  }
+
+  // 4. Chớp mắt theo đường cong đóng/mở thay vì đổi 2 frame đột ngột.
+  bool supportsBlink = (faceMode != "happy" && faceMode != "sleepy");
+  if (supportsBlink) {
+    if (!isBlinking && now - lastBlink >= nextBlink) {
+      isBlinking = true;
+      blinkStart = now;
+      lastBlink = now;
+      nextBlink = random(2500, 5500); // 2.5s - 5.5s chớp 1 lần
+      needRedraw = true;
+    }
+
+    if (isBlinking) {
+      unsigned long elapsed = now - blinkStart;
+      if (elapsed >= FACE_BLINK_MS) {
+        isBlinking = false;
+        eyeOpen = 100;
+      } else {
+        eyeOpen = calculateBlinkOpen(elapsed);
+      }
+    }
+  } else {
+    isBlinking = false;
+    eyeOpen = 100;
+  }
+
+  // 5. Reset pha animation khi đổi mode. Framebuffer tự thay toàn bộ vùng mặt,
+  // nên không cần giữ cờ modeChanged tới lần render kế tiếp.
+  bool modeChanged = (faceMode != lastFaceMode);
+  if (modeChanged) {
+    lastFaceMode = faceMode;
+    animFrame = 0;
+    isBlinking = false;
+    eyeOpen = 100;
+    if (supportsBlink) {
+      lastBlink = now;
+      nextBlink = random(1200, 2200);
+    }
+    needRedraw = true;
+  }
+
+  // 6. Tất cả biểu cảm chạy chung nhịp mục tiêu 60 FPS. Frame được dựng trong
+  // canvas 170x100 rồi truyền sang TFT, nên không lộ pha xóa nền trung gian.
+  if (needRedraw || nowMicros - lastAnimMicros >= FACE_FRAME_US) {
+    lastAnimMicros = nowMicros;
+    if (!modeChanged) animFrame++;
+    renderFaceToDisplay(tft, faceMode, oledText, animFrame, eyeOpen);
+    needRedraw = false;
+  }
+
+  // 7. Gửi Telemetry cảm biến định kỳ (2Hz)
+  if (now - lastStatus >= 500) {
+    lastStatus = now;
+    long dist = readUltrasonicDistance();
+    int  btn  = (digitalRead(PIN_BTN) == LOW) ? 1 : 0;
+
+    // Tự động dừng động cơ nếu vật cản quá gần (< 12cm)
+    if (dist > 0 && dist < 12) {
+      setMotorOutput(false, false, false, false, 0);
+    }
+
+    String telemetry = "{\"dist\":" + String(dist) + ",\"btn\":" + String(btn) + "}";
 #ifdef USE_MQTT
-    if (mqtt.connected()) mqtt.publish("panda/status", s.c_str());
-#else
-    Serial.println("[STATUS] " + s);
+    if (mqtt.connected()) mqtt.publish("panda/status", telemetry.c_str());
 #endif
   }
 }

@@ -187,10 +187,7 @@ def on_vision_update(person_detected: bool, emotion: str, action: str):
         # Cập nhật UI nếu emotion/action thay đổi
         if emotion != last_reported_status["emotion"] or action != last_reported_status["action"]:
             print(f"👁️  [BRAIN] Emotion: {emotion} | Action: {action}")
-            mqtt_bridge.publish("panda/user_status", json.dumps({
-                "emotion": emotion,
-                "action":  action,
-            }))
+            # vision.py publishes full status, including absence and confidence.
             last_reported_status["emotion"] = emotion
             last_reported_status["action"]  = action
 

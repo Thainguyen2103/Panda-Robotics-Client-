@@ -1,0 +1,14 @@
+# Wokwi project config — OLED Face Test
+[wokwi]
+version = 1
+elf = "build/oled_face_test.ino.elf"
+firmware = "build/oled_face_test.ino.bin"
+
+[[library]]
+name = "Adafruit ILI9341"
+
+[[library]]
+name = "Adafruit GFX Library"
+
+[[library]]
+name = "Adafruit BusIO"

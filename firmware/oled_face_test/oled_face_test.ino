@@ -1,91 +1,158 @@
 /*
- * PANDA OLED FACE TEST — bản tối giản chỉ để test màn hình trên Wokwi
+ * PANDA ROBOT FACE TEST — ESP32 + ILI9341 320x240
  * ================================================================
- * Part cần duy nhất: board-ssd1306  (SDA→21, SCL→22, VCC→3V3, GND→GND)
- * Libraries: "Adafruit SSD1306" + "Adafruit GFX Library"
+ * The test sketch uses the same framebuffer renderer as the main firmware.
  *
- * Chạy: bấm Play → để yên 8s, Panda TỰ diễn vòng 14 mặt (2.5s/mặt).
- * Gõ Serial:  face happy | face love | face speaking | ...  để giữ 1 mặt.
+ * Serial Monitor (115200 baud):
+ *   face neutral / happy / sad / angry / surprised / love / wink
+ *   face sleepy / cool / cute / dizzy
+ *   face questioning / hearing / ai-thinking / speaking
+ *   text <noi dung>  (chi kich hoat attentive eyes, khong ve chu)
+ *   demo
  */
-#include <Wire.h>
+
+#include <Arduino.h>
+#include <SPI.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Adafruit_ILI9341.h>
 
-Adafruit_SSD1306 d(128, 64, &Wire, -1);
+#include "../panda_firmware/Config.h"
+#include "../panda_firmware/FaceRenderer.h"
+
+Adafruit_ILI9341 tft(TFT_CS, TFT_DC, TFT_RST);
+
 String faceMode = "neutral";
-unsigned long lastCmd = 0, lastCycle = 0, lastAnim = 0;
-int animFrame = 0, cycleIdx = -1;
-const char* FACE_LIST[] = { "neutral", "happy", "sad", "angry", "surprised", "love", "wink",
-                            "sleepy", "cool", "cute", "dizzy", "questioning", "thinking", "speaking" };
+String lastFaceMode = "";
+String faceText = "Toi co the giup gi cho ban?";
 
-// ── Helper vẽ ──
-void eye(int x, int y, int w, int h) { d.fillRoundRect(x, y, w, h, 9, WHITE); }
-void mouth(int cx, int cy, bool smile) {
-  if (smile) { d.drawLine(cx - 8, cy, cx - 3, cy + 4, WHITE); d.drawLine(cx - 3, cy + 4, cx + 3, cy + 4, WHITE); d.drawLine(cx + 3, cy + 4, cx + 8, cy, WHITE); }
-  else       { d.drawLine(cx - 8, cy + 4, cx - 3, cy, WHITE); d.drawLine(cx - 3, cy, cx + 3, cy, WHITE); d.drawLine(cx + 3, cy, cx + 8, cy + 4, WHITE); } }
-void heart(int cx, int cy) {
-  d.fillCircle(cx - 5, cy - 4, 6, WHITE); d.fillCircle(cx + 5, cy - 4, 6, WHITE);
-  d.fillTriangle(cx - 11, cy - 2, cx + 11, cy - 2, cx, cy + 11, WHITE); }
-void cross(int cx, int cy) {
-  d.drawLine(cx - 7, cy - 7, cx + 7, cy + 7, WHITE); d.drawLine(cx - 7, cy + 7, cx + 7, cy - 7, WHITE); }
+unsigned long lastFrameMicros = 0;
+unsigned long lastCycle = 0;
+unsigned long lastBlink = 0;
+unsigned long blinkStart = 0;
+unsigned long nextBlink = 3200;
 
-void drawFace() {
-  d.clearDisplay();
-  const int L = 30, R = 76, Y = 14, W = 22, H = 32;
-  if (faceMode == "neutral") { eye(L, Y, W, H); eye(R, Y, W, H); }
-  else if (faceMode == "happy") { eye(L, Y + 9, W, 20); eye(R, Y + 9, W, 20); mouth(64, 48, true); }
-  else if (faceMode == "sad") { eye(L, Y + 8, W, 22); eye(R, Y + 8, W, 22);
-    d.drawLine(L, Y + 4, L + W, Y - 2, WHITE); d.drawLine(R + W, Y + 4, R, Y - 2, WHITE); mouth(64, 50, false); }
-  else if (faceMode == "angry") { eye(L, Y + 4, W, 26); eye(R, Y + 4, W, 26);
-    d.drawLine(L, Y - 2, L + W, Y + 4, WHITE); d.drawLine(R + W, Y - 2, R, Y + 4, WHITE); mouth(64, 50, false); }
-  else if (faceMode == "surprised") { d.fillCircle(L + 11, 28, 12, WHITE); d.fillCircle(R + 11, 28, 12, WHITE);
-    d.drawCircle(64, 51, 5, WHITE); }
-  else if (faceMode == "sleepy") { d.fillRoundRect(L, Y + 22, W, 5, 2, WHITE); d.fillRoundRect(R, Y + 22, W, 5, 2, WHITE);
-    d.setTextSize(1); d.setCursor(104, 8); d.print("zZ"); }
-  else if (faceMode == "wink") { eye(L, Y, W, H); d.fillRoundRect(R, Y + 15, W, 5, 2, WHITE); mouth(64, 48, true); }
-  else if (faceMode == "love") { heart(L + 11, 26); heart(R + 11, 26); mouth(64, 48, true); }
-  else if (faceMode == "cool") { d.fillRect(L - 3, Y + 8, W + 6, 12, WHITE); d.fillRect(R - 3, Y + 8, W + 6, 12, WHITE);
-    d.drawLine(L + W, Y + 12, R, Y + 12, WHITE); mouth(64, 48, true); }
-  else if (faceMode == "cute") { eye(L - 2, Y - 2, W + 4, H + 4); eye(R - 2, Y - 2, W + 4, H + 4);
-    d.fillCircle(64, 51, 3, WHITE); }
-  else if (faceMode == "dizzy") { cross(L + 11, 28); cross(R + 11, 28); mouth(64, 50, false); }
-  else if (faceMode == "questioning") { d.setTextSize(4); d.setCursor(52, 16); d.print("?"); }
-  else if (faceMode == "thinking") { for (int i = 0; i < 3; i++)
-      if ((animFrame / 3) % 3 == i) d.fillCircle(44 + i * 20, 32, 6, WHITE); else d.drawCircle(44 + i * 20, 32, 6, WHITE); }
-  else if (faceMode == "speaking") { for (int i = 0; i < 5; i++) {
-      int h = 8 + ((animFrame * (i + 3)) % 28); d.fillRect(34 + i * 14, 56 - h, 8, h, WHITE); } }
-  else { eye(L, Y, W, H); eye(R, Y, W, H); }
-  d.display();
+uint32_t animFrame = 0;
+int cycleIndex = -1;
+uint8_t eyeOpen = 100;
+bool isBlinking = false;
+bool autoDemo = true;
+bool needRedraw = true;
+
+const char *FACE_LIST[] = {
+  "neutral", "happy", "sad", "angry", "surprised", "love", "wink",
+  "sleepy", "cool", "cute", "dizzy",
+  "questioning", "hearing", "ai-thinking", "speaking"
+};
+const int FACE_COUNT = sizeof(FACE_LIST) / sizeof(FACE_LIST[0]);
+
+static bool faceSupportsBlink(const String &mode) {
+  return mode != "happy" && mode != "sleepy";
+}
+
+static void updateBlink(unsigned long now) {
+  if (!faceSupportsBlink(faceMode)) {
+    isBlinking = false;
+    eyeOpen = 100;
+    return;
+  }
+
+  if (!isBlinking && now - lastBlink >= nextBlink) {
+    isBlinking = true;
+    blinkStart = now;
+    lastBlink = now;
+    nextBlink = random(2500, 5500);
+  }
+
+  if (!isBlinking) return;
+
+  unsigned long elapsed = now - blinkStart;
+  if (elapsed >= FACE_BLINK_MS) {
+    isBlinking = false;
+    eyeOpen = 100;
+    return;
+  }
+
+  eyeOpen = calculateBlinkOpen(elapsed);
+}
+
+static void readSerialCommand() {
+  if (!Serial.available()) return;
+
+  String command = Serial.readStringUntil('\n');
+  command.trim();
+
+  if (command == "demo") {
+    autoDemo = !autoDemo;
+    lastCycle = millis();
+    Serial.println(autoDemo ? "[DEMO] ON" : "[DEMO] OFF");
+  } else if (command.startsWith("text ")) {
+    faceText = command.substring(5);
+    faceMode = "hearing";
+    autoDemo = false;
+    needRedraw = true;
+  } else if (command.startsWith("face ")) {
+    faceMode = command.substring(5);
+    faceMode.trim();
+    faceText = faceMode == "hearing" ? "Dang nghe ban noi..." : "";
+    autoDemo = false;
+    needRedraw = true;
+    Serial.println("[FACE] " + faceMode);
+  }
 }
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin(21, 22);
-  d.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  drawFace();
-  Serial.println("[OLED TEST] San sang. Go: face <ten> | de yen = auto demo.");
+  delay(150);
+
+  tft.begin(40000000);
+  tft.setRotation(1);
+  tft.fillScreen(COLOR_BG);
+
+  if (!initFaceRenderer()) {
+    Serial.println("[DISPLAY] ERROR: Khong du RAM cho face framebuffer");
+  }
+
+  // Không có boot logo: màn hình luôn chỉ hiển thị đúng hai mắt.
+  renderFaceToDisplay(tft, faceMode, faceText, animFrame, eyeOpen);
+  lastFaceMode = faceMode;
+  lastFrameMicros = micros();
+
+  Serial.println("[READY] face <mode> | text <content> | demo");
 }
 
 void loop() {
-  if (Serial.available()) {
-    String line = Serial.readStringUntil('\n'); line.trim();
-    int sp = line.indexOf(' ');
-    if (sp > 0 && line.substring(0, sp) == "face") {
-      faceMode = line.substring(sp + 1);
-      lastCmd = millis();
-      Serial.println("[FACE] " + faceMode);
-      drawFace();
+  unsigned long now = millis();
+  unsigned long nowMicros = micros();
+  readSerialCommand();
+
+  if (autoDemo && now - lastCycle >= 3000) {
+    lastCycle = now;
+    cycleIndex = (cycleIndex + 1) % FACE_COUNT;
+    faceMode = FACE_LIST[cycleIndex];
+    faceText = faceMode == "hearing" ? "Hom nay ban cam thay the nao?" : "";
+    needRedraw = true;
+    Serial.println("[DEMO] " + faceMode);
+  }
+
+  updateBlink(now);
+
+  bool modeChanged = faceMode != lastFaceMode;
+  if (modeChanged) {
+    lastFaceMode = faceMode;
+    animFrame = 0;
+    isBlinking = false;
+    eyeOpen = 100;
+    if (faceSupportsBlink(faceMode)) {
+      lastBlink = now;
+      nextBlink = random(1200, 2200);
     }
+    needRedraw = true;
   }
-  // Auto demo: không lệnh 8s → vòng 14 mặt, 2.5s/mặt
-  if (millis() - lastCmd > 8000 && millis() - lastCycle > 2500) {
-    lastCycle = millis();
-    cycleIdx = (cycleIdx + 1) % 14;
-    faceMode = FACE_LIST[cycleIdx];
-    Serial.println("[FACE] " + faceMode);
-    drawFace();
+
+  if (needRedraw || nowMicros - lastFrameMicros >= FACE_FRAME_US) {
+    lastFrameMicros = nowMicros;
+    if (!modeChanged) animFrame++;
+    renderFaceToDisplay(tft, faceMode, faceText, animFrame, eyeOpen);
+    needRedraw = false;
   }
-  // thinking/speaking animation ~10fps
-  if (millis() - lastAnim > 100) { lastAnim = millis(); animFrame++;
-    if (faceMode == "thinking" || faceMode == "speaking") drawFace(); }
 }
