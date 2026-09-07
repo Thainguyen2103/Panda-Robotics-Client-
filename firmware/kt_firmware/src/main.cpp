@@ -5,9 +5,9 @@
 #include "network.h"
 #include "audio_i2s.h"
 
-// main.cpp giờ chỉ còn vai trò "nhạc trưởng": setup()/loop() gọi các module, không tự
-// đụng vào chi tiết OLED/WiFi/MQTT/nút bấm nữa (những phần đó đã chuyển sang display.*,
-// network.*, input.*). Xem WEEKLY_LOGIC.md để hiểu lý do tách module theo cách này.
+// main.cpp chỉ đóng vai trò "nhạc trưởng": setup()/loop() gọi các module, không tự đụng
+// vào chi tiết TFT/WiFi/MQTT/nút bấm (những phần đó nằm ở display.*, network.*, input.*).
+// Xem WEEKLY_LOGIC.md để hiểu lý do tách module theo cách này.
 
 const char *TOPIC_RESULT = "panda/demo/khoa/result";
 const char *TOPIC_PROGRESS = "panda/demo/khoa/progress";
@@ -33,20 +33,61 @@ static void publishResult(const char *result)
   Serial.println(payload);
 }
 
-// Danh sách đủ 14 biểu cảm để lệnh "face demo" tự chạy qua từng cái — đỡ phải gõ tay
-// 14 lần khi muốn xem hết hoặc quay video demo báo cáo.
-static const char *DEMO_CYCLE[] = {
-    "neutral", "happy", "sad", "angry", "surprised", "sleepy", "wink",
-    "love", "cool", "cute", "dizzy", "questioning", "thinking", "speaking"};
-static const int DEMO_CYCLE_LEN = sizeof(DEMO_CYCLE) / sizeof(DEMO_CYCLE[0]);
-static const unsigned long DEMO_CYCLE_INTERVAL_MS = 1500;
-static bool demoCycleActive = false;
-static int demoCycleIndex = 0;
-static unsigned long demoCycleLastMs = 0;
+// ---------------------------------------------------------------------------
+//  Biểu cảm lúc "rảnh"
+//
+//  Chỉ còn 2 nút: ĐÚNG -> happy, SAI -> sad. Nút bấm luôn được ưu tiên và giữ nguyên
+//  biểu cảm đó một lúc. Nếu quá IDLE_ENTER_MS mà không ai bấm gì, robot tự lần lượt
+//  diễn các biểu cảm còn lại cho đỡ "chết cứng" — cũng là cách xem hết mọi animation
+//  mà không cần thêm nút test nào.
+// ---------------------------------------------------------------------------
+static const char *IDLE_FACES[] = {
+    "neutral", "questioning", "cute", "surprised", "thinking", "love",
+    "cool", "hearing", "speaking", "dizzy", "wink", "sleepy"};
+static const int IDLE_FACES_LEN = sizeof(IDLE_FACES) / sizeof(IDLE_FACES[0]);
 
-// Cho gõ tay "face <ten>" qua Serial Monitor để thử từng biểu cảm, hoặc "face demo" để
-// tự động chạy qua LẦN LƯỢT cả 14 biểu cảm (mỗi cái giữ 1.5s) — cùng quy ước "face X" với
-// firmware/panda_firmware.ino của bạn AI trong nhóm (xem ai.md mục 5).
+static const unsigned long IDLE_ENTER_MS = 6000; // im lặng bao lâu thì bắt đầu tự diễn
+static const unsigned long IDLE_STEP_MS = 4500;  // mỗi biểu cảm giữ bao lâu
+
+static unsigned long lastUserActionMs = 0;
+static unsigned long idleStepMs = 0;
+static bool idleActive = false;
+static int idleIndex = 0;
+
+// Gọi khi có tương tác của người dùng (bấm nút / gõ lệnh Serial): tạm dừng chế độ tự
+// diễn và đếm lại từ đầu, để biểu cảm vừa đặt không bị ghi đè ngay sau đó.
+static void markUserAction()
+{
+  lastUserActionMs = millis();
+  idleActive = false;
+}
+
+static void handleIdleFaces()
+{
+  unsigned long now = millis();
+  if (now - lastUserActionMs < IDLE_ENTER_MS)
+  {
+    return; // vẫn đang trong lúc "có người tương tác"
+  }
+
+  if (!idleActive)
+  {
+    idleActive = true;
+    idleStepMs = now - IDLE_STEP_MS; // đổi mặt ngay lập tức khi vừa vào chế độ rảnh
+  }
+
+  if (now - idleStepMs < IDLE_STEP_MS)
+  {
+    return;
+  }
+  idleStepMs = now;
+  displaySetExpression(IDLE_FACES[idleIndex]);
+  idleIndex = (idleIndex + 1) % IDLE_FACES_LEN;
+}
+
+// Gõ "face <ten>" qua Serial Monitor để xem thẳng 1 biểu cảm bất kỳ — cùng quy ước
+// "face X" với firmware của bạn AI trong nhóm (xem ai.md mục 5). Tiện khi cần chụp ảnh
+// hoặc quay video đúng một biểu cảm, khỏi phải ngồi đợi vòng tự diễn chạy tới.
 static void handleSerialCommand()
 {
   if (!Serial.available())
@@ -61,38 +102,9 @@ static void handleSerialCommand()
   }
 
   String arg = line.substring(5);
-  if (arg == "demo")
-  {
-    demoCycleActive = true;
-    demoCycleIndex = 0;
-    demoCycleLastMs = millis();
-    displaySetExpression(DEMO_CYCLE[demoCycleIndex]);
-  }
-  else
-  {
-    // Gõ 1 biểu cảm cụ thể bằng tay -> huỷ chế độ demo tự động đang chạy (nếu có), để
-    // lệnh tay luôn "thắng" thay vì bị demo tự động ghi đè ngay vòng loop() kế tiếp.
-    demoCycleActive = false;
-    displaySetExpression(arg.c_str());
-  }
-}
-
-// Gọi mỗi vòng loop(): khi demo tự động đang bật, cứ mỗi 1.5s chuyển sang biểu cảm kế
-// tiếp trong DEMO_CYCLE, lặp vòng quanh khi hết danh sách.
-static void handleDemoCycle()
-{
-  if (!demoCycleActive)
-  {
-    return;
-  }
-  unsigned long now = millis();
-  if (now - demoCycleLastMs < DEMO_CYCLE_INTERVAL_MS)
-  {
-    return;
-  }
-  demoCycleLastMs = now;
-  demoCycleIndex = (demoCycleIndex + 1) % DEMO_CYCLE_LEN;
-  displaySetExpression(DEMO_CYCLE[demoCycleIndex]);
+  arg.trim();
+  markUserAction();
+  displaySetExpression(arg.c_str());
 }
 
 void setup()
@@ -102,20 +114,31 @@ void setup()
   displaySetup();
   networkSetup();
   audioI2sSetup(); // module học I2S của Tuần 3 — xem audio_i2s.cpp để hiểu vì sao chưa đọc được âm thanh thật trong Wokwi
-  displaySetExpression("neutral");
+
   displaySetStats(DEMO_WORD, correctCount, wrongCount);
+  displaySetExpression("neutral");
+  lastUserActionMs = millis();
+
+  Serial.println("[main] San sang. Nut XANH = dung, nut DO = sai.");
+  Serial.println("[main] De yen ~6s robot se tu dien lan luot cac bieu cam.");
+
+  // In lượng RAM trống còn lại sau khi mọi thứ đã khởi tạo xong (khung đệm màn hình 62KB,
+  // WiFi, MQTT...). Nếu con số này tụt xuống dưới ~40KB thì cần lo: các thao tác mạng sau
+  // đó có thể xin thêm bộ nhớ không được và sinh lỗi khó hiểu.
+  Serial.print("[main] RAM trong con lai: ");
+  Serial.print(ESP.getFreeHeap());
+  Serial.println(" byte");
 }
 
 void loop()
 {
   networkLoop();
   handleSerialCommand();
-  handleDemoCycle();
 
   ButtonEvent event = inputPoll();
   if (event == ButtonEvent::Correct)
   {
-    demoCycleActive = false; // nút bấm thật luôn "thắng" demo tự động, tránh bị ghi đè ngay vòng loop() kế tiếp
+    markUserAction();
     correctCount++;
     displaySetExpression("happy");
     displaySetStats(DEMO_WORD, correctCount, wrongCount);
@@ -123,22 +146,30 @@ void loop()
   }
   else if (event == ButtonEvent::Wrong)
   {
-    demoCycleActive = false;
+    markUserAction();
     wrongCount++;
     displaySetExpression("sad");
     displaySetStats(DEMO_WORD, correctCount, wrongCount);
     publishResult("wrong");
   }
-  else if (event == ButtonEvent::CycleFace)
-  {
-    // Nút thứ 3 (GPIO27): mỗi lần bấm nhảy sang biểu cảm KẾ TIẾP trong DEMO_CYCLE — cách
-    // test 14 biểu cảm bằng phần cứng thật, không phụ thuộc gõ lệnh Serial (Serial Monitor
-    // của VS Code đôi khi không nhận đúng bàn phím tuỳ cấu hình terminal).
-    demoCycleActive = false;
-    demoCycleIndex = (demoCycleIndex + 1) % DEMO_CYCLE_LEN;
-    displaySetExpression(DEMO_CYCLE[demoCycleIndex]);
-  }
 
+  handleIdleFaces();
   displayLoop();
   audioI2sLoop();
+
+  // NHƯỜNG CPU cho hệ điều hành — 1 dòng nhỏ nhưng quan trọng.
+  //
+  // Từ khi đổi sang màn SPI, không còn chỗ nào trong loop() "nghỉ" nữa: bản OLED cũ vô
+  // tình an toàn vì hàm gửi I2C chờ bằng semaphore (lúc chờ là task tự ngủ, CPU được
+  // nhường cho việc khác), còn hàm gửi SPI chờ bằng vòng lặp đọc thanh ghi liên tục,
+  // không nhường gì cả. Các hàm còn lại đều return ngay. Kết quả: task chính quay
+  // 100% CPU không ngừng nghỉ, khiến (1) máy tính phải mô phỏng một con CPU lúc nào cũng
+  // bận tối đa nên nóng và quạt kêu to, (2) các task nền của hệ thống (WiFi, TCP/IP) bị
+  // chèn ép, dễ sinh lỗi lạ.
+  //
+  // delay(1) KHÁC HẲN delay() dài đã học ở Bước 10: nó không phải "chờ cho hết giờ" mà là
+  // báo cho hệ điều hành "tôi xong việc rồi, ai cần CPU thì dùng đi" — và 1ms là đúng 1
+  // nhịp tick của FreeRTOS, tức mức nhường nhỏ nhất có thể. Vòng lặp vẫn chạy ~1000
+  // lần/giây, thừa sức bắt kịp nút bấm (debounce 200ms) và khung hình (30ms).
+  delay(1);
 }
