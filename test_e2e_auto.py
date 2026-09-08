@@ -1,11 +1,11 @@
 """
-test_e2e_auto.py — Kiểm thử E2E KHÔNG tương tác cho Robot Panda
+test_e2e_auto.py — Kiểm thử E2E KHÔNG tương tác cho Robot Moon
 ================================================================
 Xác minh 4 module lõi không cần người nói vào mic:
 
   1. STT  : nhận diện giọng nói → text
             - transcribe file ghi âm có sẵn (_test_vi.wav)
-            - round-trip: TTS tổng hợp "Panda ơi..." → STT đọc lại → phải bắt được wake-word
+            - round-trip: TTS tổng hợp "Moon ơi..." → STT đọc lại → phải bắt được wake-word
   2. LLM  : text → AI phản hồi (stream + done)
   3. TTS  : text → speech (tổng hợp Fish Audio + phát ra loa thật)
  4. OLED  : chạy pipeline wake-word giả lập, subscribe MQTT để kiểm chứng
@@ -15,7 +15,7 @@ Xác minh 4 module lõi không cần người nói vào mic:
 Cách dùng:
     server/venv/Scripts/python.exe test_e2e_auto.py
 
-Lưu ý: TTS sẽ PHÁT RA LOA trong lúc test — bạn sẽ nghe thấy Panda nói.
+Lưu ý: TTS sẽ PHÁT RA LOA trong lúc test — bạn sẽ nghe thấy Moon nói.
 """
 
 import sys
@@ -79,8 +79,8 @@ def test_stt():
         info("Không có _test_vi.wav — bỏ qua phần 1a")
 
     # 1b. Round-trip TTS → STT (kiểm tra độ chính xác + wake-word)
-    info("Tổng hợp câu test bằng Fish Audio: \"Panda ơi, bạn tên là gì?\"")
-    audio = tts._synth_fish("Panda ơi, bạn tên là gì?")
+    info("Tổng hợp câu test bằng Fish Audio: \"Moon ơi, bạn tên là gì?\"")
+    audio = tts._synth_fish("Moon ơi, bạn tên là gì?")
     if not audio:
         fail("Fish Audio không tổng hợp được audio round-trip")
         return
@@ -94,7 +94,7 @@ def test_stt():
     ok(f"Round-trip TTS→STT hoạt động: \"{text}\"")
 
     if voice._contains_wake_word(text):
-        ok("Wake-word \"Panda\" được phát hiện trong round-trip")
+        ok("Wake-word \"Moon\" được phát hiện trong round-trip")
     else:
         fail(f"Wake-word KHÔNG được phát hiện trong: \"{text}\"")
 
@@ -146,7 +146,7 @@ def test_llm():
 def test_tts():
     section("TEST 3 — TTS: text → speech (bạn sẽ NGHE thấy loa)")
 
-    audio = tts._synth_fish("Xin chào! Mình là Panda, đang kiểm tra giọng nói.")
+    audio = tts._synth_fish("Xin chào! Mình là Moon, đang kiểm tra giọng nói.")
     if audio and len(audio) > 1024:
         ok(f"Fish Audio tổng hợp OK ({len(audio)//1024} KB)")
     else:
@@ -190,10 +190,10 @@ def test_oled_sequence():
     sub.loop_start()
     time.sleep(0.5)
 
-    info("Chạy pipeline wake-word giả lập: \"Panda, bạn tên là gì?\"")
-    info("(Panda sẽ NÓI câu trả lời ra loa trong bước này)")
+    info("Chạy pipeline wake-word giả lập: \"Moon, bạn tên là gì?\"")
+    info("(Moon sẽ NÓI câu trả lời ra loa trong bước này)")
     t0 = time.time()
-    brain._handle_wake_word("Panda, bạn tên là gì?")
+    brain._handle_wake_word("Moon, bạn tên là gì?")
     time.sleep(1.0)   # chờ MQTT drain
     sub.loop_stop()
     info(f"Pipeline hoàn thành sau {time.time()-t0:.1f}s")
@@ -250,7 +250,7 @@ def test_oled_sequence():
 # ═══════════════════════════════════════════════════════════════════
 
 def main():
-    print(f"\n{BOLD}{CYAN}[PANDA] E2E Auto Test — không cần mic{RESET}")
+    print(f"\n{BOLD}{CYAN}[MOON] E2E Auto Test — không cần mic{RESET}")
     test_stt()
     test_llm()
     test_tts()

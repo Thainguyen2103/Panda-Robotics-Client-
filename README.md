@@ -1,7 +1,7 @@
-# 🐼 Panda Robotics — "Moon"
+# 🐼 Moon Robotics — "Moon"
 
 Robot bạn đồng hành hỗ trợ trẻ em học tiếng Anh — dự án PBL4, Đại học Đà Nẵng.
-Panda nghe được (wake-word "Panda" + câu hỏi tiếng Việt/Anh), nhìn được (nhận diện
+Moon nghe được (wake-word "Moon" + câu hỏi tiếng Việt/Anh), nhìn được (nhận diện
 chủ nhân + cảm xúc), trả lời bằng giọng nói tự nhiên và "diễn" toàn bộ cảm xúc lên
 màn OLED theo phong cách robot Vector (Anki).
 
@@ -61,7 +61,7 @@ copy config\secrets.example.py config\secrets.py   # rồi điền key
 # Dashboard: http://localhost:3000
 ```
 
-Nói **"Panda"** rồi hỏi bất kỳ điều gì bằng tiếng Việt — OLED diễn cảm xúc,
+Nói **"Moon"** rồi hỏi bất kỳ điều gì bằng tiếng Việt — OLED diễn cảm xúc,
 icon chủ đề và trả lời bằng giọng nói.
 
 ## 🔑 MQTT topics (hợp đồng giữa các module)

@@ -1,9 +1,9 @@
 """
 Wake-word engine kiểu Anki Vector — server/wakeword.py
 =======================================================
-Bắt từ khóa "Panda" BẰNG ÂM HỌC trên thiết bị (Porcupine), KHÔNG đi qua ASR:
+Bắt từ khóa "Moon" BẰNG ÂM HỌC trên thiết bị (Porcupine), KHÔNG đi qua ASR:
   - Không phụ thuộc ngôn ngữ câu nói xung quanh (Việt/Anh/trộn đều được)
-  - Không bị Whisper Việt-hóa "Panda" thành "bạn nàng"/"Anna"
+  - Không bị Whisper Việt-hóa "Moon" thành "bạn nàng"/"Anna"
   - Độ trễ ~10ms, CPU không đáng kể
 
 Phần nhận diện câu hỏi SAU wake-word vẫn gửi cloud (Groq Whisper) — đúng
@@ -12,8 +12,8 @@ kiến trúc của Vector: KWS local + ASR cloud.
 Kích hoạt (một lần):
   1. pip install pvporcupine
   2. Tạo tài khoản miễn phí tại https://console.picovoice.ai/ → copy AccessKey
-  3. Console → Porcupine → "Create Keyword" → gõ "Panda" → tải file .ppn
-     (chọn nền tảng Windows x86_64) → lưu vào server/panda.ppn
+  3. Console → Porcupine → "Create Keyword" → gõ "Moon" → tải file .ppn
+     (chọn nền tảng Windows x86_64) → lưu vào server/moon.ppn
   4. Điền PICOVOICE_ACCESS_KEY trong config/settings.py
   5. Khởi động lại hệ thống.
 
@@ -42,8 +42,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import settings
 
 ACCESS_KEY = getattr(settings, "PICOVOICE_ACCESS_KEY", "")
-PPN_PATH = getattr(settings, "PANDA_PPN_PATH", "") or \
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "panda.ppn")
+PPN_PATH = getattr(settings, "MOON_PPN_PATH", "") or \
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "moon.ppn")
 
 _porcupine = None
 _init_tried = False
@@ -81,7 +81,7 @@ def run_loop(on_wake, should_listen=None):
     Vòng lặp bắt wake-word on-device (block — chạy trong thread riêng).
 
     Args:
-        on_wake:        callback không tham số, gọi khi nghe thấy "Panda".
+        on_wake:        callback không tham số, gọi khi nghe thấy "Moon".
         should_listen:  callback trả về False để tạm ngưng (khi AI đang bận).
     """
     if not available():
@@ -97,7 +97,7 @@ def run_loop(on_wake, should_listen=None):
     def _cb(indata, frames, t, status):
         q.put(bytes(indata))
 
-    print("🔔 [WAKEWORD] Porcupine đang nghe 'Panda' (on-device, mọi ngôn ngữ)...")
+    print("🔔 [WAKEWORD] Porcupine đang nghe 'Moon' (on-device, mọi ngôn ngữ)...")
     last_trigger = 0.0
 
     with sd.InputStream(samplerate=h.sample_rate, channels=1, dtype="int16",
@@ -108,7 +108,7 @@ def run_loop(on_wake, should_listen=None):
             except queue.Empty:
                 continue
 
-            # Chống tự kích: bỏ qua khi loa Panda đang phát ("...Mình là Panda!")
+            # Chống tự kích: bỏ qua khi loa Moon đang phát ("...Mình là Moon!")
             if tts.is_speaking():
                 continue
             if should_listen and not should_listen():
@@ -119,5 +119,5 @@ def run_loop(on_wake, should_listen=None):
                 now = time.time()
                 if now - last_trigger > 1.5:   # debounce 1.5s
                     last_trigger = now
-                    print("🔔 [WAKEWORD] Porcupine bắt được 'Panda'!")
+                    print("🔔 [WAKEWORD] Porcupine bắt được 'Moon'!")
                     on_wake()

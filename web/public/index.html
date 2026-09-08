@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Panda Robot Dashboard — điều khiển và giám sát robot Panda thời gian thực">
-    <title>Panda Dashboard</title>
+    <meta name="description" content="Moon Robot Dashboard — điều khiển và giám sát robot Moon thời gian thực">
+    <title>Moon Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -17,7 +17,8 @@
             <div class="header-left">
                 <div class="logo">🐼</div>
                 <div>
-                    <h1>Panda <span>Dashboard</span></h1>
+                    <h1>Moon <span>Dashboard</span></h1>
+                    <a href="http://localhost:8765" target="_blank" rel="noopener">🌙 Test Voice riêng (chạy start-voice.bat)</a>
                     <p class="header-subtitle">Robot Intelligence System</p>
                 </div>
             </div>
@@ -174,20 +175,20 @@
                     </div>
                 </div>
 
-                <!-- Voice Transcript box đã được tích hợp trực tiếp lên OLED Face và Panda AI Chat -->
+                <!-- Voice Transcript box đã được tích hợp trực tiếp lên OLED Face và Moon AI Chat -->
 
 
-                <!-- ✨ PANDA AI CHAT PANEL (NEW) -->
+                <!-- ✨ MOON AI CHAT PANEL (NEW) -->
                 <div class="visual-group ai-chat-group">
-                    <h3><span class="panda-icon-h3">🐼</span> Panda AI</h3>
+                    <h3><span class="moon-icon-h3">🐼</span> Moon AI</h3>
 
                     <div class="ai-chat-panel" id="ai-chat-panel">
 
                         <!-- Trạng thái mặc định: chờ wake-word -->
                         <div class="ai-idle-hint" id="ai-idle-hint">
                             <div class="ai-idle-icon">🎙️</div>
-                            <p>Nói <strong>"Panda..."</strong> để bắt đầu hội thoại</p>
-                            <p class="ai-idle-sub">Sau 3 giây im lặng, Panda sẽ trả lời</p>
+                            <p>Nói <strong>"Moon..."</strong> để bắt đầu hội thoại</p>
+                            <p class="ai-idle-sub">Sau 3 giây im lặng, Moon sẽ trả lời</p>
                         </div>
 
                         <!-- Bubble câu hỏi người dùng -->
@@ -201,13 +202,13 @@
                             <div class="thinking-dots">
                                 <span></span><span></span><span></span>
                             </div>
-                            <span class="thinking-label" id="ai-thinking-label">Panda đang suy nghĩ...</span>
+                            <span class="thinking-label" id="ai-thinking-label">Moon đang suy nghĩ...</span>
                         </div>
 
-                        <!-- Bubble câu trả lời Panda -->
-                        <div class="ai-bubble panda-bubble" id="ai-panda-bubble" style="display:none">
-                            <div class="bubble-label"><span>🐼</span> Panda trả lời</div>
-                            <div class="bubble-text" id="ai-panda-text"></div>
+                        <!-- Bubble câu trả lời Moon -->
+                        <div class="ai-bubble moon-bubble" id="ai-moon-bubble" style="display:none">
+                            <div class="bubble-label"><span>🐼</span> Moon trả lời</div>
+                            <div class="bubble-text" id="ai-moon-text"></div>
                             <div class="bubble-cursor" id="ai-cursor">▋</div>
                         </div>
 

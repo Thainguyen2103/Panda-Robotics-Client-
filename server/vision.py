@@ -21,7 +21,7 @@ from config import settings
 from server.vision_features import FaceDetails, HeadMotion, ExpressionState, upper_body, ARM_EDGES
 from server.vision_signals import EyeState, HandDetails, distance_estimate, combined_actions, nearby_objects, HAND_EDGES
 
-LOG = logging.getLogger("panda.vision")
+LOG = logging.getLogger("moon.vision")
 BASE = Path(__file__).resolve().parent
 EMOTIONS = ("neutral", "happy", "surprised", "sad", "angry", "disgust", "fear", "contempt")
 

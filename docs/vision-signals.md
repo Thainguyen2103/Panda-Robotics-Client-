@@ -101,7 +101,7 @@ rộng khung hình đang xử lý (mặc định 640), rồi chạy:
 ```
 
 Ví dụ trên trả `VISION_DISTANCE_SCALE_CM = 15`. Điền vào settings hoặc đặt
-`$env:PANDA_DISTANCE_SCALE_CM = '15'` trước khởi động. Công thức là
+`$env:MOON_DISTANCE_SCALE_CM = '15'` trước khởi động. Công thức là
 `distance_cm = scale * frame_width / face_width`. Làm lại khi đổi zoom/camera
 hoặc người. Số ví dụ không phải kết quả đo camera của bạn.
 

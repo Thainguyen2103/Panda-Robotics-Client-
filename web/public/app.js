@@ -47,8 +47,8 @@ const aiUserBubble    = document.getElementById('ai-user-bubble');
 const aiUserText      = document.getElementById('ai-user-text');
 const aiThinkingBar   = document.getElementById('ai-thinking-bar');
 const aiThinkingLabel = document.getElementById('ai-thinking-label');
-const aiPandaBubble   = document.getElementById('ai-panda-bubble');
-const aiPandaText     = document.getElementById('ai-panda-text');
+const aiMoonBubble   = document.getElementById('ai-moon-bubble');
+const aiMoonText     = document.getElementById('ai-moon-text');
 const aiCursor        = document.getElementById('ai-cursor');
 const voiceStateBadge = document.getElementById('voice-state-badge');
 const voiceStateLabel = document.getElementById('voice-state-label');
@@ -278,7 +278,7 @@ async function toggleLiveMic() {
         resetLiveVad();
         socket.emit('mic_live', '1');
         setLiveUI(true);
-        logToTerminal('🎙️ LIVE MIC BẬT — Panda nghe liên tục qua DSP trình duyệt', 'sys');
+        logToTerminal('🎙️ LIVE MIC BẬT — Moon nghe liên tục qua DSP trình duyệt', 'sys');
     } catch (e) {
         logToTerminal(`🎙️ Lỗi live mic: ${e.name} — ${e.message}`, 'sys');
     }
@@ -372,9 +372,9 @@ function resetAiPanel() {
     aiIdleHint.style.display = 'flex';
     aiUserBubble.style.display = 'none';
     aiThinkingBar.style.display = 'none';
-    aiPandaBubble.style.display = 'none';
+    aiMoonBubble.style.display = 'none';
     aiUserText.textContent = '';
-    aiPandaText.textContent = '';
+    aiMoonText.textContent = '';
     aiCursor.style.display = 'inline';
 }
 
@@ -382,8 +382,8 @@ function showUserQuestion(text) {
     aiIdleHint.style.display = 'none';
     aiUserBubble.style.display = 'block';
     aiUserText.textContent = text;
-    aiPandaBubble.style.display = 'none';
-    aiPandaText.textContent = '';
+    aiMoonBubble.style.display = 'none';
+    aiMoonText.textContent = '';
     aiCursor.style.display = 'inline';
 }
 
@@ -396,14 +396,14 @@ function hideThinking() {
     aiThinkingBar.style.display = 'none';
 }
 
-function appendPandaChunk(chunk) {
-    aiPandaBubble.style.display = 'block';
-    aiPandaText.textContent += chunk;
+function appendMoonChunk(chunk) {
+    aiMoonBubble.style.display = 'block';
+    aiMoonText.textContent += chunk;
     // Auto scroll
-    aiPandaBubble.scrollTop = aiPandaBubble.scrollHeight;
+    aiMoonBubble.scrollTop = aiMoonBubble.scrollHeight;
 }
 
-function finalizePandaResponse() {
+function finalizeMoonResponse() {
     aiCursor.style.display = 'none';
     hideThinking();
 }
@@ -498,7 +498,7 @@ socket.on('mqtt_message', (data) => {
                 case 'listening':
                     resetAiPanel();
                     aiIdleHint.style.display = 'none';
-                    showThinking('👂 Panda đang lắng nghe...');
+                    showThinking('👂 Moon đang lắng nghe...');
                     setOledAiMode('questioning');     // OLED: ? + ring
                     break;
                 case 'question':
@@ -506,11 +506,11 @@ socket.on('mqtt_message', (data) => {
                     setOledAiMode('hearing', msg.text); // OLED: text transcript
                     break;
                 case 'thinking':
-                    showThinking('🧠 Panda đang suy nghĩ...');
+                    showThinking('🧠 Moon đang suy nghĩ...');
                     // OLED giữ transcript đã nghe ('hearing') — dots chỉ trên dashboard
                     break;
                 case 'answering':
-                    showThinking('✍️ Panda đang soạn câu trả lời...');
+                    showThinking('✍️ Moon đang soạn câu trả lời...');
                     // OLED vẫn giữ transcript
                     break;
                 case 'done':
@@ -529,17 +529,17 @@ socket.on('mqtt_message', (data) => {
             const msg = JSON.parse(payload);
             if (!msg.done) {
                 // Chunk mới đến — hiển thị stream
-                if (aiPandaText.textContent === '') {
+                if (aiMoonText.textContent === '') {
                     // Lần đầu → reset và hiện bubble
-                    aiPandaBubble.style.display = 'block';
+                    aiMoonBubble.style.display = 'block';
                     aiCursor.style.display = 'inline';
                 }
                 // Overwrite với full text (backend gửi accumulated text)
-                aiPandaText.textContent = msg.text;
+                aiMoonText.textContent = msg.text;
             } else {
                 // Done — show full text, ẩn cursor
-                aiPandaText.textContent = msg.text;
-                finalizePandaResponse();
+                aiMoonText.textContent = msg.text;
+                finalizeMoonResponse();
                 logToTerminal(`AI: ${msg.text.substring(0, 60)}...`, 'ai-response');
             }
         } catch(e) {}
@@ -571,8 +571,8 @@ function logToTerminal(text, type) {
     }
 }
 
-// ─── Autonomous idle: Panda "tự chủ" khi rảnh — nhìn quanh, tò mò, nháy mắt... ──
-// Mỗi 5–14s, nếu đang neutral, Panda tự diễn một micro-behavior rồi về lại mắt thường.
+// ─── Autonomous idle: Moon "tự chủ" khi rảnh — nhìn quanh, tò mò, nháy mắt... ──
+// Mỗi 5–14s, nếu đang neutral, Moon tự diễn một micro-behavior rồi về lại mắt thường.
 (function scheduleIdleBehavior() {
     setTimeout(() => {
         if (oledFace.classList.contains('neutral')) {

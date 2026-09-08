@@ -1,10 +1,10 @@
 """
-Voice (STT) module — Robot Panda
+Voice (STT) module — Robot Moon
 =================================
 Pipeline nhận dạng giọng nói kiểu Anki Vector:
   Microphone (VAD năng lượng) → đoạn thoại ngắn → Groq Whisper → transcript
     → bộ lọc chống hallucination
-      → phát hiện wake-word "Panda" → callback lên brain.py
+      → phát hiện wake-word "Moon" → callback lên brain.py
 
 Thiết kế tối ưu độ trễ:
   - Ghi âm 16kHz mono int16, block 30ms → phát hiện đầu/cuối câu gần như tức thì
@@ -56,7 +56,7 @@ try:
 except Exception:
     mqtt_bridge = None
 
-# ─── Cờ TTS đang phát — để mic KHÔNG thu tiếng loa của chính Panda ───────────
+# ─── Cờ TTS đang phát — để mic KHÔNG thu tiếng loa của chính Moon ───────────
 try:
     from server.tts import is_speaking as _tts_speaking
 except Exception:
@@ -89,8 +89,8 @@ except ImportError:
     _nr = None
     print("⚠️  [VOICE] noisereduce chưa cài — bỏ qua khử ồn. pip install noisereduce")
 # Prompt mớm chính tả tên riêng cho pass vi: khi âm mơ hồ, Whisper ưu tiên viết
-# "Panda" thay vì bịa "và hẹn gặp lại" / "bạn nàng"...
-WAKE_STT_PROMPT   = getattr(settings, "WAKE_STT_PROMPT", "Xin chào Panda, hôm nay trời đẹp quá.")
+# "Moon" thay vì bịa "và hẹn gặp lại" / "bạn nàng"...
+WAKE_STT_PROMPT   = getattr(settings, "WAKE_STT_PROMPT", "Xin chào Moon, hôm nay trời đẹp quá.")
 WAKE_SILENCE_SEC  = getattr(settings, "WAKE_SILENCE_SEC", 1.2)   # im lặng kết thúc clip standby
 QUESTION_SILENCE_SEC = getattr(settings, "QUESTION_SILENCE_SEC", 3.0)
 QUESTION_MAX_SEC  = getattr(settings, "QUESTION_MAX_SEC", 20.0)
@@ -137,12 +137,12 @@ _on_wake_word_cbs  = []
 _on_wake_rescue_cbs = []   # sửa lỗi ASR để cứu wake khi bản thô trượt
 _wake_exec = ThreadPoolExecutor(max_workers=2)   # transcribe nền — tai không ngừng nghe
 
-WAKE_WORDS = sorted(getattr(settings, "PANDA_WAKE_WORDS", ["panda"]),
+WAKE_WORDS = sorted(getattr(settings, "MOON_WAKE_WORDS", ["moon"]),
                     key=len, reverse=True)   # dài nhất trước để ưu tiên khớp đầy đủ
 
 
 # ─── Khớp wake-word KHÔNG PHỤ THUỘC DẤU (phonetic-normalized) ────────────────
-# Whisper vi-mode hay Việt hóa từ mượn Anh: "Panda" → "bạn nàng", "ban nang"...
+# Whisper vi-mode hay Việt hóa từ mượn Anh: "Moon" → "bạn nàng", "ban nang"...
 # Chuẩn hóa bỏ dấu thanh để mọi biến thể cùng khớp về một dạng.
 def _strip_diacritics(s: str) -> str:
     """lower + bỏ dấu thanh + đ→d + nén khoảng trắng."""
@@ -153,11 +153,8 @@ def _strip_diacritics(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
-# Biến thể bổ sung mà Whisper vi-mode sinh ra cho "Panda" (đo thực tế)
-_EXTRA_WAKE_VARIANTS = [
-    "bạn nàng", "ban nang", "ban nang", "bạn nàng ơi",
-    "pang da", "pang đa",
-]
+# Biến thể bổ sung mà Whisper vi-mode sinh ra cho "Moon" (đo thực tế)
+_EXTRA_WAKE_VARIANTS = []
 
 WAKE_WORDS_NORM = sorted(
     {_strip_diacritics(w) for w in WAKE_WORDS}
@@ -358,8 +355,8 @@ def _record_until_silence(silence_sec: float = 2.0,
                     if yield_on_pause and _paused_event.is_set() and not got_speech:
                         return None
 
-                    # Loa Panda đang phát TTS → clip sẽ bị bẩn bởi tiếng của chính
-                    # Panda (gây tự kích wake-word) → hủy bản ghi này
+                    # Loa Moon đang phát TTS → clip sẽ bị bẩn bởi tiếng của chính
+                    # Moon (gây tự kích wake-word) → hủy bản ghi này
                     if _tts_speaking():
                         return None
 
@@ -439,7 +436,7 @@ def _record_until_silence(silence_sec: float = 2.0,
 _UNSET = object()   # sentinel: language không được truyền → dùng STT_LANGUAGE
 
 
-def transcribe_bytes(data: bytes, filename: str = "panda_clip.wav",
+def transcribe_bytes(data: bytes, filename: str = "moon_clip.wav",
                      language=_UNSET, prompt: str = None,
                      model: str = None) -> str:
     """
@@ -460,7 +457,7 @@ def transcribe_bytes(data: bytes, filename: str = "panda_clip.wav",
 
         kwargs = {
             "model": model or STT_MODEL,
-            "file": (filename, open(tmp_path, "rb")),
+            "file": (filename, data),
             "temperature": 0.0,
             "response_format": "text",
         }
@@ -527,7 +524,7 @@ def _transcribe(audio: bytes, model: str = None) -> str:
     """PCM int16 16kHz mono → khử ồn → WAV → Groq (1 pass, theo STT_LANGUAGE)."""
     if not audio:
         return ""
-    return transcribe_bytes(_wrap_wav(_denoise_pcm(audio)), "panda_clip.wav", model=model)
+    return transcribe_bytes(_wrap_wav(_denoise_pcm(audio)), "moon_clip.wav", model=model)
 
 
 def _transcribe_dual(audio: bytes) -> str:
@@ -535,27 +532,12 @@ def _transcribe_dual(audio: bytes) -> str:
     Chạy 2 pass SONG SONG (vi + en) cho clip standby — mô phỏng cách Anki Vector
     tách wake-word khỏi ASR đa ngôn ngữ:
       - pass vi: chính xác cho câu lệnh tiếng Việt
-      - pass en: giữ nguyên từ mượn tiếng Anh như "Panda"
+      - pass en: giữ nguyên từ mượn tiếng Anh như "Moon"
     Ưu tiên transcript bắt được wake-word; nếu không, trả về pass vi.
     Độ trễ ≈ max(2 pass) chứ không cộng dồn (chạy concurrent).
     """
-    wav = _wrap_wav(_denoise_pcm(audio))
-    # LƯỜI HÓA để tiết kiệm quota Groq free-tier (tránh throttling gây trễ):
-    # pass vi rẻ nhất chạy trước; bắt được wake → trả ngay (1 call).
-    # Chỉ khi hụt mới mở 2 pass còn lại song song.
-    t_vi = transcribe_bytes(wav, "clip_vi.wav", "vi")
-    if _contains_wake_word(t_vi):
-        return t_vi
-    with ThreadPoolExecutor(max_workers=2) as ex:
-        f_en = ex.submit(transcribe_bytes, wav, "clip_en.wav", "en")
-        f_vp = ex.submit(transcribe_bytes, wav, "clip_vp.wav", "vi", WAKE_STT_PROMPT)
-        t_en = f_en.result()
-        t_vp = f_vp.result()
-    for t in (t_vp, t_en):
-        if _contains_wake_word(t):
-            print(f"🌐 [VOICE] Wake-word bắt từ pass dự phòng: \"{t}\"")
-            return t
-    return t_vi or t_vp or t_en
+    # One request only: prompted retries can invent the wakeword in noise.
+    return _transcribe(audio)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -618,18 +600,11 @@ def _levenshtein(a: str, b: str) -> int:
 
 def _contains_wake_word(text: str) -> bool:
     """
-    Kiểm tra transcript có wake-word "Panda" (hoặc biến thể) không.
+    Kiểm tra transcript có wake-word "Moon" (hoặc biến thể) không.
     Khớp phonetic KHÔNG PHỤ THUỘC DẤU: "bạn nàng" / "Păng Đa" / "PHAN TA" đều khớp.
     """
-    if not text:
-        return False
-    norm = _strip_diacritics(text)
-    if any(wake in norm for wake in WAKE_WORDS_NORM):
-        return True
-    # Fuzzy: Whisper đôi khi nghe "Panda" thành "Anna"/"Amanda"/"panna"...
-    # → token dài ≥4 ký tự, cách "panda" ≤ 2 phép sửa thì vẫn nhận.
-    return any(len(tok) >= 4 and _levenshtein(tok, "panda") <= 2
-               for tok in norm.split())
+    from server.voice_core import wake_tail
+    return wake_tail(text or "") is not None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -687,7 +662,7 @@ def continuous_listen_loop():
         → nếu có wake-word → callback wake-word.
 
     Giống Vector: sau mỗi câu trả lời robot quay về vòng lặp này ngay,
-    luôn sẵn sàng nghe "Panda".
+    luôn sẵn sàng nghe "Moon".
     """
     if sd is None or groq_client is None:
         print("❌ [VOICE] Thiếu sounddevice hoặc Groq — không thể nghe.")
@@ -698,7 +673,7 @@ def continuous_listen_loop():
         while True:
             time.sleep(1)
 
-    print("👂 [VOICE] Vòng lặp nghe liên tục bắt đầu. Nói \"Panda\" để gọi mình!")
+    print("👂 [VOICE] Vòng lặp nghe liên tục bắt đầu. Nói \"Moon\" để gọi mình!")
     dev = _select_input_device()
     while dev is None:
         time.sleep(2)
@@ -730,7 +705,7 @@ def continuous_listen_loop():
                     except Exception as e:
                         print(f"❌ [VOICE] Lỗi callback wake-word: {e}")
             elif _on_wake_rescue_cbs:
-                # Cứu hộ: sửa lỗi chính tả rồi thử lại wake (vd 'Hai bạn nàng' → 'Hey Panda')
+                # Cứu hộ: sửa lỗi chính tả rồi thử lại wake (vd 'Hai bạn nàng' → 'Hey Moon')
                 for rc in _on_wake_rescue_cbs:
                     try:
                         fixed = rc(text)
