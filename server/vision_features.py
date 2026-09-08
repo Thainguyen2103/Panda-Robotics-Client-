@@ -3,6 +3,7 @@ from collections import deque
 import math
 import numpy as np
 from config import settings
+from server.vision_signals import eye_geometry
 
 
 class FaceDetails:
@@ -39,7 +40,7 @@ class FaceDetails:
         cues = dict(brow_down=pair("browDown"),brow_inner_up=scores.get("browInnerUp",0.),
                     eye_squint=pair("eyeSquint"),mouth_frown=pair("mouthFrown"),
                     mouth_press=pair("mouthPress"),smile=pair("mouthSmile"),
-                    jaw_open=scores.get("jawOpen",0.))
+                    jaw_open=scores.get("jawOpen",0.),eye_wide=pair("eyeWide"),brow_outer_up=pair("browOuterUp"))
         angles = None
         if result.facial_transformation_matrixes:
             matrix = np.asarray(result.facial_transformation_matrixes[0])[:3,:3]
@@ -50,7 +51,54 @@ class FaceDetails:
                     pitch,yaw,roll = cv2.RQDecomp3x3(rotation)[0]
                     if max(abs(pitch),abs(yaw),abs(roll)) < 65:
                         angles = dict(pitch=float(pitch),yaw=float(yaw),roll=float(roll))
-        return dict(angles=angles,cues=cues)
+        eyes = eye_geometry(result.face_landmarks[0],frame.shape)
+        if eyes is not None:
+            eyes.update(blink_left=scores.get("eyeBlinkLeft",0.),blink_right=scores.get("eyeBlinkRight",0.))
+        return dict(angles=angles,cues=cues,eyes=eyes)
+
+
+def expression_intensities(cues):
+    """Independent geometric activation scores, not probabilities summing to one."""
+    c = cues or {}
+    return dict(happy=float(c.get("smile",0)),
+        surprised=float(min(c.get("jaw_open",0),max(c.get("eye_wide",0),c.get("brow_outer_up",0)))),
+        angry=float(math.sqrt(c.get("brow_down",0)*max(c.get("eye_squint",0),c.get("mouth_press",0)))),
+        sad=float(math.sqrt(c.get("brow_inner_up",0)*c.get("mouth_frown",0))))
+
+
+class ExpressionState:
+    def __init__(self): self.reset()
+    def reset(self):
+        self.value,self.pending = "unknown","unknown"
+        self.since,self.confirmed = 0.,-float("inf")
+        self.source = "uncertain"
+
+    def update(self,probs,cues,now):
+        intensities = expression_intensities(cues)
+        # A visible smile can be recognized even if FER wrongly dominates with neutral.
+        if intensities["happy"] >= .45:
+            label,dwell,source = "happy",.18,"landmarks"
+        elif intensities["surprised"] >= .30:
+            label,dwell,source = "surprised",.18,"landmarks"
+        elif intensities["angry"] >= .35 and (cues or {}).get("brow_down",0) >= .5:
+            label,dwell,source = "angry",.65,"landmarks"
+        elif intensities["sad"] >= .30 and (cues or {}).get("brow_inner_up",0) >= .35:
+            label,dwell,source = "sad",.65,"landmarks"
+        elif probs is not None:
+            label,count,source = emotion_candidate(probs,cues)
+            dwell = .65 if count == 5 else .30
+        else:
+            label,dwell,source = "unknown",.30,"uncertain"
+        if label != self.pending:
+            self.pending,self.since = label,now
+        if label != "unknown" and now-self.since >= dwell:
+            self.value,self.confirmed,self.source = label,now,source
+        elif now-self.confirmed > .6:
+            self.value,self.source = "unknown","uncertain"
+        labels = ("neutral","happy","surprised","sad","angry","disgust","fear","contempt")
+        score = intensities.get(self.value,0.) if self.source == "landmarks" else float(probs[labels.index(self.value)]) if probs is not None and self.value in labels else 0.
+        return dict(emotion=self.value,emotion_source=self.source,emotion_confidence=score,
+                    expression_intensities=intensities)
 
 
 class HeadMotion:
