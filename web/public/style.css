@@ -1158,3 +1158,22 @@ button:active { transform: translateY(0); }
 #voice-log { max-height: 260px; overflow: auto; padding-left: 24px; font-size: 12px; }
 #voice-log li { padding: 8px 0; overflow-wrap: anywhere; }
 .voice-controls button:disabled { opacity: .5; cursor: default; }
+
+/* Static, scrollable transcript: never translate the entire OLED text layer. */
+.oled-face.hearing .oled-text {
+    display: block;
+    padding: 14px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    overflow-y: auto;
+    overflow-x: hidden;
+    pointer-events: auto;
+    animation: none;
+    transform: none;
+    text-shadow: 0 0 3px var(--accent-glow);
+    font-family: system-ui, sans-serif;
+    line-height: 1.5;
+}
+.oled-face.hearing .oled-text::before,
+.oled-face.hearing .oled-text::after { content: none; }
+.oled-face.hearing { animation: none; }

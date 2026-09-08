@@ -98,3 +98,8 @@ port 8765 chưa có service. Port 8765 chỉ là backend nội bộ; đường `
 chuyển tới dashboard 3000. Không còn trang test Voice riêng.
 Text câu sau wake hiện ở **Bạn đã nói**, OLED mô phỏng và Activity Log.
 Transcript thô/chẩn đoán nằm trong mục mở rộng ngay dưới các nút mic.
+
+Dashboard Voice bỏ qua bản tin AI/state/thinking/response cũ từ MQTT để
+không ghi đè phiên test. OLED hiển thị transcript 6 giây rồi về mắt; câu đầy đủ
+vẫn giữ trong khung Bạn đã nói. Chữ dài xuống dòng, có thể cuộn trong OLED.
+Kiểm tra hồi quy giao diện: `node tests/test_voice_display.cjs` (cần Playwright).

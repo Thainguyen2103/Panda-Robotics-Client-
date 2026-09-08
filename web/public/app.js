@@ -1,5 +1,11 @@
 // ─── Socket.IO setup ──────────────────────────────────────────────────────────
 const socket = io();
+const voiceOnlyDashboard = !!document.getElementById('dashboard-voice');
+let transcriptTimer;
+function cancelTranscriptTimer() {
+    clearTimeout(transcriptTimer);
+    transcriptTimer = undefined;
+}
 
 const visionPanel = new VisionPanel(document);
 let lastCameraFrame = 0;
@@ -87,6 +93,7 @@ const TOPIC_COLOR = {
 };
 
 function drawFace(faceName) {
+    cancelTranscriptTimer();
     // Khi set emotion thường → thoát khỏi AI mode
     oledFace.classList.remove(...ALL_EMOTIONS, ...ALL_AI_MODES, ...IDLE_BEHAVIORS);
     const pm = oledFace.className.match(/topic-[\w-]+/);
@@ -107,12 +114,14 @@ drawFace('neutral');
  * text: chỉ dùng cho mode 'hearing' — hiển thị transcript trên OLED
  */
 function setOledAiMode(mode, text = '') {
-    oledFace.classList.remove(...ALL_EMOTIONS, ...ALL_AI_MODES, ...IDLE_BEHAVIORS);
+    cancelTranscriptTimer();
     if (mode === 'neutral') {
-        oledFace.classList.add('neutral');
-        if (oledTopicEl) oledTopicEl.style.opacity = '0';
+        drawFace('neutral');
+        if (oledTextEl) { oledTextEl.textContent = ''; oledTextEl.scrollTop = 0; }
+        if (oledCapEl) oledCapEl.textContent = '';
         return;
     }
+    oledFace.classList.remove(...ALL_EMOTIONS, ...ALL_AI_MODES, ...IDLE_BEHAVIORS);
     oledFace.classList.add(mode);
 
     // Emoji + caption chủ đề: emoji hiện khi nghĩ+nói, caption khi nói
@@ -123,9 +132,9 @@ function setOledAiMode(mode, text = '') {
     // Mode 'hearing': hiển thị text trên OLED — co chữ vừa khung, không cắt đầu/cuối
     if (mode === 'hearing' && oledTextEl) {
         oledTextEl.textContent = `"${text}"`;
-        const n = text.length;
-        oledTextEl.style.fontSize = n <= 18 ? '15px' : n <= 30 ? '12px' : n <= 45 ? '10px' : '9px';
-        oledTextEl.classList.toggle('long-text', n > 45);   // chỉ cuộn khi quá dài
+        oledTextEl.style.fontSize = '13px';
+        oledTextEl.classList.remove('long-text');
+        oledTextEl.scrollTop = 0;
     }
 
     // Mode 'questioning': icon là '?'
@@ -223,6 +232,9 @@ function finalizeMoonResponse() {
 // ─── MQTT message handler ─────────────────────────────────────────────────────
 socket.on('mqtt_message', (data) => {
     const { topic, payload } = data;
+    // This dashboard tests Voice without Brain: stale/retained AI messages must
+    // never overwrite the local transcript or leave a reply spinner running.
+    if (voiceOnlyDashboard && (topic.startsWith('panda/ai/') || topic.startsWith('panda/log/voice'))) return;
 
     // ── Sensor status ─────────────────────────────────────────────────────────
     if (topic === 'panda/status') {
@@ -257,6 +269,7 @@ socket.on('mqtt_message', (data) => {
 
     // ── Face command ──────────────────────────────────────────────────────────
     } else if (topic === 'panda/cmd/face') {
+        if (voiceOnlyDashboard && ALL_AI_MODES.some(mode => oledFace.classList.contains(mode))) return;
         drawFace(payload);
         logToTerminal(`RX: ${topic} → ${payload}`, 'status');
 
@@ -365,7 +378,10 @@ socket.on('mqtt_message', (data) => {
 function logToTerminal(text, type) {
     const p = document.createElement('p');
     const time = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    p.innerHTML = `<span class="log-time">${time}</span> ${text}`;
+    const stamp = document.createElement('span');
+    stamp.className = 'log-time';
+    stamp.textContent = time;
+    p.append(stamp, document.createTextNode(` ${text}`));
 
     if (type === 'cmd')         p.className = 'log-cmd';
     else if (type === 'status') p.className = 'log-status';
@@ -398,7 +414,16 @@ function logToTerminal(text, type) {
 
 // Voice test shares dashboard state, OLED preview and Activity Log.
 window.addEventListener('moon-voice', ({detail: msg}) => {
+    hideThinking();
+    aiMoonBubble.style.display = 'none';
+    aiMoonText.textContent = '';
+    aiCursor.style.display = 'none';
+    if (msg.event === 'ready') {
+        setVoiceState('standby');
+        setOledAiMode('neutral');
+    }
     if (msg.event === 'wake') {
+        setOledAiMode('questioning');
         setVoiceState('listening');
         logToTerminal('WAKE: Moon — đang nghe', 'log-voice');
     }
@@ -406,11 +431,15 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
         showUserQuestion(msg.text);
         hideThinking();
         setOledAiMode('hearing', msg.text);
+        aiCursor.style.display = 'none';
+        // Keep the full sentence in the chat; OLED is a short preview only.
+        transcriptTimer = setTimeout(() => setOledAiMode('neutral'), 6000);
         logToTerminal(`VOICE: ${msg.text}`, 'log-voice');
     }
     if (msg.event === 'state') setVoiceState(msg.state);
     if (['stopped', 'timeout', 'error'].includes(msg.event)) {
         setVoiceState('standby');
+        setOledAiMode('neutral');
         if (msg.text) logToTerminal(msg.text, 'sys');
     }
 });
