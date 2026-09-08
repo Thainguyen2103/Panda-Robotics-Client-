@@ -39,6 +39,42 @@
             <section class="panel control-panel">
                 <h2><i data-lucide="sliders-horizontal"></i> Controls & AI Vision</h2>
 
+                <!-- AI Vision Status — đầu cột trái, cạnh Camera để theo dõi khi test -->
+                <div class="control-group">
+                    <h3>AI Vision Status</h3>
+                    <div class="vision-status-box">
+                        <div class="status-item">
+                            <span class="label">Camera / AI:</span>
+                            <span class="val" id="cv-health">Đang chờ</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Danh tính:</span>
+                            <span class="val" id="cv-identity">Chưa rõ</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Emotion:</span>
+                            <span class="val" id="cv-emotion">N/A</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Action:</span>
+                            <span class="val" id="cv-action">N/A</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Khớp cánh tay:</span>
+                            <span class="val" id="cv-joints">Chưa rõ</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Dấu hiệu mặt:</span>
+                            <span class="val" id="cv-cues">Chưa rõ</span>
+                        </div>
+                        <div class="status-item"><span class="label">Đầu:</span><span class="val" id="cv-head">Chưa rõ</span></div>
+                        <div class="status-item"><span class="label">Cánh tay:</span><span class="val" id="cv-arms">Chưa rõ</span></div>
+                        <div class="status-item"><span class="label">Tay trái:</span><span class="val" id="cv-left-hand">Chưa rõ</span></div>
+                        <div class="status-item"><span class="label">Tay phải:</span><span class="val" id="cv-right-hand">Chưa rõ</span></div>
+
+                    </div>
+                </div>
+
                 <div class="control-group">
 
                     <h3>Movement</h3>
@@ -83,46 +119,23 @@
                     </div>
                 </div>
 
-                <!-- AI Vision Status — cuối cột trái, ngang tầm Camera cột giữa -->
-                <div class="control-group">
-                    <h3>AI Vision Status</h3>
-                    <div class="vision-status-box">
-                        <div class="status-item">
-                            <span class="label">Camera / AI:</span>
-                            <span class="val" id="cv-health">Đang chờ</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="label">Danh tính:</span>
-                            <span class="val" id="cv-identity">Chưa rõ</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="label">Emotion:</span>
-                            <span class="val" id="cv-emotion">N/A</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="label">Action:</span>
-                            <span class="val" id="cv-action">N/A</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="label">Khớp cánh tay:</span>
-                            <span class="val" id="cv-joints">Chưa rõ</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="label">Dấu hiệu mặt:</span>
-                            <span class="val" id="cv-cues">Chưa rõ</span>
-                        </div>
-                        <div class="status-item"><span class="label">Đầu:</span><span class="val" id="cv-head">Chưa rõ</span></div>
-                        <div class="status-item"><span class="label">Cánh tay:</span><span class="val" id="cv-arms">Chưa rõ</span></div>
-                        <div class="status-item"><span class="label">Tay trái:</span><span class="val" id="cv-left-hand">Chưa rõ</span></div>
-                        <div class="status-item"><span class="label">Tay phải:</span><span class="val" id="cv-right-hand">Chưa rõ</span></div>
-
-                    </div>
-                </div>
             </section>
 
             <!-- ═══ CENTER: Visuals + AI Chat ════════════════════════════════ -->
             <section class="panel visual-panel">
                 <h2><i data-lucide="eye"></i> Visuals</h2>
+
+                <div class="visual-group">
+                    <h3>Camera</h3>
+                    <div class="camera-box" style="padding: 0;">
+                        <div class="scanline"></div>
+                        <img id="cam-image" src="" alt="Camera Feed" style="width:100%; height:100%; object-fit:contain; display:none; position:absolute; top:0; left:0; z-index:0;" />
+                        <div class="cam-content" id="cam-placeholder">
+                            <span class="cam-no-signal">🔴 NO SIGNAL</span>
+                            <span class="cam-mock">[Waiting for stream...]</span>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="visual-group">
                     <h3>OLED Face</h3>
@@ -157,18 +170,6 @@
                             <div class="oled-text" id="oled-text"></div>
                             <!-- Topic emoji (thinking/speaking) -->
                             <div class="oled-topic" id="oled-topic"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="visual-group">
-                    <h3>Camera</h3>
-                    <div class="camera-box" style="padding: 0;">
-                        <div class="scanline"></div>
-                        <img id="cam-image" src="" alt="Camera Feed" style="width:100%; height:100%; object-fit:contain; display:none; position:absolute; top:0; left:0; z-index:0;" />
-                        <div class="cam-content" id="cam-placeholder">
-                            <span class="cam-no-signal">🔴 NO SIGNAL</span>
-                            <span class="cam-mock">[Waiting for stream...]</span>
                         </div>
                     </div>
                 </div>
