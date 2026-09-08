@@ -187,7 +187,7 @@
                         <div class="ai-idle-hint" id="ai-idle-hint">
                             <div class="ai-idle-icon">🎙️</div>
                             <p>Nói <strong>"Moon..."</strong> để kiểm tra giọng nói</p>
-                            <p class="ai-idle-sub">Nghe tiếng tick rồi nói tiếp — text hiển thị tại đây, chưa dùng LLM</p>
+                            <p class="ai-idle-sub">Bật mic web để test STT; khi mic web tắt, theo dõi hội thoại từ Brain.</p>
                         </div>
 
                         <!-- Bubble câu hỏi người dùng -->
@@ -220,6 +220,7 @@
                             <button class="btn-browser-mic" id="voice-test-sound">Thử tiếng tick</button>
                         </div>
                         <select id="voice-device" aria-label="Microphone"><option value="">Microphone mặc định</option></select>
+                        <p id="voice-display-source">Nguồn hiển thị: Brain qua MQTT (nếu đang chạy)</p>
                         <p id="voice-state" role="status">Chưa bật mic</p>
                         <meter id="voice-level" min="0" max="0.15" value="0" aria-label="Mức microphone"></meter>
                         <span id="voice-speech"></span>
@@ -273,8 +274,8 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="vision-ui.js?v=20260908a"></script>
-    <script src="app.js?v=20260908c"></script>
-    <script src="voice-panel.js?v=20260908b"></script>
+    <script src="app.js?v=20260908d"></script>
+    <script src="voice-panel.js?v=20260908d"></script>
     <script>
         lucide.createIcons();
     </script>

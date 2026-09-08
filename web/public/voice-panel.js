@@ -62,6 +62,7 @@ function event(msg) {
 $('start').onclick = async () => {
     if (starting || stream) return;
     starting = true;
+    window.dispatchEvent(new CustomEvent('moon-voice', {detail: {event: 'starting'}}));
     const token = ++generation;
     $('start').disabled = true; $('stop').disabled = false; $('device').disabled = true;
     $('error').textContent = ''; $('state').textContent = 'Đang mở mic…';

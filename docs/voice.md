@@ -99,7 +99,12 @@ chuyển tới dashboard 3000. Không còn trang test Voice riêng.
 Text câu sau wake hiện ở **Bạn đã nói**, OLED mô phỏng và Activity Log.
 Transcript thô/chẩn đoán nằm trong mục mở rộng ngay dưới các nút mic.
 
-Dashboard Voice bỏ qua bản tin AI/state/thinking/response cũ từ MQTT để
-không ghi đè phiên test. OLED hiển thị transcript 6 giây rồi về mắt; câu đầy đủ
+Khi bật mic web, dashboard bỏ qua AI/state/thinking/response từ MQTT để
+không ghi đè phiên test. Khi mic web chưa bật hoặc đã dừng, dashboard theo
+Brain qua MQTT và hiển thị đầy đủ câu hỏi → suy nghĩ → nói → standby. OLED hiển thị transcript 6 giây rồi về mắt; câu đầy đủ
 vẫn giữ trong khung Bạn đã nói. Chữ dài xuống dòng, có thể cuộn trong OLED.
 Kiểm tra hồi quy giao diện: `node tests/test_voice_display.cjs` (cần Playwright).
+
+Dòng Nguồn hiển thị cho biết bên nào đang điều khiển OLED. Voice STT chỉ
+hiện tiến trình nhận diện, không tự tạo câu trả lời LLM. Câu trả lời có sẵn
+từ Brain chỉ được hiển thị khi không test bằng mic web.

@@ -1,6 +1,6 @@
 // ─── Socket.IO setup ──────────────────────────────────────────────────────────
 const socket = io();
-const voiceOnlyDashboard = !!document.getElementById('dashboard-voice');
+let voiceOnlyDashboard = false; // The web mic claims the display only during its session.
 let transcriptTimer;
 function cancelTranscriptTimer() {
     clearTimeout(transcriptTimer);
@@ -154,6 +154,7 @@ socket.on('connect', () => {
 socket.on('disconnect', () => {
     dot.className = 'dot offline';
     statusText.textContent = 'Offline';
+    if (!voiceOnlyDashboard) { hideThinking(); aiCursor.style.display = 'none'; setVoiceState('standby'); setOledAiMode('neutral'); }
     logToTerminal('Disconnected from Server', 'sys');
 });
 
@@ -173,6 +174,7 @@ function clearAiHistory() {
 const VOICE_STATE_CONFIG = {
     standby:   { label: 'Standby',    emoji: '🎙️', cls: 'state-standby'   },
     listening: { label: 'Listening',  emoji: '👂', cls: 'state-listening'  },
+    transcribing: { label: 'Đang nhận diện', emoji: '🎙️', cls: 'state-listening' },
     thinking:  { label: 'Thinking',   emoji: '🧠', cls: 'state-thinking'   },
     speaking:  { label: 'Speaking',   emoji: '🔊', cls: 'state-speaking'   },
 };
@@ -311,8 +313,9 @@ socket.on('mqtt_message', (data) => {
         // Đồng bộ OLED face theo AI state
         // (thinking: OLED GIỮ transcript đã nghe — mode 'hearing' — không đổi sang dots)
         if (payload === 'listening')   setOledAiMode('questioning');
-        else if (payload === 'speaking') setOledAiMode('speaking');
-        else if (payload === 'standby')  setOledAiMode('neutral');
+        else if (payload === 'thinking') setOledAiMode('ai-thinking');
+        else if (payload === 'speaking') { hideThinking(); setOledAiMode('speaking'); }
+        else if (payload === 'standby') { hideThinking(); aiCursor.style.display = 'none'; setOledAiMode('neutral'); }
         logToTerminal(`AI State: ${payload}`, 'ai-state');
 
     // ── AI thinking / stages ────────────────────────────────────────────────────────────────
@@ -332,10 +335,12 @@ socket.on('mqtt_message', (data) => {
                     break;
                 case 'thinking':
                     showThinking('🧠 Moon đang suy nghĩ...');
+                    setOledAiMode('ai-thinking');
                     // OLED giữ transcript đã nghe ('hearing') — dots chỉ trên dashboard
                     break;
                 case 'answering':
                     showThinking('✍️ Moon đang soạn câu trả lời...');
+                    setOledAiMode('ai-thinking');
                     // OLED vẫn giữ transcript
                     break;
                 case 'done':
@@ -352,6 +357,9 @@ socket.on('mqtt_message', (data) => {
     } else if (topic === 'panda/ai/response') {
         try {
             const msg = JSON.parse(payload);
+            if (typeof msg.text !== 'string') return;
+            aiIdleHint.style.display = 'none';
+            aiMoonBubble.style.display = 'block';
             if (!msg.done) {
                 // Chunk mới đến — hiển thị stream
                 if (aiMoonText.textContent === '') {
@@ -414,30 +422,56 @@ function logToTerminal(text, type) {
 
 // Voice test shares dashboard state, OLED preview and Activity Log.
 window.addEventListener('moon-voice', ({detail: msg}) => {
-    hideThinking();
+    // Meter/diagnostic packets arrive continuously; they must not erase the
+    // active progress indicator or interrupt the OLED transition.
+    if (['meter', 'ignored', 'transcript', 'calibrated'].includes(msg.event)) return;
+    if (['starting', 'ready'].includes(msg.event)) voiceOnlyDashboard = true;
+    if (msg.event === 'stopped') voiceOnlyDashboard = false;
+    const sourceLabel = document.getElementById('voice-display-source');
+    if (sourceLabel) sourceLabel.textContent = voiceOnlyDashboard ? 'Nguồn hiển thị: mic web — test STT' : 'Nguồn hiển thị: Brain qua MQTT (nếu đang chạy)';
     aiMoonBubble.style.display = 'none';
     aiMoonText.textContent = '';
     aiCursor.style.display = 'none';
-    if (msg.event === 'ready') {
+    if (['starting', 'ready'].includes(msg.event)) {
+        hideThinking();
         setVoiceState('standby');
         setOledAiMode('neutral');
     }
     if (msg.event === 'wake') {
+        hideThinking();
         setOledAiMode('questioning');
         setVoiceState('listening');
         logToTerminal('WAKE: Moon — đang nghe', 'log-voice');
+    }
+    if (msg.event === 'processing') {
+        aiIdleHint.style.display = 'none';
+        showThinking('Đang nhận diện giọng nói…');
+        setVoiceState('transcribing');
+        setOledAiMode('ai-thinking');
     }
     if (msg.event === 'question') {
         showUserQuestion(msg.text);
         hideThinking();
         setOledAiMode('hearing', msg.text);
         aiCursor.style.display = 'none';
-        // Keep the full sentence in the chat; OLED is a short preview only.
         transcriptTimer = setTimeout(() => setOledAiMode('neutral'), 6000);
         logToTerminal(`VOICE: ${msg.text}`, 'log-voice');
     }
-    if (msg.event === 'state') setVoiceState(msg.state);
+    if (msg.event === 'state') {
+        hideThinking();
+        setVoiceState(msg.state);
+        // Preserve a completed transcript, but never leave the processing
+        // animation running after a rejected clip or a wake-only result.
+        if (!oledFace.classList.contains('hearing')) {
+            setOledAiMode(msg.state === 'listening' ? 'questioning' : 'neutral');
+        }
+    }
+    if (msg.event === 'rejected') {
+        hideThinking();
+        logToTerminal(msg.text, 'sys');
+    }
     if (['stopped', 'timeout', 'error'].includes(msg.event)) {
+        hideThinking();
         setVoiceState('standby');
         setOledAiMode('neutral');
         if (msg.text) logToTerminal(msg.text, 'sys');
