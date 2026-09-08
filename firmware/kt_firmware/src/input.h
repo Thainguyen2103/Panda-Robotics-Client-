@@ -6,11 +6,10 @@ enum class ButtonEvent
 {
   None,
   Correct,
-  Wrong,
-  CycleFace // nút thứ 3: chuyển sang biểu cảm OLED kế tiếp
+  Wrong
 };
 
-// Cấu hình pinMode cho cả 3 nút. Gọi 1 lần trong setup().
+// Cấu hình pinMode cho cả 2 nút. Gọi 1 lần trong setup().
 void inputSetup();
 
 // Gọi mỗi vòng loop(). Trả về đúng 1 sự kiện cho lần bấm mới nhất (đã tự debounce +
