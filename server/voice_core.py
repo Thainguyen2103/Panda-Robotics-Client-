@@ -15,7 +15,8 @@ def wake_tail(text):
 
     Do not strip Vietnamese accents: 'muốn', 'môn', 'món' are not Moon.
     """
-    match = re.search(r"(?<!\w)moon(?!\w)", unicodedata.normalize("NFC", text), re.I)
+    text = unicodedata.normalize("NFC", text)
+    match = re.search(r"(?<!\w)moon(?!\w)", text, re.I)
     if match is None:
         return None
     tail = text[match.end():].lstrip(" ,.!?:;—-")

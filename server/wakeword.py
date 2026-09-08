@@ -17,7 +17,7 @@ Kích hoạt (một lần):
   4. Điền PICOVOICE_ACCESS_KEY trong config/settings.py
   5. Khởi động lại hệ thống.
 
-Khi chưa cấu hình: brain tự fallback về wake-word Whisper dual-pass (vi+en).
+Khi chưa cấu hình: fallback Whisper một lượt; xem docs/voice.md để test độc lập.
 """
 
 import os

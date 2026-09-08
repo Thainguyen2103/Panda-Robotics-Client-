@@ -164,10 +164,8 @@ PERSON_LOST_GRACE_SEC = 10.0
 
 # ─── Wake-word on-device (Porcupine — tùy chọn, kiểu Anki Vector) ─────────────
 # Bắt "Moon" bằng âm học trên máy, không phụ thuộc ngôn ngữ & không cần mạng.
-# LƯU Ý: console.picovoice.ai hiện CHỈ nhận email công ty — người dùng cá nhân
-# (Gmail...) không đăng ký được. Khi đó cứ để trống: hệ thống tự dùng
-# fallback Whisper dual-pass + fuzzy matching (vẫn bắt tốt "Moon").
-# Cách kích hoạt (nếu có email công ty): xem server/wakeword.py
+# Cấu hình key trong secrets.py/môi trường và model Moon .ppn đúng nền tảng.
+# Nếu chưa có, Voice Lab dùng Whisper một lượt, khớp đúng token Moon.
 PICOVOICE_ACCESS_KEY = _key("PICOVOICE_ACCESS_KEY")
 MOON_PPN_PATH = os.environ.get("MOON_PPN_PATH", "")   # để trống = mặc định server/moon.ppn
 

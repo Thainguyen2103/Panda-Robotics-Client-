@@ -1,4 +1,4 @@
-# 🐼 Moon Robotics — "Moon"
+# 🌙 Moon Robotics
 
 Robot bạn đồng hành hỗ trợ trẻ em học tiếng Anh — dự án PBL4, Đại học Đà Nẵng.
 Moon nghe được (wake-word "Moon" + câu hỏi tiếng Việt/Anh), nhìn được (nhận diện
@@ -7,8 +7,9 @@ màn OLED theo phong cách robot Vector (Anki).
 
 ## ✨ Tính năng nổi bật
 
-- **Giọng nói**: wake-word 3 lớp (Whisper dual-pass + cứu hộ fuzzy/phonetic), VAD
-  streaming chống ồn quạt/TV, chống hallucination, sửa lỗi ASR bằng LLM.
+- **Voice Lab độc lập**: microphone liên tục, WebRTC VAD, wakeword Moon bằng
+  Porcupine hoặc Whisper dự phòng, hiển thị STT nguyên văn để kiểm tra.
+  Chạy `start-voice.bat`; xem [hướng dẫn Voice](docs/voice.md).
 - **Não cloud**: Groq Whisper (STT) → Groq LLM (trả lời) → Fish Audio (TTS streaming
   từng câu) — độ trễ wake→tiếng đầu tiên ~2-3s.
 - **Phân loại 24 chủ đề** (hybrid: keyword 0ms + LLM enum fallback, benchmark 15/15)
@@ -43,6 +44,13 @@ web/         server.js + public/ (dashboard OLED mô phỏng, idle behaviors)
 firmware/    panda_firmware.ino (ESP32, chạy được trên Wokwi lẫn chip thật)
 tools/       bench_topics.py, dev_mic_bridge.py
 ```
+
+## 🎙️ Test Voice độc lập (công việc hiện tại)
+
+Chạy `start-voice.bat`, mở http://localhost:8765 và bật microphone.
+Cài môi trường lần đầu theo [docs/voice.md](docs/voice.md). Không cần Brain/LLM.
+Wake âm học tức thời cần model Moon `.ppn` và Picovoice key; nếu chưa có,
+trang dùng Whisper dự phòng và hiển thị rõ độ trễ phụ thuộc ngắt câu/mạng.
 
 ## 🚀 Chạy thử (không cần phần cứng)
 

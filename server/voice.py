@@ -88,9 +88,6 @@ try:
 except ImportError:
     _nr = None
     print("⚠️  [VOICE] noisereduce chưa cài — bỏ qua khử ồn. pip install noisereduce")
-# Prompt mớm chính tả tên riêng cho pass vi: khi âm mơ hồ, Whisper ưu tiên viết
-# "Moon" thay vì bịa "và hẹn gặp lại" / "bạn nàng"...
-WAKE_STT_PROMPT   = getattr(settings, "WAKE_STT_PROMPT", "Xin chào Moon, hôm nay trời đẹp quá.")
 WAKE_SILENCE_SEC  = getattr(settings, "WAKE_SILENCE_SEC", 1.2)   # im lặng kết thúc clip standby
 QUESTION_SILENCE_SEC = getattr(settings, "QUESTION_SILENCE_SEC", 3.0)
 QUESTION_MAX_SEC  = getattr(settings, "QUESTION_MAX_SEC", 20.0)
@@ -137,13 +134,7 @@ _on_wake_word_cbs  = []
 _on_wake_rescue_cbs = []   # sửa lỗi ASR để cứu wake khi bản thô trượt
 _wake_exec = ThreadPoolExecutor(max_workers=2)   # transcribe nền — tai không ngừng nghe
 
-WAKE_WORDS = sorted(getattr(settings, "MOON_WAKE_WORDS", ["moon"]),
-                    key=len, reverse=True)   # dài nhất trước để ưu tiên khớp đầy đủ
-
-
-# ─── Khớp wake-word KHÔNG PHỤ THUỘC DẤU (phonetic-normalized) ────────────────
-# Whisper vi-mode hay Việt hóa từ mượn Anh: "Moon" → "bạn nàng", "ban nang"...
-# Chuẩn hóa bỏ dấu thanh để mọi biến thể cùng khớp về một dạng.
+# Compatibility normalizer used by the legacy Brain ASR helper.
 def _strip_diacritics(s: str) -> str:
     """lower + bỏ dấu thanh + đ→d + nén khoảng trắng."""
     s = unicodedata.normalize("NFD", s.lower())
@@ -151,16 +142,6 @@ def _strip_diacritics(s: str) -> str:
     s = s.replace("đ", "d")
     s = re.sub(r"[^\w\s]", " ", s)
     return re.sub(r"\s+", " ", s).strip()
-
-
-# Biến thể bổ sung mà Whisper vi-mode sinh ra cho "Moon" (đo thực tế)
-_EXTRA_WAKE_VARIANTS = []
-
-WAKE_WORDS_NORM = sorted(
-    {_strip_diacritics(w) for w in WAKE_WORDS}
-    | {_strip_diacritics(w) for w in _EXTRA_WAKE_VARIANTS},
-    key=len, reverse=True,
-)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -528,14 +509,7 @@ def _transcribe(audio: bytes, model: str = None) -> str:
 
 
 def _transcribe_dual(audio: bytes) -> str:
-    """
-    Chạy 2 pass SONG SONG (vi + en) cho clip standby — mô phỏng cách Anki Vector
-    tách wake-word khỏi ASR đa ngôn ngữ:
-      - pass vi: chính xác cho câu lệnh tiếng Việt
-      - pass en: giữ nguyên từ mượn tiếng Anh như "Moon"
-    Ưu tiên transcript bắt được wake-word; nếu không, trả về pass vi.
-    Độ trễ ≈ max(2 pass) chứ không cộng dồn (chạy concurrent).
-    """
+    """Compatibility entry point: one STT request, no prompted wake retries."""
     # One request only: prompted retries can invent the wakeword in noise.
     return _transcribe(audio)
 
@@ -599,10 +573,7 @@ def _levenshtein(a: str, b: str) -> int:
 
 
 def _contains_wake_word(text: str) -> bool:
-    """
-    Kiểm tra transcript có wake-word "Moon" (hoặc biến thể) không.
-    Khớp phonetic KHÔNG PHỤ THUỘC DẤU: "bạn nàng" / "Păng Đa" / "PHAN TA" đều khớp.
-    """
+    """Match the complete name Moon, without fuzzy or accent folding."""
     from server.voice_core import wake_tail
     return wake_tail(text or "") is not None
 
