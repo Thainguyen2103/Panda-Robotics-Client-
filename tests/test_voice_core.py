@@ -15,6 +15,23 @@ class EnergyVad:
 
 
 class VoiceCoreTests(unittest.TestCase):
+    def test_fan_misclassified_as_speech_is_calibrated_out(self):
+        s = Segmenter(EnergyVad(), calibration_frames=60)
+        fan = frame(1600)
+        for _ in range(60):
+            self.assertIsNone(s.feed(fan, .45)[0])
+        for _ in range(100):
+            clip, rms, speech = s.feed(fan, .45)
+            self.assertIsNone(clip)
+            self.assertFalse(speech)
+        clips = [s.feed(pcm, .45)[0] for pcm in [frame(7000)] * 10 + [fan] * 15]
+        self.assertEqual(sum(c is not None for c in clips), 1)
+
+    def test_bad_segment_cannot_hide_behind_good_segment(self):
+        result = {'text': 'Moon. Subscribe!', 'segments': [
+            {'no_speech_prob': .01}, {'no_speech_prob': .9}]}
+        self.assertEqual(reliable_transcript(result), '')
+
     def test_wake_boundaries_and_original_case(self):
         self.assertEqual(wake_tail('Hey MOON ơi, Hôm nay trời đẹp!'), 'Hôm nay trời đẹp!')
         self.assertEqual(wake_tail('Moon!'), '')

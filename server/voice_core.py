@@ -27,15 +27,21 @@ class Segmenter:
     """30ms PCM frames; short pre-roll, confirmed onset, bounded utterances.
 
     VAD is injected so timing/noise behavior can be tested without a microphone.
-    Noise estimation only uses non-speech frames and is capped to avoid deafening
-    the detector in a noisy room. No peak-relative gate that cuts quiet syllables.
+    Calibrate ambient noise before accepting speech, including noise misclassified
+    by VAD. No peak-relative gate that cuts quiet syllables.
     """
-    def __init__(self, vad, min_rms=0.003, max_sec=15):
+    def __init__(self, vad, min_rms=0.003, max_sec=15, calibration_frames=0):
         self.vad = vad
         self.min_rms = min_rms
         self.max_frames = math.ceil(max_sec * 1000 / FRAME_MS)
         self.noise = min_rms / 3
+        self.calibration_frames = calibration_frames
+        self.calibration = []
         self.reset()
+
+    @property
+    def threshold(self):
+        return max(self.min_rms, self.noise * 2.2)
 
     def reset(self):
         self.pre = collections.deque(maxlen=10)
@@ -50,8 +56,16 @@ class Segmenter:
             raise ValueError("Expected 480 mono int16 samples at 16kHz")
         values = struct.unpack('<480h', pcm)
         rms = math.sqrt(sum(v*v for v in values) / 480) / 32768
+        if self.calibration_frames:
+            self.calibration.append(rms)
+            self.calibration_frames -= 1
+            if not self.calibration_frames:
+                ordered = sorted(self.calibration)
+                self.noise = ordered[int((len(ordered)-1) * .8)]
+                self.calibration.clear()
+            return None, rms, False
         voiced = self.vad.is_speech(pcm, RATE)
-        speech = voiced and rms >= max(self.min_rms, min(self.noise * 1.8, 0.012))
+        speech = voiced and rms >= self.threshold
         if not voiced and not self.active:
             self.noise = .98 * self.noise + .02 * rms
         if not self.active:
@@ -78,8 +92,8 @@ def reliable_transcript(result):
     """Keep the raw STT text; confidence rejects noise, never rewrites words."""
     text = (result.get('text') or '').strip()
     segments = result.get('segments') or []
-    if segments and all(s.get('no_speech_prob', 0) > .6 or
-                        s.get('avg_logprob', 0) < -1.2 or
+    if segments and any(s.get('no_speech_prob', 0) > .45 or
+                        s.get('avg_logprob', 0) < -1.0 or
                         s.get('compression_ratio', 0) > 2.4 for s in segments):
         return ''
     return text

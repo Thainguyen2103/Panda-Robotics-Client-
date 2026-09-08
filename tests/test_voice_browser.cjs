@@ -23,9 +23,20 @@ const {chromium} = require('playwright');
             });
         });
         await page.goto('http://localhost:8765');
+        await page.evaluate(() => {
+            window.toneCount = 0;
+            const create = AudioContext.prototype.createOscillator;
+            AudioContext.prototype.createOscillator = function () {
+                window.toneCount++;
+                return create.call(this);
+            };
+        });
+        await page.locator('#test-sound').click();
+        assert.equal(await page.evaluate(() => window.toneCount), 1);
         await page.locator('#start').click();
         await page.waitForFunction(() => document.getElementById('question').textContent === 'Tôi muốn học tiếng Anh.');
         assert.match(await page.locator('#log').innerText(), /Moon, Tôi muốn học tiếng Anh/);
+        assert.equal(await page.evaluate(() => window.toneCount), 2, 'wake event must play the cue');
         await page.locator('#stop').click();
         assert.equal(await page.locator('#start').isEnabled(), true);
         assert.equal(await page.locator('#stop').isDisabled(), true);

@@ -27,6 +27,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         engine = Engine()
         socket = Socket()
         session = Session(socket, None, engine)
+        session.segmenter.calibration_frames = 0
         await session.feed(bytes(960))
         self.assertFalse(session.listening)
         await session.feed(bytes(960))

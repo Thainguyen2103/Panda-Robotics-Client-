@@ -1,5 +1,17 @@
 const $ = id => document.getElementById(id);
-let stream, context, capture, source, ws, starting = false, generation = 0, wakes = 0;
+let stream, context, capture, source, highpass, ws, starting = false, generation = 0, wakes = 0;
+function wakeTick() {
+    if (!context || context.state !== 'running') return;
+    const tone = context.createOscillator(), volume = context.createGain();
+    const now = context.currentTime;
+    tone.frequency.setValueAtTime(1100, now);
+    volume.gain.setValueAtTime(0, now);
+    volume.gain.linearRampToValueAtTime(.06, now + .008);
+    volume.gain.exponentialRampToValueAtTime(.0001, now + .07);
+    tone.connect(volume); volume.connect(context.destination);
+    tone.onended = () => { tone.disconnect(); volume.disconnect(); };
+    tone.start(now); tone.stop(now + .08);
+}
 function addLog(text) {
     const li = document.createElement('li');
     li.textContent = `${new Date().toLocaleTimeString()} · ${text}`;
@@ -11,6 +23,7 @@ async function stop() {
     starting = false;
     if (capture) { capture.port.onmessage = null; capture.disconnect(); capture = null; }
     if (source) { source.disconnect(); source = null; }
+    if (highpass) { highpass.disconnect(); highpass = null; }
     stream?.getTracks().forEach(t => t.stop()); stream = null;
     const oldSocket = ws; ws = null;
     if (oldSocket) { oldSocket.onclose = null; oldSocket.close(); }
@@ -20,15 +33,23 @@ async function stop() {
     $('state').textContent = 'Đã dừng'; $('level').value = 0; $('speech').textContent = '';
 }
 function event(msg) {
-    if (msg.event === 'ready') { $('engine').textContent = msg.engine; $('state').textContent = 'Đang chờ Moon'; }
+    if (msg.event === 'ready') { $('engine').textContent = msg.engine; $('state').textContent = msg.calibrating ? 'Đo tiếng nền 1.8 giây — hãy giữ im lặng' : 'Đang chờ Moon'; }
+    if (msg.event === 'calibrated') {
+        $('state').textContent = 'Đang chờ Moon';
+        $('noise').textContent = `Nền ${msg.noise} · ngưỡng giọng ${msg.threshold}. Nếu đổi vị trí/quạt, dừng và bật mic để đo lại.`;
+    }
     if (msg.event === 'meter') { $('level').value = msg.rms; $('speech').textContent = msg.speech ? 'Có giọng nói' : 'Nền / im lặng'; }
     if (msg.event === 'wake') {
+        wakeTick();
         $('state').textContent = 'Đã nghe Moon — hãy nói tiếp';
         $('wake').textContent = `Đã bắt wakeword: ${++wakes} lần (${msg.engine})`;
         addLog(`WAKE · ${msg.engine}`);
     }
     if (msg.event === 'processing') $('state').textContent = 'Đang chuyển thành text — mic vẫn thu';
     if (msg.event === 'transcript') addLog(`${msg.text || '(không có text tin cậy)'} · STT ${msg.latency_ms} ms · audio ${msg.duration_ms} ms`);
+    if (msg.event === 'ignored') {
+        $('diagnostic').textContent = `Bỏ qua khi chờ Moon (có thể là nhiễu): ${msg.text || '(không đủ tin cậy)'} · ${msg.latency_ms} ms`;
+    }
     if (msg.event === 'question') $('question').textContent = msg.text;
     if (msg.event === 'state') $('state').textContent = msg.state === 'listening' ? 'Đã nghe Moon — hãy nói tiếp' : 'Đang chờ Moon';
     if (msg.event === 'timeout') { $('state').textContent = msg.text; addLog(msg.text); }
@@ -46,7 +67,7 @@ $('start').onclick = async () => {
         const selected = $('device').value;
         const acquired = await navigator.mediaDevices.getUserMedia({audio: {
             deviceId: selected ? {exact: selected} : undefined,
-            channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true
+            channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: false
         }});
         if (token !== generation) { acquired.getTracks().forEach(t => t.stop()); return; }
         stream = acquired;
@@ -56,7 +77,7 @@ $('start').onclick = async () => {
         $('device').replaceChildren(new Option('Microphone mặc định', ''));
         devices.filter(d => d.kind === 'audioinput').forEach(d => $('device').add(new Option(d.label || 'Microphone', d.deviceId)));
         $('device').value = selected;
-        context = new AudioContext();
+        context ||= new AudioContext();
         await context.resume();
         if (token !== generation) return;
         await context.audioWorklet.addModule('/voice-worklet.js');
@@ -88,7 +109,10 @@ $('start').onclick = async () => {
             }
             socket.send(e.data);
         };
-        source.connect(capture); capture.connect(context.destination); // Worklet outputs silence.
+        highpass = context.createBiquadFilter();
+        highpass.type = 'highpass'; highpass.frequency.value = 150; highpass.Q.value = .707;
+        source.connect(highpass); highpass.connect(capture);
+        capture.connect(context.destination); // Worklet outputs silence.
         starting = false;
     } catch (err) {
         if (token === generation) { $('error').textContent = err.message; await stop(); }
@@ -96,4 +120,10 @@ $('start').onclick = async () => {
 };
 $('stop').onclick = stop;
 $('clear').onclick = () => { $('log').replaceChildren(); };
+$('test-sound').onclick = async () => {
+    // User gesture unlocks audio without requiring microphone permission.
+    if (!context) context = new AudioContext();
+    await context.resume();
+    wakeTick();
+};
 window.addEventListener('pagehide', stop);

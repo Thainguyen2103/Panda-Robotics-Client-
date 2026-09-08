@@ -35,7 +35,8 @@ class Session:
     def __init__(self, ws, client, engine=None):
         self.ws, self.client, self.engine = ws, client, engine
         self.segmenter = Segmenter(webrtcvad.Vad(settings.VOICE_VAD_MODE),
-                                   settings.VOICE_MIN_RMS, settings.VOICE_MAX_SEC)
+                                   settings.VOICE_MIN_RMS, settings.VOICE_MAX_SEC,
+                                   calibration_frames=60)
         self.clips = asyncio.Queue(maxsize=3)
         self.acoustic_buffer = bytearray()
         self.listening = False
@@ -55,7 +56,8 @@ class Session:
     async def feed(self, pcm):
         if len(pcm) != FRAME_BYTES:
             raise ValueError('Audio frame must be 30ms PCM16 mono / 16kHz')
-        if self.engine:
+        calibrating = self.segmenter.calibration_frames > 0
+        if self.engine and not calibrating:
             self.acoustic_buffer.extend(pcm)
             size = self.engine.frame_length * 2
             while len(self.acoustic_buffer) >= size:
@@ -68,12 +70,16 @@ class Session:
         silence = (settings.VOICE_QUESTION_SILENCE_SEC if self.listening
                    else settings.VOICE_WAKE_SILENCE_SEC)
         clip, rms, speech = self.segmenter.feed(pcm, silence)
+        if calibrating and not self.segmenter.calibration_frames:
+            await self.emit('calibrated', noise=round(self.segmenter.noise, 4),
+                            threshold=round(self.segmenter.threshold, 4))
         now = time.monotonic()
         if self.listening and self.segmenter.active:
             self.deadline = now + settings.VOICE_WAIT_SEC
         if now - self.last_meter > .1:
             self.last_meter = now
-            await self.emit('meter', rms=round(rms, 4), speech=speech)
+            await self.emit('meter', rms=round(rms, 4), speech=speech,
+                            threshold=round(self.segmenter.threshold, 4))
         if clip and (not self.engine or self.listening):
             if self.clips.full():
                 await self.emit('error', text='STT không theo kịp. Hãy dừng và bật mic lại để tránh kết quả cũ.')
@@ -103,7 +109,9 @@ class Session:
                 await self.emit('processing')
                 text = await self.transcribe(clip)
                 self.sequence += 1
-                await self.emit('transcript', text=text, sequence=self.sequence,
+                # Unrelated standby ASR is diagnostic, not a user's question.
+                accepted = self.listening or wake_tail(text) is not None
+                await self.emit('transcript' if accepted else 'ignored', text=text, sequence=self.sequence,
                                 latency_ms=round((time.monotonic()-start)*1000),
                                 duration_ms=round(len(clip)/32))
                 if not text:
@@ -152,7 +160,7 @@ async def socket_handler(request):
         engine, description = acoustic_engine()
         async with AsyncGroq(api_key=settings.GROQ_API_KEY, timeout=15, max_retries=0) as client:
             session = Session(ws, client, engine)
-            await session.emit('ready', engine=description)
+            await session.emit('ready', engine=description, calibrating=True)
             tasks = [asyncio.create_task(session.worker()), asyncio.create_task(session.watchdog())]
             async for msg in ws:
                 if msg.type == WSMsgType.BINARY:

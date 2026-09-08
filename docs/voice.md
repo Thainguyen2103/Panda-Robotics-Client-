@@ -16,7 +16,8 @@ py -3.12 -m venv .voice-venv
 ```
 
 Mở [Voice Lab](http://localhost:8765) trong Chrome/Edge, bấm **Bật microphone**,
-cho phép dùng mic. Có thể đổi thiết bị sau khi dừng. Không chạy `start.bat` cho
+cho phép dùng mic, giữ im lặng 1.8 giây để đo nền rồi mới gọi Moon. Có thể đổi thiết bị sau khi dừng.
+Nút **Thử tiếng tick** kiểm tra loa; mỗi wake thật phát tiếng tick 80ms. Không chạy `start.bat` cho
 bài test này vì lệnh đó khởi động toàn bộ Brain.
 
 ## Hai chế độ wakeword
@@ -38,7 +39,7 @@ không âm thầm giả vờ đang chạy Porcupine.
 
 ## Những gì cần quan sát
 
-1. Nói “Moon”, xem số lần wake tăng và trạng thái **Đã nghe Moon**.
+1. Nói “Moon”, nghe tiếng tick, xem số lần wake tăng và trạng thái **Đã nghe Moon**.
 2. Nói “Hôm nay tôi muốn học tiếng Anh”. Text xuất hiện trong ô câu nói;
    nhật ký giữ bản STT nguyên văn, độ dài audio và thời gian API xử lý.
 3. Thử nói liền “Moon, hôm nay trời đẹp quá”; không cần mở lại mic.
@@ -50,7 +51,8 @@ không âm thầm giả vờ đang chạy Porcupine.
 
 Âm thanh được gửi tới Groq để STT; không lưu file audio, không gửi qua MQTT.
 Nhật ký tối đa 60 mục nằm trong trang. Tắt mic đóng socket và hủy yêu cầu STT
-đang chờ. Thu âm dùng DSP của trình duyệt (AEC/NS/AGC), PCM mono 16kHz,
+đang chờ. Thu âm dùng AEC/NS của trình duyệt, tắt AGC để tránh khuếch đại quạt,
+lọc high-pass 150Hz và hiệu chuẩn nền 1.8 giây, PCM mono 16kHz,
 WebRTC VAD, pre-roll 300ms, onset 3/5 frame, tối thiểu 180ms giọng nói.
 Câu sau wake kết thúc sau 850ms im lặng, giới hạn 15 giây mỗi đoạn.
 Hàng đợi giới hạn 3 đoạn; mạng quá chậm sẽ báo lỗi và dừng thay vì phát text cũ.
@@ -79,3 +81,10 @@ Biến môi trường vision mới: `MOON_CAMERA_SOURCE`, `MOON_DISTANCE_SCALE_C
 
 Tham khảo: [Groq STT và confidence metadata](https://console.groq.com/docs/speech-to-text),
 [Porcupine frame length, sample rate và sensitivity](https://picovoice.ai/docs/api/porcupine-python/).
+
+Sau cập nhật chống nhiễu: ngưỡng RMS bằng tối thiểu cấu hình hoặc 2.2 lần nền
+(percentile 80). Đổi quạt/vị trí cần dừng và bật mic để đo lại. Giọng nhỏ hơn
+ngưỡng có thể bị bỏ sót; xem mức nền/ngưỡng trên trang để điều chỉnh vị trí mic.
+Text không có Moon khi standby chỉ hiện ở ô chẩn đoán “Bỏ qua”, không vào
+nhật ký câu nhận diện. Đây là phân loại kết quả, không phải bằng chứng đã
+khử hết tiếng ồn. Kết quả chứa segment confidence thấp bị từ chối.

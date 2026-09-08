@@ -10,10 +10,10 @@
 <small>MOON / VOICE LAB</small><h1>Gọi Moon, rồi nói thử</h1>
 <p>Kiểm tra wakeword và giọng nói → text. Kết quả là bản STT nguyên văn, không qua Brain hay LLM.</p>
 <div class="card">
-<div class="row"><button id="start">Bật microphone</button><button id="stop" disabled>Dừng</button><select id="device" aria-label="Microphone"><option value="">Microphone mặc định</option></select></div>
+<div class="row"><button id="start">Bật microphone</button><button id="stop" disabled>Dừng</button><button id="test-sound">Thử tiếng tick</button><select id="device" aria-label="Microphone"><option value="">Microphone mặc định</option></select></div>
 <p>Âm thanh được gửi tới Groq để chuyển thành text khi phát hiện lời nói. Không lưu bản ghi âm trên máy chủ.</p>
 <div class="row"><span id="state" role="status">Chưa bật mic</span><meter id="level" min="0" max="0.15" value="0" aria-label="Mức âm thanh"></meter><span id="speech"></span></div>
-<p id="engine">Bật mic để kiểm tra chế độ wakeword.</p><p id="error" role="alert"></p>
+<p id="noise">Khi bật mic, giữ im lặng 1.8 giây để đo tiếng quạt/nền. Khi bắt được Moon sẽ có tiếng tick ngắn.</p><p id="diagnostic"></p><p id="engine">Bật mic để kiểm tra chế độ wakeword.</p><p id="error" role="alert"></p>
 </div>
 <div class="card"><h2>Câu nói sau wakeword</h2><div id="question" aria-live="polite">Nói “Moon”, chờ trạng thái “Đã nghe Moon”, rồi nói một câu.</div><p id="wake">Đã bắt wakeword: 0 lần</p></div>
 <div class="card"><div class="row"><h2>Nhật ký nhận diện nguyên văn</h2><button id="clear">Xóa nhật ký</button></div><p>Có thể nói liền “Moon, hôm nay trời đẹp quá”. Hãy thử thêm nói nhỏ, quạt bật và câu không có từ Moon để kiểm tra nhận nhầm.</p><ol id="log" reversed></ol></div>
