@@ -90,9 +90,9 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_http_assets_origin_and_missing_key(self):
         async with TestClient(TestServer(make_app())) as client:
-            for path in ['/', '/voice-test.js', '/voice-worklet.js']:
-                response = await client.get(path)
-                self.assertEqual(response.status, 200)
+            response = await client.get('/', allow_redirects=False)
+            self.assertEqual(response.status, 302)
+            self.assertEqual(response.headers['Location'], 'http://localhost:3000/')
             response = await client.get('/ws', headers={'Origin': 'https://unrelated.example'})
             self.assertEqual(response.status, 403)
             with patch('server.voice_lab.settings.GROQ_API_KEY', ''):

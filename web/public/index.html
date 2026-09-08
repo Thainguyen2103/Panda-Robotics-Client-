@@ -18,7 +18,6 @@
                 <div class="logo">🐼</div>
                 <div>
                     <h1>Moon <span>Dashboard</span></h1>
-                    <a href="http://localhost:8765" target="_blank" rel="noopener">🌙 Test Voice riêng (chạy start-voice.bat)</a>
                     <p class="header-subtitle">Robot Intelligence System</p>
                 </div>
             </div>
@@ -180,20 +179,20 @@
 
                 <!-- ✨ MOON AI CHAT PANEL (NEW) -->
                 <div class="visual-group ai-chat-group">
-                    <h3><span class="moon-icon-h3">🐼</span> Moon AI</h3>
+                    <h3><span class="moon-icon-h3">🐼</span> Moon Voice</h3>
 
                     <div class="ai-chat-panel" id="ai-chat-panel">
 
                         <!-- Trạng thái mặc định: chờ wake-word -->
                         <div class="ai-idle-hint" id="ai-idle-hint">
                             <div class="ai-idle-icon">🎙️</div>
-                            <p>Nói <strong>"Moon..."</strong> để bắt đầu hội thoại</p>
-                            <p class="ai-idle-sub">Sau 3 giây im lặng, Moon sẽ trả lời</p>
+                            <p>Nói <strong>"Moon..."</strong> để kiểm tra giọng nói</p>
+                            <p class="ai-idle-sub">Nghe tiếng tick rồi nói tiếp — text hiển thị tại đây, chưa dùng LLM</p>
                         </div>
 
                         <!-- Bubble câu hỏi người dùng -->
                         <div class="ai-bubble user-bubble" id="ai-user-bubble" style="display:none">
-                            <div class="bubble-label"><i data-lucide="user"></i> Bạn hỏi</div>
+                            <div class="bubble-label"><i data-lucide="user"></i> Bạn đã nói</div>
                             <div class="bubble-text" id="ai-user-text"></div>
                         </div>
 
@@ -214,20 +213,26 @@
 
                     </div>
 
-                    <!-- Browser push-to-talk: dùng mic của trình duyệt (cùng mic Google Translate) -->
-                    <button class="btn-browser-mic" id="mic-btn" onclick="toggleBrowserMic()">
-                        🎤 Nói qua trình duyệt
-                    </button>
-
-                    <!-- Live mic: nghe liên tục với DSP AEC+NS+AGC kiểu Google Dịch -->
-                    <button class="btn-browser-mic" id="mic-live-btn" onclick="toggleLiveMic()">
-                        🎙️ Nghe liên tục qua trình duyệt
-                    </button>
-
-                    <!-- History button -->
-                    <button class="btn-clear-history" id="btn-clear-history" onclick="clearAiHistory()">
-                        <i data-lucide="trash-2"></i> Xóa lịch sử
-                    </button>
+                    <div class="voice-controls" id="dashboard-voice" data-endpoint="/voice/ws">
+                        <div class="voice-buttons">
+                            <button class="btn-browser-mic" id="voice-start">🎙️ Bật microphone</button>
+                            <button class="btn-browser-mic" id="voice-stop" disabled>Dừng mic</button>
+                            <button class="btn-browser-mic" id="voice-test-sound">Thử tiếng tick</button>
+                        </div>
+                        <select id="voice-device" aria-label="Microphone"><option value="">Microphone mặc định</option></select>
+                        <p id="voice-state" role="status">Chưa bật mic</p>
+                        <meter id="voice-level" min="0" max="0.15" value="0" aria-label="Mức microphone"></meter>
+                        <span id="voice-speech"></span>
+                        <p id="voice-noise">Giữ im lặng 1.8 giây khi bật mic để đo tiếng nền.</p>
+                        <p id="voice-wake">Đã bắt wakeword: 0 lần</p>
+                        <p id="voice-engine">Âm thanh được gửi tới Groq để nhận diện; không qua Brain/LLM.</p>
+                        <p id="voice-error" role="alert"></p>
+                        <details><summary>Chẩn đoán Voice và transcript nguyên văn</summary>
+                            <p id="voice-diagnostic"></p>
+                            <button class="btn-clear-history" id="voice-clear">Xóa nhật ký Voice</button>
+                            <ol id="voice-log" reversed></ol>
+                        </details>
+                    </div>
                 </div>
             </section>
 
@@ -268,7 +273,8 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="vision-ui.js?v=20260908a"></script>
-    <script src="app.js?v=20260908a"></script>
+    <script src="app.js?v=20260908b"></script>
+    <script src="voice-panel.js?v=20260908b"></script>
     <script>
         lucide.createIcons();
     </script>

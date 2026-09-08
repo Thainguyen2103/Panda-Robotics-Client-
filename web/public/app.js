@@ -52,8 +52,6 @@ const aiMoonText     = document.getElementById('ai-moon-text');
 const aiCursor        = document.getElementById('ai-cursor');
 const voiceStateBadge = document.getElementById('voice-state-badge');
 const voiceStateLabel = document.getElementById('voice-state-label');
-const micBtn          = document.getElementById('mic-btn');
-const micLiveBtn      = document.getElementById('mic-live-btn');
 
 // ─── OLED Face ────────────────────────────────────────────────────────────────
 const ALL_EMOTIONS = ['neutral','happy','sad','surprised','angry','love','wink','sleepy','dizzy','cool','cute'];
@@ -158,194 +156,8 @@ function sendCommand(topic, payload) {
 
 // ─── Clear AI chat history ────────────────────────────────────────────────────
 function clearAiHistory() {
-    socket.emit('send_cmd', { topic: 'panda/ai/clear_history', payload: '1' });
     resetAiPanel();
     logToTerminal('AI history cleared', 'sys');
-}
-
-// ─── Browser Push-to-Talk (MediaStream → Socket.IO → MQTT → Groq) ────────────
-// Dùng CHÍNH mic của trình duyệt (cùng thiết bị Google Translate dùng),
-// ghi âm webm/opus rồi gửi về backend — bypass mic server bị lỗi.
-let mediaRecorder = null;
-let micChunks = [];
-
-function arrayBufferToBase64(buf) {
-    const bytes = new Uint8Array(buf);
-    let bin = '';
-    const CHUNK = 0x8000;
-    for (let i = 0; i < bytes.length; i += CHUNK) {
-        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
-    }
-    return btoa(bin);
-}
-
-function setMicUI(recording) {
-    if (!micBtn) return;
-    micBtn.classList.toggle('recording', recording);
-    micBtn.textContent = recording ? '⏹ Dừng & gửi' : '🎤 Nói qua trình duyệt';
-}
-
-async function toggleBrowserMic() {
-    // Đang thu → dừng và gửi
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-        return;
-    }
-    if (!navigator.mediaDevices || !window.MediaRecorder) {
-        logToTerminal('🎤 Trình duyệt không hỗ trợ MediaRecorder', 'sys');
-        return;
-    }
-    try {
-        // Bật DSP kiểu Google Dịch: triệt tiếng loa + khử ồn + tự động gain
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-            },
-        });
-        const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-            ? 'audio/webm;codecs=opus' : 'audio/webm';
-        mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
-        micChunks = [];
-
-        mediaRecorder.ondataavailable = (e) => {
-            if (e.data && e.data.size > 0) micChunks.push(e.data);
-        };
-
-        mediaRecorder.onstop = async () => {
-            stream.getTracks().forEach(t => t.stop());   // tắt đèn mic
-            const blob = new Blob(micChunks, { type: 'audio/webm' });
-            if (blob.size < 1024) {
-                logToTerminal('🎤 Audio quá ngắn — bỏ qua', 'sys');
-            } else {
-                const b64 = arrayBufferToBase64(await blob.arrayBuffer());
-                socket.emit('voice_audio', b64);
-                logToTerminal(`🎤 Đã gửi audio browser (${(blob.size / 1024).toFixed(1)} KB)`, 'log-voice');
-            }
-            setMicUI(false);
-        };
-
-        mediaRecorder.start();
-        setMicUI(true);
-        logToTerminal('🎤 Browser mic đang thu... nhấn nút lần nữa để gửi', 'sys');
-    } catch (e) {
-        logToTerminal(`🎤 Lỗi mic browser: ${e.name} — ${e.message}`, 'sys');
-        setMicUI(false);
-    }
-}
-
-// ─── LIVE MIC: nghe liên tục hands-free với DSP kiểu Google Dịch ─────────────
-// AudioContext 16kHz + chuỗi DSP trình duyệt (AEC+NS+AGC) → VAD năng lượng nhẹ
-// trong JS → gửi clip PCM sạch về server → Whisper 3-pass. Mượt như Google Dịch.
-let live = { on:false, ctx:null, proc:null, stream:null,
-             ambient:0, seen:0, speech:false, speechBlocks:0,
-             preroll:[], buf:[], lastSpeech:0, pending:[] };
-
-function setLiveUI(on) {
-    if (!micLiveBtn) return;
-    micLiveBtn.classList.toggle('recording', on);
-    micLiveBtn.textContent = on ? '🎙️ Đang nghe liên tục — nhấn để tắt'
-                                : '🎙️ Nghe liên tục qua trình duyệt';
-}
-
-function resetLiveVad() {
-    Object.assign(live, { ambient:0, seen:0, speech:false, speechBlocks:0,
-                          preroll:[], buf:[], lastSpeech:0, pending:[] });
-}
-
-async function toggleLiveMic() {
-    if (live.on) { stopLiveMic(); return; }
-    try {
-        live.stream = await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true },
-        });
-        const AC = window.AudioContext || window.webkitAudioContext;
-        live.ctx = new AC({ sampleRate: 16000 });
-        if (live.ctx.sampleRate !== 16000) {
-            live.ctx.close(); live.stream.getTracks().forEach(t => t.stop());
-            logToTerminal('🎙️ Trình duyệt không hỗ trợ AudioContext 16kHz', 'sys');
-            return;
-        }
-        const src = live.ctx.createMediaStreamSource(live.stream);
-        live.proc = live.ctx.createScriptProcessor(4096, 1, 1);
-        live.proc.onaudioprocess = (e) => {
-            if (live.on) liveFeed(e.inputBuffer.getChannelData(0));
-        };
-        src.connect(live.proc);
-        live.proc.connect(live.ctx.destination);
-        live.on = true;
-        resetLiveVad();
-        socket.emit('mic_live', '1');
-        setLiveUI(true);
-        logToTerminal('🎙️ LIVE MIC BẬT — Moon nghe liên tục qua DSP trình duyệt', 'sys');
-    } catch (e) {
-        logToTerminal(`🎙️ Lỗi live mic: ${e.name} — ${e.message}`, 'sys');
-    }
-}
-
-function stopLiveMic() {
-    live.on = false;
-    try {
-        if (live.proc) live.proc.disconnect();
-        if (live.ctx)  live.ctx.close();
-        if (live.stream) live.stream.getTracks().forEach(t => t.stop());
-    } catch (e) {}
-    socket.emit('mic_live', '0');
-    setLiveUI(false);
-    logToTerminal('🎙️ Live mic TẮT — trả tai về mic robot', 'sys');
-}
-
-function liveFeed(f32) {
-    for (let i = 0; i < f32.length; i++) live.pending.push(f32[i]);
-    while (live.pending.length >= 480) {          // block 30ms @16k
-        liveBlock(live.pending.splice(0, 480));
-    }
-}
-
-function liveBlock(blk) {
-    let sum = 0;
-    for (let i = 0; i < blk.length; i++) sum += blk[i] * blk[i];
-    const rms = Math.sqrt(sum / blk.length);
-
-    // 0.6s hiệu chuẩn ồn nền (giống server)
-    if (live.seen < 20) {
-        live.seen++;
-        live.ambient = (live.seen === 1) ? rms : live.ambient * 0.7 + rms * 0.3;
-        live.preroll.push(blk); if (live.preroll.length > 50) live.preroll.shift();
-        return;
-    }
-    const thr = Math.max(0.02, live.ambient * 2.5);
-    const isSpeech = rms >= thr;
-
-    if (isSpeech) {
-        if (!live.speech) { live.speech = true; live.buf = live.preroll.slice(); live.preroll = []; }
-        live.speechBlocks++;
-        live.lastSpeech = Date.now();
-        live.buf.push(blk);
-    } else {
-        live.ambient = live.ambient * 0.9 + rms * 0.1;
-        if (live.speech) {
-            live.buf.push(blk);
-            if (Date.now() - live.lastSpeech >= 1200) emitLiveClip();   // endpointer 1.2s
-        } else {
-            live.preroll.push(blk); if (live.preroll.length > 50) live.preroll.shift();
-        }
-    }
-    if (live.speech && live.buf.length > 333) emitLiveClip();           // clip ≤ 10s
-}
-
-function emitLiveClip() {
-    if (live.speechBlocks >= 8) {                                       // ≥ 0.24s giọng
-        const all = [].concat(...live.buf);
-        const i16 = new Int16Array(all.length);
-        for (let i = 0; i < all.length; i++) {
-            const v = Math.max(-1, Math.min(1, all[i]));
-            i16[i] = v < 0 ? v * 0x8000 : v * 0x7FFF;
-        }
-        socket.emit('voice_clip', arrayBufferToBase64(i16.buffer));
-    }
-    live.speech = false; live.speechBlocks = 0; live.buf = []; live.preroll = [];
 }
 
 // ─── Voice AI State helpers ───────────────────────────────────────────────────
@@ -583,3 +395,22 @@ function logToTerminal(text, type) {
         scheduleIdleBehavior();
     }, 5000 + Math.random() * 9000);
 })();
+
+// Voice test shares dashboard state, OLED preview and Activity Log.
+window.addEventListener('moon-voice', ({detail: msg}) => {
+    if (msg.event === 'wake') {
+        setVoiceState('listening');
+        logToTerminal('WAKE: Moon — đang nghe', 'log-voice');
+    }
+    if (msg.event === 'question') {
+        showUserQuestion(msg.text);
+        hideThinking();
+        setOledAiMode('hearing', msg.text);
+        logToTerminal(`VOICE: ${msg.text}`, 'log-voice');
+    }
+    if (msg.event === 'state') setVoiceState(msg.state);
+    if (['stopped', 'timeout', 'error'].includes(msg.event)) {
+        setVoiceState('standby');
+        if (msg.text) logToTerminal(msg.text, 'sys');
+    }
+});

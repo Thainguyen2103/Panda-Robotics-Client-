@@ -7,7 +7,7 @@ màn OLED theo phong cách robot Vector (Anki).
 
 ## ✨ Tính năng nổi bật
 
-- **Voice Lab độc lập**: microphone liên tục, WebRTC VAD, wakeword Moon bằng
+- **Voice trên dashboard**: microphone liên tục, WebRTC VAD, wakeword Moon bằng
   Porcupine hoặc Whisper dự phòng, hiển thị STT nguyên văn để kiểm tra.
   Chạy `start-voice.bat`; xem [hướng dẫn Voice](docs/voice.md).
 - **Não cloud**: Groq Whisper (STT) → Groq LLM (trả lời) → Fish Audio (TTS streaming
@@ -45,12 +45,12 @@ firmware/    panda_firmware.ino (ESP32, chạy được trên Wokwi lẫn chip t
 tools/       bench_topics.py, dev_mic_bridge.py
 ```
 
-## 🎙️ Test Voice độc lập (công việc hiện tại)
+## 🎙️ Test Voice trên dashboard (công việc hiện tại)
 
-Chạy `start-voice.bat`, mở http://localhost:8765 và bật microphone.
+Chạy `start-voice.bat`, mở http://localhost:3000 và bật microphone.
 Cài môi trường lần đầu theo [docs/voice.md](docs/voice.md). Không cần Brain/LLM.
 Wake âm học tức thời cần model Moon `.ppn` và Picovoice key; nếu chưa có,
-trang dùng Whisper dự phòng và hiển thị rõ độ trễ phụ thuộc ngắt câu/mạng.
+dashboard dùng Whisper dự phòng và hiển thị rõ độ trễ phụ thuộc ngắt câu/mạng.
 
 ## 🚀 Chạy thử (không cần phần cứng)
 

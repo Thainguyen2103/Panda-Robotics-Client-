@@ -1,7 +1,9 @@
-# Moon Voice Lab
+# Moon Voice trên dashboard
 
-Chạy riêng để đánh giá wakeword và STT; không khởi động Brain, MQTT, camera,
-LLM, TTS hoặc firmware. Giữ microphone trình duyệt mở liên tục cả khi gọi STT.
+Test trực tiếp trong dashboard hiện tại, ô **Moon Voice**. Microphone →
+WebSocket cùng origin `/voice/ws` → Python Voice → STT; không gửi audio tới
+MQTT hoặc Brain/LLM. Giữ microphone mở liên tục cả khi gọi STT.
+Các phần điều khiển, camera, OLED và Monitor của dashboard vẫn giữ nguyên.
 
 ## Chạy trên Windows
 
@@ -9,13 +11,14 @@ Dùng Python **3.12 hoặc 3.13** để có wheel WebRTC VAD sẵn, không cần
 Từ thư mục gốc project:
 
 ```powershell
+npm --prefix web install
 py -3.12 -m venv .voice-venv
 .\.voice-venv\Scripts\python.exe -m pip install -r requirements-voice.txt
 # Nếu chưa có config/secrets.py, sao chép config/secrets.example.py và điền GROQ_API_KEY.
 .\start-voice.bat
 ```
 
-Mở [Voice Lab](http://localhost:8765) trong Chrome/Edge, bấm **Bật microphone**,
+Mở [Dashboard](http://localhost:3000) trong Chrome/Edge, bấm **Bật microphone**,
 cho phép dùng mic, giữ im lặng 1.8 giây để đo nền rồi mới gọi Moon. Có thể đổi thiết bị sau khi dừng.
 Nút **Thử tiếng tick** kiểm tra loa; mỗi wake thật phát tiếng tick 80ms. Không chạy `start.bat` cho
 bài test này vì lệnh đó khởi động toàn bộ Brain.
@@ -34,7 +37,7 @@ bài test này vì lệnh đó khởi động toàn bộ Brain.
   fuzzy matching hay LLM sửa lời nói. Chế độ này có thể bỏ sót nếu Whisper viết
   sai tên, và không có độ trễ tức thì như mô hình âm học.
 
-Trang luôn hiện chế độ thực tế. Key/model có cấu hình nhưng lỗi sẽ báo lỗi;
+Dashboard luôn hiện chế độ thực tế. Key/model có cấu hình nhưng lỗi sẽ báo lỗi;
 không âm thầm giả vờ đang chạy Porcupine.
 
 ## Những gì cần quan sát
@@ -69,6 +72,7 @@ node tests/test_voice_worklet.cjs
 node tests/test_vision_ui.cjs
 # Khi có Playwright và Edge, chạy server rồi test mic giả (không gửi audio cloud):
 node tests/test_voice_browser.cjs
+node tests/test_voice_bridge.cjs
 ```
 
 Test xác minh segmentation, tiếng click/im lặng, wake token, STT chậm/lỗi,
@@ -88,3 +92,9 @@ ngưỡng có thể bị bỏ sót; xem mức nền/ngưỡng trên trang để 
 Text không có Moon khi standby chỉ hiện ở ô chẩn đoán “Bỏ qua”, không vào
 nhật ký câu nhận diện. Đây là phân loại kết quả, không phải bằng chứng đã
 khử hết tiếng ồn. Kết quả chứa segment confidence thấp bị từ chối.
+
+`start-voice.bat` nay chạy web dashboard; Node tự khởi động Python Voice khi
+port 8765 chưa có service. Port 8765 chỉ là backend nội bộ; đường `/` cũ
+chuyển tới dashboard 3000. Không còn trang test Voice riêng.
+Text câu sau wake hiện ở **Bạn đã nói**, OLED mô phỏng và Activity Log.
+Transcript thô/chẩn đoán nằm trong mục mở rộng ngay dưới các nút mic.

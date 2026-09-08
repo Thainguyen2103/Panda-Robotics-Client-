@@ -14,8 +14,6 @@ import webrtcvad
 from config import settings
 from server.voice_core import Segmenter, wake_tail, reliable_transcript, RATE, FRAME_BYTES
 
-PUBLIC = Path(__file__).resolve().parents[1] / 'web' / 'public'
-
 
 def acoustic_engine():
     key = settings.PICOVOICE_ACCESS_KEY
@@ -185,11 +183,9 @@ async def socket_handler(request):
 def make_app():
     app = web.Application()
     app.router.add_get('/ws', socket_handler)
-    for route, filename in [('/', 'voice-test.html'), ('/voice-test.js', 'voice-test.js'),
-                            ('/voice-worklet.js', 'voice-worklet.js')]:
-        async def serve(request, name=filename):
-            return web.FileResponse(PUBLIC / name, headers={'Cache-Control': 'no-store'})
-        app.router.add_get(route, serve)
+    async def dashboard(request):
+        raise web.HTTPFound('http://localhost:3000/')
+    app.router.add_get('/', dashboard)
     return app
 
 

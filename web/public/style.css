@@ -1145,3 +1145,16 @@ button:active { transform: translateY(0); }
     0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.5); }
     50%      { box-shadow: 0 0 0 8px rgba(255, 71, 87, 0); }
 }
+
+/* Voice controls inside the existing Moon panel. */
+.voice-controls { min-width: 0; padding-top: 12px; }
+.voice-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.voice-buttons .btn-browser-mic { flex: 1 1 120px; margin: 4px 0; }
+.voice-controls select { max-width: 100%; width: 100%; padding: 10px; background: #182233; color: #e2e8f0; border: 1px solid #475569; border-radius: 8px; }
+.voice-controls p { margin: 10px 0; font-size: 13px; overflow-wrap: anywhere; }
+.voice-controls meter { width: 55%; }
+#voice-state { color: #86efac; font-weight: 600; }
+#voice-error { color: #fca5a5; }
+#voice-log { max-height: 260px; overflow: auto; padding-left: 24px; font-size: 12px; }
+#voice-log li { padding: 8px 0; overflow-wrap: anywhere; }
+.voice-controls button:disabled { opacity: .5; cursor: default; }

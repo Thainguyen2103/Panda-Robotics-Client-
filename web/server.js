@@ -7,6 +7,9 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
+const {attachVoice, startVoiceService} = require('./voice-bridge');
+attachVoice(server);
+startVoiceService();
 
 // Define MQTT settings
 const MQTT_BROKER = 'mqtt://localhost:1883';

@@ -11,7 +11,7 @@ const {chromium} = require('playwright');
         const errors = [];
         page.on('pageerror', e => errors.push(e.message));
         let frames = 0;
-        await page.routeWebSocket('**/ws', socket => {
+        await page.routeWebSocket('**/voice/ws', socket => {
             socket.send(JSON.stringify({event: 'ready', engine: 'TEST mock'}));
             socket.onMessage(data => {
                 assert.equal(data.length, 960);
@@ -22,7 +22,7 @@ const {chromium} = require('playwright');
                 }
             });
         });
-        await page.goto('http://localhost:8765');
+        await page.goto('http://localhost:3000');
         await page.evaluate(() => {
             window.toneCount = 0;
             const create = AudioContext.prototype.createOscillator;
@@ -31,22 +31,24 @@ const {chromium} = require('playwright');
                 return create.call(this);
             };
         });
-        await page.locator('#test-sound').click();
+        await page.locator('#voice-test-sound').click();
         assert.equal(await page.evaluate(() => window.toneCount), 1);
-        await page.locator('#start').click();
-        await page.waitForFunction(() => document.getElementById('question').textContent === 'Tôi muốn học tiếng Anh.');
-        assert.match(await page.locator('#log').innerText(), /Moon, Tôi muốn học tiếng Anh/);
+        await page.locator('#voice-start').click();
+        await page.waitForFunction(() => document.getElementById('ai-user-text').textContent === 'Tôi muốn học tiếng Anh.');
+        assert.match(await page.locator('#voice-log').textContent(), /Moon, Tôi muốn học tiếng Anh/);
         assert.equal(await page.evaluate(() => window.toneCount), 2, 'wake event must play the cue');
-        await page.locator('#stop').click();
-        assert.equal(await page.locator('#start').isEnabled(), true);
-        assert.equal(await page.locator('#stop').isDisabled(), true);
-        await page.locator('#start').click();
-        await page.waitForFunction(() => document.getElementById('state').textContent === 'Đang chờ Moon');
-        await page.locator('#stop').click();
+        await page.locator('#voice-stop').click();
+        assert.equal(await page.locator('#voice-start').isEnabled(), true);
+        assert.equal(await page.locator('#voice-stop').isDisabled(), true);
+        await page.locator('#voice-start').click();
+        await page.waitForFunction(() => document.getElementById('voice-state').textContent === 'Đang chờ Moon');
+        await page.locator('#voice-stop').click();
         await page.setViewportSize({width: 390, height: 844});
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
         await page.screenshot({path: '.voice-venv/voice-ui.png', fullPage: true});
         assert.deepEqual(errors, []);
+        assert.equal(await page.locator('#ai-user-bubble').isVisible(), true);
+        assert.match(await page.locator('#terminal-log').innerText(), /VOICE: Tôi muốn học tiếng Anh/);
         assert(frames >= 4);
         console.log('Voice browser: fake mic PCM stream, transcript, restart, mobile layout passed');
     } finally { await browser.close(); }

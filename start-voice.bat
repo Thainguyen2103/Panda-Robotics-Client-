@@ -1,9 +1,6 @@
 @echo off
 cd /d "%~dp0"
-echo Moon Voice Lab: http://localhost:8765
-if exist .voice-venv\Scripts\python.exe (
-    .voice-venv\Scripts\python.exe -m server.voice_lab
-) else (
-    python -m server.voice_lab
-)
+echo Moon Dashboard: http://localhost:3000
+echo Voice only - no Brain or LLM
+node web\server.js
 pause

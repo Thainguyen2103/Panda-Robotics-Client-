@@ -1,4 +1,5 @@
-const $ = id => document.getElementById(id);
+(() => {
+const $ = id => document.getElementById(id === 'question' ? 'ai-user-text' : `voice-${id}`);
 let stream, context, capture, source, highpass, ws, starting = false, generation = 0, wakes = 0;
 function wakeTick() {
     if (!context || context.state !== 'running') return;
@@ -30,9 +31,11 @@ async function stop() {
     const oldContext = context; context = null;
     if (oldContext) await oldContext.close();
     $('start').disabled = false; $('stop').disabled = true; $('device').disabled = false;
+    window.dispatchEvent(new CustomEvent('moon-voice', {detail: {event: 'stopped'}}));
     $('state').textContent = 'Đã dừng'; $('level').value = 0; $('speech').textContent = '';
 }
 function event(msg) {
+    window.dispatchEvent(new CustomEvent('moon-voice', {detail: msg}));
     if (msg.event === 'ready') { $('engine').textContent = msg.engine; $('state').textContent = msg.calibrating ? 'Đo tiếng nền 1.8 giây — hãy giữ im lặng' : 'Đang chờ Moon'; }
     if (msg.event === 'calibrated') {
         $('state').textContent = 'Đang chờ Moon';
@@ -82,7 +85,7 @@ $('start').onclick = async () => {
         if (token !== generation) return;
         await context.audioWorklet.addModule('/voice-worklet.js');
         if (token !== generation) return;
-        ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+        ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${document.getElementById('dashboard-voice').dataset.endpoint}`);
         const socket = ws;
         // Wait for server readiness (including keys/model) before sending any audio.
         await new Promise((resolve, reject) => {
@@ -127,3 +130,5 @@ $('test-sound').onclick = async () => {
     wakeTick();
 };
 window.addEventListener('pagehide', stop);
+
+})();
