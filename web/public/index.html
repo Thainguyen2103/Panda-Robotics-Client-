@@ -40,36 +40,7 @@
                 <h2><i data-lucide="sliders-horizontal"></i> Controls & AI Vision</h2>
 
                 <div class="control-group">
-                    <h3>AI Vision Status</h3>
-                    <div class="vision-status-box">
-                        <div class="status-item">
-                            <span class="label">Camera / AI:</span>
-                            <span class="val" id="cv-health">Đang chờ</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="label">Danh tính:</span>
-                            <span class="val" id="cv-identity">Chưa rõ</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="label">Emotion:</span>
-                            <span class="val" id="cv-emotion">N/A</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="label">Action:</span>
-                            <span class="val" id="cv-action">N/A</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="label">Khớp cánh tay:</span>
-                            <span class="val" id="cv-joints">Chưa rõ</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="label">Dấu hiệu mặt:</span>
-                            <span class="val" id="cv-cues">Chưa rõ</span>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="control-group">
                     <h3>Movement</h3>
                     <div class="d-pad">
                         <button id="btn-forward" onclick="sendCommand('panda/cmd/move', 'forward')">↑</button>
@@ -109,6 +80,37 @@
                     <div class="button-row">
                         <button id="btn-buzz-on" onclick="sendCommand('panda/cmd/buzz', 'on')"><i data-lucide="bell"></i> Buzz ON</button>
                         <button id="btn-buzz-off" onclick="sendCommand('panda/cmd/buzz', 'off')"><i data-lucide="bell-off"></i> Buzz OFF</button>
+                    </div>
+                </div>
+
+                <!-- AI Vision Status — cuối cột trái, ngang tầm Camera cột giữa -->
+                <div class="control-group">
+                    <h3>AI Vision Status</h3>
+                    <div class="vision-status-box">
+                        <div class="status-item">
+                            <span class="label">Camera / AI:</span>
+                            <span class="val" id="cv-health">Đang chờ</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Danh tính:</span>
+                            <span class="val" id="cv-identity">Chưa rõ</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Emotion:</span>
+                            <span class="val" id="cv-emotion">N/A</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Action:</span>
+                            <span class="val" id="cv-action">N/A</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Khớp cánh tay:</span>
+                            <span class="val" id="cv-joints">Chưa rõ</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Dấu hiệu mặt:</span>
+                            <span class="val" id="cv-cues">Chưa rõ</span>
+                        </div>
                     </div>
                 </div>
             </section>
