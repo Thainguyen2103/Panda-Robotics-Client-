@@ -39,6 +39,7 @@
             <section class="panel control-panel">
                 <h2><i data-lucide="sliders-horizontal"></i> Controls & AI Vision</h2>
 
+                <!-- AI Vision Status — đầu cột trái, cạnh Camera để theo dõi khi test -->
                 <div class="control-group">
                     <h3>AI Vision Status</h3>
                     <div class="vision-status-box">
@@ -66,10 +67,16 @@
                             <span class="label">Dấu hiệu mặt:</span>
                             <span class="val" id="cv-cues">Chưa rõ</span>
                         </div>
+                        <div class="status-item"><span class="label">Đầu:</span><span class="val" id="cv-head">Chưa rõ</span></div>
+                        <div class="status-item"><span class="label">Cánh tay:</span><span class="val" id="cv-arms">Chưa rõ</span></div>
+                        <div class="status-item"><span class="label">Tay trái:</span><span class="val" id="cv-left-hand">Chưa rõ</span></div>
+                        <div class="status-item"><span class="label">Tay phải:</span><span class="val" id="cv-right-hand">Chưa rõ</span></div>
+
                     </div>
                 </div>
 
                 <div class="control-group">
+
                     <h3>Movement</h3>
                     <div class="d-pad">
                         <button id="btn-forward" onclick="sendCommand('panda/cmd/move', 'forward')">↑</button>
@@ -111,11 +118,24 @@
                         <button id="btn-buzz-off" onclick="sendCommand('panda/cmd/buzz', 'off')"><i data-lucide="bell-off"></i> Buzz OFF</button>
                     </div>
                 </div>
+
             </section>
 
             <!-- ═══ CENTER: Visuals + AI Chat ════════════════════════════════ -->
             <section class="panel visual-panel">
                 <h2><i data-lucide="eye"></i> Visuals</h2>
+
+                <div class="visual-group">
+                    <h3>Camera</h3>
+                    <div class="camera-box" style="padding: 0;">
+                        <div class="scanline"></div>
+                        <img id="cam-image" src="" alt="Camera Feed" style="width:100%; height:100%; object-fit:contain; display:none; position:absolute; top:0; left:0; z-index:0;" />
+                        <div class="cam-content" id="cam-placeholder">
+                            <span class="cam-no-signal">🔴 NO SIGNAL</span>
+                            <span class="cam-mock">[Waiting for stream...]</span>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="visual-group">
                     <h3>OLED Face</h3>
@@ -150,18 +170,6 @@
                             <div class="oled-text" id="oled-text"></div>
                             <!-- Topic emoji (thinking/speaking) -->
                             <div class="oled-topic" id="oled-topic"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="visual-group">
-                    <h3>Camera</h3>
-                    <div class="camera-box" style="padding: 0;">
-                        <div class="scanline"></div>
-                        <img id="cam-image" src="" alt="Camera Feed" style="width:100%; height:100%; object-fit:contain; display:none; position:absolute; top:0; left:0; z-index:0;" />
-                        <div class="cam-content" id="cam-placeholder">
-                            <span class="cam-no-signal">🔴 NO SIGNAL</span>
-                            <span class="cam-mock">[Waiting for stream...]</span>
                         </div>
                     </div>
                 </div>
@@ -237,6 +245,16 @@
                     </div>
                 </div>
 
+                <div class="control-group"><h3>Tín hiệu quan sát</h3><div class="vision-status-box">
+                        <div class="status-item"><span class="label">Hướng nhìn ~:</span><span class="val" id="cv-gaze">Chưa rõ</span></div>
+                        <div class="status-item"><span class="label">Trạng thái mắt:</span><span class="val" id="cv-eyes">Chưa rõ</span></div>
+                        <div class="status-item"><span class="label">Chớp mắt ~:</span><span class="val" id="cv-blinks">Chưa rõ</span></div>
+                        <div class="status-item"><span class="label">Khoảng cách ~:</span><span class="val" id="cv-distance">Chưa rõ</span></div>
+                        <div class="status-item"><span class="label">Đồ vật:</span><span class="val" id="cv-objects">Chưa rõ</span></div>
+                        <p class="vision-note">* Khoảng cách chưa hiệu chuẩn. Hướng nhìn và chớp mắt là ước lượng.</p>
+                        <details class="vision-scores"><summary>Điểm FER+ liên tục</summary><p class="vision-note">Điểm mô hình, không phải xác suất cảm xúc thật.</p><div class="vision-score"><span>Trung tính</span><progress max="1" value="0" id="cv-prob-neutral" aria-label="Trung tính"></progress><span id="cv-score-neutral">—</span></div><div class="vision-score"><span>Vui</span><progress max="1" value="0" id="cv-prob-happy" aria-label="Vui"></progress><span id="cv-score-happy">—</span></div><div class="vision-score"><span>Ngạc nhiên</span><progress max="1" value="0" id="cv-prob-surprised" aria-label="Ngạc nhiên"></progress><span id="cv-score-surprised">—</span></div><div class="vision-score"><span>Buồn</span><progress max="1" value="0" id="cv-prob-sad" aria-label="Buồn"></progress><span id="cv-score-sad">—</span></div><div class="vision-score"><span>Giận</span><progress max="1" value="0" id="cv-prob-angry" aria-label="Giận"></progress><span id="cv-score-angry">—</span></div><div class="vision-score"><span>Chán ghét</span><progress max="1" value="0" id="cv-prob-disgust" aria-label="Chán ghét"></progress><span id="cv-score-disgust">—</span></div><div class="vision-score"><span>Sợ</span><progress max="1" value="0" id="cv-prob-fear" aria-label="Sợ"></progress><span id="cv-score-fear">—</span></div><div class="vision-score"><span>Khinh miệt</span><progress max="1" value="0" id="cv-prob-contempt" aria-label="Khinh miệt"></progress><span id="cv-score-contempt">—</span></div><p class="vision-note">Mức kích hoạt từ mốc mặt (độc lập, không cộng thành 1)</p><div class="vision-score"><span>Cười</span><progress max="1" value="0" id="cv-intensity-happy" aria-label="Tín hiệu Cười"></progress><span id="cv-intensity-score-happy">—</span></div><div class="vision-score"><span>Ngạc nhiên</span><progress max="1" value="0" id="cv-intensity-surprised" aria-label="Tín hiệu Ngạc nhiên"></progress><span id="cv-intensity-score-surprised">—</span></div><div class="vision-score"><span>Buồn</span><progress max="1" value="0" id="cv-intensity-sad" aria-label="Tín hiệu Buồn"></progress><span id="cv-intensity-score-sad">—</span></div><div class="vision-score"><span>Giận</span><progress max="1" value="0" id="cv-intensity-angry" aria-label="Tín hiệu Giận"></progress><span id="cv-intensity-score-angry">—</span></div></details>
+                </div></div>
+
                 <div class="log-section">
                     <h3>Activity Log</h3>
                     <div class="terminal" id="terminal-log">
@@ -248,8 +266,8 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="vision-ui.js?v=20260907b"></script>
-    <script src="app.js?v=20260907b"></script>
+    <script src="vision-ui.js?v=20260908a"></script>
+    <script src="app.js?v=20260908a"></script>
     <script>
         lucide.createIcons();
     </script>

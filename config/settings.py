@@ -54,6 +54,20 @@ VISION_FACE_DETAILS_MODEL = "face_landmarker.task"
 VISION_HEAD_NOD_DEGREES = 8.0
 VISION_HEAD_SHAKE_DEGREES = 10.0
 VISION_DRAW_SKELETON = True
+VISION_HANDS_ENABLED = True
+VISION_HANDS_MODEL = "hand_landmarker.task"
+VISION_HANDS_FPS = 5
+VISION_OBJECTS_ENABLED = True
+VISION_OBJECTS_MODEL = "yolov8n.pt"
+VISION_OBJECTS_FPS = 1
+VISION_EAR_CLOSED = 0.19
+VISION_EAR_OPEN = 0.23
+VISION_EYES_CLOSED_SEC = 1.5
+# Approximate distance until calibrated: assumed camera HFOV and face width.
+VISION_CAMERA_HFOV = 60.0
+VISION_FACE_WIDTH_CM = 14.0
+# Calibration: known distance_cm * detected_face_width_px / frame_width_px.
+VISION_DISTANCE_SCALE_CM = float(os.environ.get("PANDA_DISTANCE_SCALE_CM", "0")) or None
 VISION_POSE_ENABLED = True
 VISION_POSE_SIZE = 320
 VISION_DEVICE = "cpu"  # CUDA: "0"

@@ -15,7 +15,8 @@ màn OLED theo phong cách robot Vector (Anki).
   → OLED hiển thị icon + caption + màu riêng từng chủ đề.
 - **Thị giác máy**: YuNet (face) + SFace (chủ nhân đã đăng ký) + FER+ (biểu cảm) +
   YOLOv8-pose (khớp cánh tay, giơ/vẫy tay), MediaPipe (góc đầu và tín hiệu biểu cảm). Tối ưu cho người
-  đối diện, thấy đầu–vai–tay; xem [hướng dẫn và giới hạn CV](docs/vision.md).
+  đối diện, thấy đầu–vai–tay; bổ sung 21 mốc bàn tay, tổ hợp cử chỉ, hướng nhìn/mắt,
+  khoảng cách và đồ vật. Xem [hướng dẫn tín hiệu CV mới](docs/vision-signals.md).
 - **Màn hình cảm xúc**: 11 biểu cảm + 4 trạng thái AI + 25 hành vi idle tự chủ,
   biểu cảm kết thúc chọn theo ngữ cảnh hội thoại.
 - **Kiến trúc MQTT tách rời**: não (Python) ↔ dashboard (web) ↔ thân robot (ESP32)

@@ -1,5 +1,8 @@
 # Computer vision cho Panda
 
+> Bản mở rộng hiện tại (08/09/2026): xem [hướng dẫn tín hiệu mới](vision-signals.md)
+> cho bàn tay 21 mốc, tổ hợp cử chỉ, hướng nhìn/mắt, khoảng cách, đồ vật và điểm biểu cảm liên tục.
+
 ## Phạm vi hiện tại
 
 Một người đứng/ngồi đối diện camera; khung hình thấy mặt, hai vai và cổ tay khi
@@ -42,8 +45,7 @@ Mỗi khớp có `x`, `y` chuẩn hóa theo ảnh (0–1), `confidence`, `visibl
 bị che/khuất hình, x/y là null; không dùng tọa độ đó điều khiển robot.
 `elbow_angles.left/right` là góc 2D trên ảnh, không phải góc cơ thể 3D.
 `pose_time` là thời gian đơn điệu của lần suy luận pose để kiểm tra độ cũ trong
-cùng tiến trình. Skeleton chỉ vẽ khi kết quả chưa quá 0,5 giây. Đây là sáu khớp
-cánh tay; chưa có 21 khớp bàn tay/ngón tay.
+cùng tiến trình. Skeleton chỉ vẽ khi kết quả chưa quá 0,5 giây. Sáu khớp cánh tay tiếp tục được giữ; bản mới bổ sung `hands[]` với 21 mốc mỗi bàn tay (xem hướng dẫn tín hiệu mới).
 
 
 ## Luồng xử lý

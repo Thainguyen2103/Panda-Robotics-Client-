@@ -18,7 +18,8 @@ except ImportError:
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from config import settings
-from server.vision_features import FaceDetails, HeadMotion, emotion_candidate, upper_body, ARM_EDGES
+from server.vision_features import FaceDetails, HeadMotion, ExpressionState, upper_body, ARM_EDGES
+from server.vision_signals import EyeState, HandDetails, distance_estimate, combined_actions, nearby_objects, HAND_EDGES
 
 LOG = logging.getLogger("panda.vision")
 BASE = Path(__file__).resolve().parent
@@ -180,6 +181,9 @@ def empty_result(status="ok"):
                 arm_action="unknown", face_box=None, person_box=None,
                 upper_body_joints={}, elbow_angles={}, pose_time=0.,
                 head_pose=None, expression_cues={}, emotion_source="uncertain",
+                actions=[],hands=[],objects=[],emotion_probs={},expression_intensities={},
+                eyes={"state":"unknown","gaze":"unknown","blink_rate_per_min":None},
+                distance={"cm":None,"source":"unavailable"},
                 inference_ms=0., frame_time=0.)
 
 
@@ -189,6 +193,7 @@ class VisionEngine:
         self.emotion_label, self.identity_label = StableLabel(hold=3), StableLabel(hold=1)
         self.head, self.arms = HeadGestures(), ArmGestures()
         self.head_motion = HeadMotion()
+        self.eye_state,self.expression_state = EyeState(),ExpressionState()
         self.master = None
         self.reset()
         if cv2 is None:
@@ -200,6 +205,8 @@ class VisionEngine:
         self._load("emotion", lambda: cv2.dnn.readNetFromONNX(str(BASE/settings.EMOTION_MODEL)))
         if settings.VISION_FACE_DETAILS_ENABLED:
             self._load("face_details",lambda:FaceDetails(BASE/settings.VISION_FACE_DETAILS_MODEL))
+        if settings.VISION_HANDS_ENABLED:
+            self._load("hands",lambda:HandDetails(BASE/settings.VISION_HANDS_MODEL))
         if (BASE/"master_face.npy").exists():
             try:
                 feature = np.load(BASE/"master_face.npy", allow_pickle=False)
@@ -220,6 +227,15 @@ class VisionEngine:
                 from ultralytics import YOLO
                 return YOLO(str(path), task="pose")
             self._load("pose", load_pose)
+        if settings.VISION_OBJECTS_ENABLED:
+            def load_objects():
+                path = BASE/settings.VISION_OBJECTS_MODEL
+                if not path.is_file(): raise FileNotFoundError(path.name)
+                import torch
+                torch.set_num_threads(settings.VISION_CV_THREADS)
+                from ultralytics import YOLO
+                return YOLO(str(path),task="detect")
+            self._load("objects",load_objects)
 
     def _load(self, name, loader):
         try:
@@ -250,14 +266,43 @@ class VisionEngine:
         self.joints,self.elbow_angles = {},{}
         self.head_pose,self.cues = None,{}
         self.head_motion.reset()
+        self.eye_state.reset()
+        self.expression_state.reset()
+        self.hands,self.objects = [],[]
+        self.hands_time,self.objects_time = -float("inf"),-float("inf")
+        if "hands" in self.models: self.models["hands"].reset()
         self.emotion_label.reset()
         self.identity_label.reset()
         self.head.reset()
         self.arms.reset()
 
     def close(self):
-        if "face_details" in self.models:
-            self.models["face_details"].close()
+        for name in ("face_details","hands"):
+            if name in self.models: self.models[name].close()
+
+    def _objects(self,frame,now):
+        prediction = self.models["objects"].predict(frame,imgsz=320,conf=.45,device=settings.VISION_DEVICE,verbose=False)[0]
+        objects = []
+        for box,score,category in zip(prediction.boxes.xyxy.cpu().numpy(),prediction.boxes.conf.cpu().numpy(),prediction.boxes.cls.cpu().numpy()):
+            label = prediction.names[int(category)]
+            if label == "person": continue
+            x,y,r,b = map(float,box)
+            objects.append(dict(label=label,confidence=round(float(score),3),timestamp=now,
+                box=[x/frame.shape[1],y/frame.shape[0],(r-x)/frame.shape[1],(b-y)/frame.shape[0]]))
+        return objects
+
+    def _schedule(self,now,face):
+        # One expensive secondary model per frame keeps eye/head sampling responsive.
+        candidates = []
+        stages = (("identity",self.identity_time,settings.VISION_IDENTITY_FPS,face and self.master is not None),
+                  ("emotion",self.emotion_time,settings.VISION_EMOTION_FPS,face),
+                  ("pose",self.pose_time,settings.VISION_POSE_FPS,True),
+                  ("hands",self.hands_time,settings.VISION_HANDS_FPS,True),
+                  ("objects",self.objects_time,settings.VISION_OBJECTS_FPS,True))
+        for name,last,fps,enabled in stages:
+            if enabled and name in self.models and now-last >= 1/max(1,fps):
+                candidates.append(((now-last)*fps,name))
+        return max(candidates,key=lambda item:item[0])[1] if candidates else None
 
     def _pose(self, frame, now):
         result = self.models["pose"].predict(frame, imgsz=settings.VISION_POSE_SIZE,
@@ -304,6 +349,7 @@ class VisionEngine:
                 if valid:
                     best = max(valid,key=lambda f:(iou(self.face_box,f[:4]) > .25,f[2]*f[3]))
         if best is None:
+            stage = self._schedule(now,False)
             self.face_box, self.emotion_probs = None, None
             self.identity_time = self.emotion_time = -float("inf")
             self.identity_result = {"identity":"unknown","identity_score":None}
@@ -312,12 +358,15 @@ class VisionEngine:
             self.identity_label.reset()
             self.head.reset()
             self.head_motion.reset()
+            self.eye_state.reset()
+            self.expression_state.reset()
             self.head_pose,self.cues = None,{}
             self.head_action, self.head_until = "unknown", 0.
         else:
             if iou(self.face_box,best[:4]) < .25:
                 self.reset()
             self.face_box = tuple(float(v) for v in best[:4])
+            stage = self._schedule(now,min(best[2:4]) >= settings.VISION_MIN_FACE_SIZE)
             result.update(face_detected=True,face_box=list(self.face_box))
             x,y,w,h = self.face_box
             crop = frame[max(0,int(y)):max(0,min(frame.shape[0],int(y+h))),max(0,int(x)):max(0,min(frame.shape[1],int(x+w)))]
@@ -325,11 +374,13 @@ class VisionEngine:
                 details = self._run("face_details",lambda:self.models["face_details"].detect(frame,self.face_box,now)) if "face_details" in self.models else None
                 self.head_pose = details["angles"] if details else None
                 self.cues = details["cues"] if details else {}
+                result["eyes"] = self.eye_state.update(details.get("eyes") if details else None,self.head_pose,now)
+                result["distance"] = distance_estimate(self.face_box,frame.shape[1],self.head_pose)
                 # Never mix sparse ratios with 3D angle histories during tracking loss.
                 event = self.head_motion.update(self.head_pose,now) if "face_details" in self.models else self.head.update(best,now)
                 if event != "unknown":
                     self.head_action,self.head_until = event,now+.7
-                if "identity" in self.models and self.master is not None and now-self.identity_time >= 1/max(1,settings.VISION_IDENTITY_FPS):
+                if stage == "identity":
                     self.identity_time = now
                     def recognize():
                         model = self.models["identity"]
@@ -343,7 +394,7 @@ class VisionEngine:
                         self.identity_label.reset()
                     self.identity_result = {key:result[key] for key in ("identity","identity_score")}
                 result.update(self.identity_result)
-                if "emotion" in self.models and now-self.emotion_time >= 1/max(1,settings.VISION_EMOTION_FPS):
+                if stage == "emotion":
                     self.emotion_time = now
                     def expression():
                         gray = cv2.cvtColor(crop,cv2.COLOR_BGR2GRAY)
@@ -356,17 +407,12 @@ class VisionEngine:
                         return probs/probs.sum()
                     probs = self._run("emotion",expression)
                     if probs is not None:
-                        self.emotion_probs = probs if self.emotion_probs is None else .45*probs+.55*self.emotion_probs
-                        label,count,source = emotion_candidate(self.emotion_probs,self.cues)
-                        self.emotion_label.count = count
-                        result["emotion"] = self.emotion_label.update(label)
-                        result["emotion_confidence"] = float(self.emotion_probs[EMOTIONS.index(result["emotion"])]) if result["emotion"] != "unknown" else 0.
-                        result["emotion_source"] = source if result["emotion"] == label else "held"
+                        self.emotion_probs = probs if self.emotion_probs is None else .65*probs+.35*self.emotion_probs
                     else:
                         self.emotion_probs = None
                         self.emotion_label.reset()
-                    self.emotion_result = {key:result[key] for key in ("emotion","emotion_confidence","emotion_source")}
-                result.update(self.emotion_result)
+                result.update(self.expression_state.update(self.emotion_probs,self.cues,now))
+                result["emotion_probs"] = {name:round(float(value),5) for name,value in zip(EMOTIONS,self.emotion_probs)} if self.emotion_probs is not None else {}
             else:
                 self.identity_time = self.emotion_time = -float("inf")
                 self.identity_result = {"identity":"unknown","identity_score":None}
@@ -376,25 +422,42 @@ class VisionEngine:
                 self.identity_label.reset()
                 self.head.reset()
                 self.head_motion.reset()
+                self.eye_state.reset()
+                self.expression_state.reset()
                 self.head_pose,self.cues = None,{}
                 self.head_until = 0.
-        if "pose" in self.models and now-self.pose_time >= 1/max(1,settings.VISION_POSE_FPS):
+        if stage == "pose":
             self.pose_time = now
             self._run("pose",lambda:self._pose(frame,now))
             if "pose" in self.errors:
                 self.pose_box,self.pose_action = None,"unknown"
                 self.joints,self.elbow_angles = {},{}
                 self.arms.reset()
+        if now-self.pose_time > .75:
+            self.pose_box,self.pose_action = None,"unknown"
+            self.joints,self.elbow_angles = {},{}
         head_action = self.head_action if now < self.head_until else "unknown"
+        if stage == "hands":
+            self.hands_time = now
+            self.hands = self._run("hands",lambda:self.models["hands"].detect(frame,now,self.joints,self.pose_box)) or []
+        if now-self.hands_time > .6: self.hands = []
+        if stage == "objects":
+            self.objects_time = now
+            self.objects = self._run("objects",lambda:self._objects(frame,now)) or []
+        if now-self.objects_time > 1.5: self.objects = []
+        actions = combined_actions(head_action,self.pose_action,self.hands)
         result.update(person_detected=best is not None or self.pose_box is not None,
                       person_box=list(self.pose_box) if self.pose_box else None,
                       head_action=head_action,arm_action=self.pose_action,
                       upper_body_joints=self.joints,elbow_angles=self.elbow_angles,
                       pose_time=self.pose_time if np.isfinite(self.pose_time) else 0.,
                       head_pose=self.head_pose,expression_cues=self.cues,
-                      action=head_action if head_action != "unknown" else self.pose_action,
+                      actions=actions,hands=self.hands,objects=nearby_objects(self.objects,self.hands),
+                      secondary_stage=stage,
+                      frame_size=[frame.shape[1],frame.shape[0]],
+                      action=" + ".join(item["label"] for item in actions) or "unknown",
                       inference_ms=round((time.monotonic()-started)*1000,1),
-                      models={name:name in self.models and name not in self.errors for name in ("face","identity","emotion","pose","face_details")},
+                      models={name:name in self.models and name not in self.errors for name in ("face","identity","emotion","pose","face_details","hands","objects")},
                       errors=dict(self.errors),enrolled=self.master is not None)
         if self.errors:
             result["status"] = "degraded"
@@ -527,6 +590,17 @@ def start_vision(callback, stop_event=None, publish=None):
                 last_sequence = sequence
                 display = frame.copy()
                 if began-result.get("frame_time",0) <= .5:
+                    for hand in result.get("hands",[]):
+                        if began-hand["timestamp"] > .5: continue
+                        points = [(int(v[0]*display.shape[1]),int(v[1]*display.shape[0])) for v in hand["landmarks"]]
+                        for a,b in HAND_EDGES: cv2.line(display,points[a],points[b],(80,220,120),1)
+                        for p in points: cv2.circle(display,p,2,(80,255,180),-1)
+                    for obj in result.get("objects",[]):
+                        if began-obj["timestamp"] > 1.5: continue
+                        x,y,w,h = obj["box"]
+                        x,y,w,h = int(x*display.shape[1]),int(y*display.shape[0]),int(w*display.shape[1]),int(h*display.shape[0])
+                        cv2.rectangle(display,(x,y),(x+w,y+h),(220,180,80),1)
+                        cv2.putText(display,obj["label"],(x,max(14,y-4)),cv2.FONT_HERSHEY_SIMPLEX,.4,(220,180,80),1)
                     if settings.VISION_DRAW_SKELETON and began-result.get("pose_time",0) <= .5:
                         joints = result.get("upper_body_joints",{})
                         def point(joint):
