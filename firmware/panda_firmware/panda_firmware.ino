@@ -88,12 +88,14 @@ void handleAiCmd(String subtopic, String payload) {
   // panda/ai/state — listening | speaking | thinking | standby
   if (subtopic == "state") {
     if (payload == "listening") {
-      faceMode = "hearing";
+      faceMode = "questioning";
       oledText = "";
       Serial.println("[AI] state: listening -> attentive eyes");
     } else if (payload == "speaking") {
-      faceMode = "speaking";
-      Serial.println("[AI] state: speaking -> face speaking");
+      // on_done publishes the answer before audio starts. Keep that answer on
+      // screen while it is being read; use animated eyes only as a fallback.
+      faceMode = oledText.length() > 0 ? "answering" : "speaking";
+      Serial.println("[AI] state: speaking -> answer display");
     } else if (payload == "thinking") {
       faceMode = "ai-thinking";
       Serial.println("[AI] state: thinking -> thinking eyes");
@@ -103,6 +105,25 @@ void handleAiCmd(String subtopic, String payload) {
       Serial.println("[AI] state: standby -> face neutral");
     }
     needRedraw = true;
+    return;
+  }
+
+  // panda/ai/response — JSON { "done": bool, "text": "..." }
+  // Only show the complete answer. Partial chunks stay in the web chat so the
+  // small robot display does not flicker on every token.
+  if (subtopic == "response") {
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, payload);
+    if (err) {
+      Serial.println("[AI] Response JSON Parse Error: " + String(err.c_str()));
+      return;
+    }
+    if (doc["done"] | false) {
+      oledText = String(doc["text"] | "");
+      faceMode = oledText.length() > 0 ? "answering" : "speaking";
+      needRedraw = true;
+      Serial.println("[AI] response/done -> show answer");
+    }
     return;
   }
 
@@ -119,13 +140,13 @@ void handleAiCmd(String subtopic, String payload) {
     const char* text  = doc["text"]  | "";
 
     if (strcmp(stage, "listening") == 0) {
-      faceMode = "hearing";
+      faceMode = "questioning";
       oledText = "";
       Serial.println("[AI] thinking/listening -> attentive eyes");
     } else if (strcmp(stage, "question") == 0) {
-      faceMode = "questioning";
+      faceMode = "hearing";
       oledText = String(text);
-      Serial.println("[AI] thinking/question -> curious eyes");
+      Serial.println("[AI] thinking/question -> transcript text");
     } else if (strcmp(stage, "thinking") == 0) {
       faceMode = "ai-thinking";
       Serial.println("[AI] thinking/thinking -> thinking eyes");
@@ -302,6 +323,8 @@ void setup() {
   }
   Serial.println("\n[WIFI] Connected! IP: " + WiFi.localIP().toString());
   mqtt.setServer(MQTT_HOST, MQTT_PORT);
+  // AI response JSON is commonly larger than PubSubClient's 256-byte default.
+  mqtt.setBufferSize(2048);
   mqtt.setSocketTimeout(1);
   mqtt.setCallback(onMqttMessage);
 #endif

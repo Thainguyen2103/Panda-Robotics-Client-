@@ -882,8 +882,15 @@ button:active { transform: translateY(0); }
    MODE 2: hearing — hiển thị transcript text
    Triggered: nhận transcript từ Groq
 ═══════════════════════════════════════════════════════════════════════════ */
-.oled-face.hearing .oled-eyes { opacity: 0; }
-.oled-face.hearing .oled-text { opacity: 1; }
+.oled-face.hearing .oled-eyes,
+.oled-face.answering .oled-eyes { opacity: 0; }
+.oled-face.hearing .oled-text,
+.oled-face.answering .oled-text { opacity: 1; }
+
+.oled-face.answering .oled-text {
+    color: var(--accent);
+    text-shadow: 0 0 3px var(--accent-glow);
+}
 
 /* Border pulse xanh lá khi đang nghe */
 .oled-face.hearing {
@@ -1160,7 +1167,8 @@ button:active { transform: translateY(0); }
 .voice-controls button:disabled { opacity: .5; cursor: default; }
 
 /* Static, scrollable transcript: never translate the entire OLED text layer. */
-.oled-face.hearing .oled-text {
+.oled-face.hearing .oled-text,
+.oled-face.answering .oled-text {
     display: block;
     padding: 14px;
     white-space: pre-wrap;
@@ -1175,5 +1183,8 @@ button:active { transform: translateY(0); }
     line-height: 1.5;
 }
 .oled-face.hearing .oled-text::before,
-.oled-face.hearing .oled-text::after { content: none; }
-.oled-face.hearing { animation: none; }
+.oled-face.hearing .oled-text::after,
+.oled-face.answering .oled-text::before,
+.oled-face.answering .oled-text::after { content: none; }
+.oled-face.hearing,
+.oled-face.answering { animation: none; }

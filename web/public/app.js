@@ -61,7 +61,7 @@ const voiceStateLabel = document.getElementById('voice-state-label');
 
 // ─── OLED Face ────────────────────────────────────────────────────────────────
 const ALL_EMOTIONS = ['neutral','happy','sad','surprised','angry','love','wink','sleepy','dizzy','cool','cute'];
-const ALL_AI_MODES = ['questioning','hearing','ai-thinking','speaking'];
+const ALL_AI_MODES = ['questioning','hearing','ai-thinking','answering','speaking'];
 const IDLE_BEHAVIORS = ['idle-look-left','idle-look-right','idle-look-up',
                         'idle-curious','idle-happy','idle-squint','idle-sleepy',
                         'idle-wink','idle-cross','idle-wide','idle-shy','idle-scan',
@@ -110,8 +110,8 @@ drawFace('neutral');
 
 /**
  * setOledAiMode(mode, text)
- * mode: 'questioning' | 'hearing' | 'ai-thinking' | 'speaking' | 'neutral'
- * text: chỉ dùng cho mode 'hearing' — hiển thị transcript trên OLED
+ * mode: 'questioning' | 'hearing' | 'ai-thinking' | 'answering' | 'speaking' | 'neutral'
+ * text: dùng cho hearing/answering để hiển thị transcript/câu trả lời
  */
 function setOledAiMode(mode, text = '') {
     cancelTranscriptTimer();
@@ -130,7 +130,7 @@ function setOledAiMode(mode, text = '') {
     if (oledCapEl)   oledCapEl.style.opacity   = (mode === 'speaking') ? '1' : '0';
 
     // Mode 'hearing': hiển thị text trên OLED — co chữ vừa khung, không cắt đầu/cuối
-    if (mode === 'hearing' && oledTextEl) {
+    if ((mode === 'hearing' || mode === 'answering') && oledTextEl) {
         oledTextEl.textContent = `"${text}"`;
         oledTextEl.style.fontSize = '13px';
         oledTextEl.classList.remove('long-text');
@@ -314,7 +314,10 @@ socket.on('mqtt_message', (data) => {
         // (thinking: OLED GIỮ transcript đã nghe — mode 'hearing' — không đổi sang dots)
         if (payload === 'listening')   setOledAiMode('questioning');
         else if (payload === 'thinking') setOledAiMode('ai-thinking');
-        else if (payload === 'speaking') { hideThinking(); setOledAiMode('speaking'); }
+        else if (payload === 'speaking') {
+            hideThinking();
+            if (!oledFace.classList.contains('answering')) setOledAiMode('speaking');
+        }
         else if (payload === 'standby') { hideThinking(); aiCursor.style.display = 'none'; setOledAiMode('neutral'); }
         logToTerminal(`AI State: ${payload}`, 'ai-state');
 
@@ -373,6 +376,7 @@ socket.on('mqtt_message', (data) => {
                 // Done — show full text, ẩn cursor
                 aiMoonText.textContent = msg.text;
                 finalizeMoonResponse();
+                setOledAiMode('answering', msg.text);
                 logToTerminal(`AI: ${msg.text.substring(0, 60)}...`, 'ai-response');
             }
         } catch(e) {}
