@@ -76,7 +76,7 @@ def available() -> bool:
         return False
 
 
-def run_loop(on_wake, should_listen=None):
+def run_loop(on_wake, should_listen=None, stop_event=None):
     """
     Vòng lặp bắt wake-word on-device (block — chạy trong thread riêng).
 
@@ -92,32 +92,44 @@ def run_loop(on_wake, should_listen=None):
     from server import tts
 
     h = _porcupine
-    q = queue.Queue()
-
-    def _cb(indata, frames, t, status):
-        q.put(bytes(indata))
-
     print("🔔 [WAKEWORD] Porcupine đang nghe 'Moon' (on-device, mọi ngôn ngữ)...")
     last_trigger = 0.0
 
-    with sd.InputStream(samplerate=h.sample_rate, channels=1, dtype="int16",
-                        device=None, blocksize=h.frame_length, callback=_cb):
-        while True:
+    stopping = lambda: stop_event is not None and stop_event.is_set()
+    while not stopping():
+        # Quan trọng: không giữ InputStream mở khi Brain đang thu câu hỏi
+        # hoặc phát TTS. Windows không ổn định khi hai stream cùng tranh mic.
+        if (should_listen and not should_listen()) or tts.is_speaking():
+            time.sleep(0.1)
+            continue
+
+        q = queue.Queue()
+
+        def _cb(indata, frames, t, status):
+            q.put(bytes(indata))
+
+        detected = False
+        with sd.InputStream(samplerate=h.sample_rate, channels=1, dtype="int16",
+                            device=None, blocksize=h.frame_length, callback=_cb):
+            while (not should_listen or should_listen()) \
+                    and not tts.is_speaking() and not stopping():
+                try:
+                    data = q.get(timeout=0.25)
+                except queue.Empty:
+                    continue
+
+                keyword_index = h.process(np.frombuffer(data, dtype=np.int16))
+                if keyword_index >= 0:
+                    now = time.time()
+                    if now - last_trigger > 1.5:   # debounce 1.5s
+                        last_trigger = now
+                        detected = True
+                        print("🔔 [WAKEWORD] Porcupine bắt được 'Moon'!")
+                        break
+
+        # Stream đã đóng trước khi pipeline mở mic để nghe câu hỏi.
+        if detected and not stopping():
             try:
-                data = q.get(timeout=2.0)
-            except queue.Empty:
-                continue
-
-            # Chống tự kích: bỏ qua khi loa Moon đang phát ("...Mình là Moon!")
-            if tts.is_speaking():
-                continue
-            if should_listen and not should_listen():
-                continue
-
-            keyword_index = h.process(np.frombuffer(data, dtype=np.int16))
-            if keyword_index >= 0:
-                now = time.time()
-                if now - last_trigger > 1.5:   # debounce 1.5s
-                    last_trigger = now
-                    print("🔔 [WAKEWORD] Porcupine bắt được 'Moon'!")
-                    on_wake()
+                on_wake()
+            except Exception as e:
+                print(f"❌ [WAKEWORD] Lỗi callback wake: {e}")

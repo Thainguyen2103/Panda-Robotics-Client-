@@ -648,6 +648,11 @@ def set_external_mic(on: bool):
         print("🎙️ [VOICE] Mic trình duyệt TẮT — loop server nghe lại.")
 
 
+def external_mic_active() -> bool:
+    """True khi dashboard đang sở hữu microphone."""
+    return _external_mic.is_set()
+
+
 def _publish_voice_log(text: str):
     if mqtt_bridge:
         try:

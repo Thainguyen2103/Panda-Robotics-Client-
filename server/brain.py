@@ -41,6 +41,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import settings
 from server import mqtt_bridge
 from server.vision import start_vision
+from server import voice
 from server.voice import (register_callbacks, continuous_listen_loop,
                           listen_for_question, pause_listening, resume_listening,
                           transcribe_bytes, _is_hallucination, _contains_wake_word,
@@ -786,22 +787,24 @@ def main():
     mqtt_bridge.client.subscribe(settings.TOPIC_MIC_LIVE)
     mqtt_bridge.client.message_callback_add(settings.TOPIC_MIC_LIVE, on_mic_live)
 
-    # Thread nghe giọng nói
-    v_thread = threading.Thread(target=voice_listening_thread, daemon=True)
-    v_thread.start()
-    print("✅ [BRAIN] Voice thread đang chạy.")
-
     # Wake-word on-device (Porcupine) nếu đã cấu hình — đúng kiểu Anki Vector:
     # KWS local bắt "Moon" mọi ngôn ngữ, ASR cloud xử lý phần còn lại.
     from server import wakeword
     if wakeword.available():
         threading.Thread(target=wakeword.run_loop, kwargs=dict(
-            on_wake=lambda: threading.Thread(
-                target=_handle_wake_word, args=("Moon",), daemon=True).start(),
-            should_listen=lambda: voice_ai_state == "standby",
+            # run_loop đóng stream KWS rồi mới gọi callback; chạy đồng bộ
+            # để không mở lại mic trong lúc pipeline đang thu câu hỏi.
+            on_wake=lambda: _handle_wake_word("Moon"),
+            should_listen=lambda: (voice_ai_state == "standby"
+                                   and not voice.external_mic_active()),
         ), daemon=True).start()
         print("✅ [BRAIN] Porcupine wake-word on-device đang chạy.")
     else:
+        # Chỉ chạy Whisper standby khi Porcupine không có. Hai engine mở
+        # cùng một mic sẽ gây duplicate wake và lỗi device busy trên Windows.
+        v_thread = threading.Thread(target=voice_listening_thread, daemon=True)
+        v_thread.start()
+        print("✅ [BRAIN] Voice thread Whisper đang chạy.")
         print("ℹ️  [BRAIN] Chưa cấu hình Porcupine — dùng wake-word Whisper dual-pass.")
 
     # Vision (blocking — chạy trên main thread)
