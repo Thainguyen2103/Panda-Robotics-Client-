@@ -95,7 +95,7 @@ class VisionPanel {
             if (meter) meter.value = value;
             this.text(`cv-score-${name}`,probs[name] == null ? '—' : `${Math.round(value*100)}%`);
         }
-        for (const name of ['happy','surprised','sad','angry']) {
+        for (const name of ['happy','surprised','sad','angry','disgust','fear','contempt']) {
             const value = Math.max(0,Math.min(1,intensities[name] || 0));
             const meter = this.document.getElementById(`cv-intensity-${name}`);
             if (meter) meter.value = value;

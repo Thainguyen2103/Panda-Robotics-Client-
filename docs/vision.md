@@ -15,7 +15,7 @@ chéo nhau hoặc che khuất nhau.
 |---|---|---|
 | Phát hiện mặt | YuNet, ảnh thu nhỏ 320 px, trả tọa độ về ảnh gốc | Mặt nhỏ, quay ngang, che mặt làm giảm chất lượng |
 | Chủ nhân / khách | SFace, so khớp cosine với mẫu đã đăng ký | Chỉ một chủ nhân; không có chống giả mạo bằng ảnh/video |
-| Biểu cảm | FER+ kết hợp tín hiệu chân mày/mắt/khóe miệng từ MediaPipe, giữ nhãn ngắn khi chưa chắc | Ước lượng biểu cảm nhìn thấy, không khẳng định trạng thái tâm lý |
+| Biểu cảm | FER+ trên crop vuông không kéo giãn, kết hợp tín hiệu chân mày/mắt/mũi/môi từ MediaPipe, giữ nhãn ngắn khi chưa chắc | Ước lượng biểu cảm nhìn thấy, không khẳng định trạng thái tâm lý |
 | Vẫy tay | YOLOv8n-pose, cổ tay ở trên vai và có chuyển động đi–về, ưu tiên đo tương đối với khuỷu tay | Cần cổ tay trong hình; cử động ngón tay riêng chưa hỗ trợ |
 | Giơ tay | Cổ tay cao hơn vai qua nhiều lần đo | Một hoặc hai tay |
 | Gật/lắc đầu | Góc pitch/yaw từ ma trận mặt MediaPipe, lọc rung và kiểm tra xoay đi–về | Ngưỡng thử nghiệm 8°/10°, cần hiệu chỉnh bằng video demo thật |
@@ -27,15 +27,19 @@ mốc mặt chi tiết và ma trận biến đổi; gật/lắc dựa trên góc
 chỉ vào tỷ lệ mũi–miệng như bản trước. Nếu thiếu mô hình mới, hệ thống báo lỗi
 mô hình và dùng cách mốc YuNet cũ làm phương án dự phòng.
 
-Buồn/giận nhẹ cần cả FER+ xếp nhãn đó trong hai ứng viên đầu và tín hiệu mốc
-mặt phù hợp trong 5 lần suy luận liên tiếp (khoảng 1,5–2 giây). Không nhân trọng
-số hoặc chuyển một nhãn vui rõ thành buồn/giận. Dòng “Dấu hiệu mặt” mô tả tín
+Buồn/giận/chán ghét/sợ/khinh miệt nhẹ cần cả FER+ xếp nhãn đó trong hai ứng viên
+đầu và tín hiệu mốc mặt phù hợp trong khoảng 0,65 giây. Các biểu cảm rõ còn có
+thể được xác nhận bằng tổ hợp chân mày, mắt, mũi và môi; một kết quả FER+ khác
+trung tính đã đủ rõ sẽ không bị tín hiệu hình học ghi đè. Không nhân trọng số
+hoặc chuyển một nhãn FER+ rõ thành cảm xúc khác. Dòng “Dấu hiệu mặt” mô tả tín
 hiệu hình học; đó không phải một kết luận về cảm xúc. Nhãn backend giữ tối đa
 3 lần đo chưa chắc; mất mặt/đổi người xóa ngay lịch sử. Chưa có tập video gán
 nhãn để xác nhận mức cải thiện độ chính xác.
 
 Dashboard cập nhật chữ theo nhịp 250 ms, chờ nhãn ổn định, giữ ngắn khi chưa rõ.
-Các hàng có chiều cao cố định 40 px và tối đa hai dòng; số ms/% chuyển vào tooltip.
+Nhãn chính hiển thị dạng `Vui (82%)`; bảng chi tiết hiển thị phần trăm của đủ tám
+đầu ra FER+ và bảy mức kích hoạt hình học. Đây là độ tin cậy/độ kích hoạt ước lượng,
+không phải phép đo chắc chắn cảm xúc thật của người dùng.
 Bỏ log bản tin `panda/user_status` trùng để Activity Log không cuộn từng khung hình.
 
 ### Dữ liệu khớp cánh tay
