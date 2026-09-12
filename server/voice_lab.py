@@ -42,6 +42,10 @@ class Session:
         self.sequence = 0
         self.last_meter = 0
         self.busy = False
+        # Porcupine bắt keyword khi từ "Moon" chưa kết thúc hẳn. Không cho
+        # phần đuôi keyword rơi vào clip câu hỏi.
+        self.waiting_for_wake_quiet = False
+        self.wake_quiet_frames = 0
 
     async def emit(self, event, **data):
         await self.ws.send_json(dict(event=event, **data))
@@ -64,7 +68,30 @@ class Session:
                 detected = self.engine.process(struct.unpack(f'<{size//2}h', frame)) >= 0
                 if detected and not self.listening and not self.busy and self.clips.empty():
                     self.segmenter.reset()
+                    self.waiting_for_wake_quiet = True
+                    self.wake_quiet_frames = 0
                     await self.wake()
+
+        if self.waiting_for_wake_quiet:
+            values = struct.unpack('<480h', pcm)
+            rms = (sum(v*v for v in values) / 480) ** .5 / 32768
+            voiced = self.segmenter.vad.is_speech(pcm, RATE)
+            speech = voiced and rms >= self.segmenter.threshold
+            self.wake_quiet_frames = 0 if speech else self.wake_quiet_frames + 1
+            # 120 ms im lặng xác nhận keyword đã kết thúc. Sau mốc này
+            # người dùng có trọn VOICE_WAIT_SEC để bắt đầu câu hỏi.
+            if self.wake_quiet_frames >= 4:
+                self.waiting_for_wake_quiet = False
+                self.wake_quiet_frames = 0
+                self.segmenter.reset()
+                self.deadline = time.monotonic() + settings.VOICE_WAIT_SEC
+                await self.emit('armed')
+            now = time.monotonic()
+            if now - self.last_meter > .1:
+                self.last_meter = now
+                await self.emit('meter', rms=round(rms, 4), speech=speech,
+                                threshold=round(self.segmenter.threshold, 4))
+            return
         silence = (settings.VOICE_QUESTION_SILENCE_SEC if self.listening
                    else settings.VOICE_WAKE_SILENCE_SEC)
         clip, rms, speech = self.segmenter.feed(pcm, silence)
@@ -138,6 +165,8 @@ class Session:
             await asyncio.sleep(.25)
             if self.listening and not self.busy and self.clips.empty() and time.monotonic() > self.deadline:
                 self.listening = False
+                self.waiting_for_wake_quiet = False
+                self.wake_quiet_frames = 0
                 self.segmenter.reset()
                 await self.emit('timeout', text='Chưa nghe được câu nói. Hãy gọi Moon lại.')
 

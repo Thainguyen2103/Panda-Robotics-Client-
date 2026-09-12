@@ -44,10 +44,11 @@ function event(msg) {
     if (msg.event === 'meter') { $('level').value = msg.rms; $('speech').textContent = msg.speech ? 'Có giọng nói' : 'Nền / im lặng'; }
     if (msg.event === 'wake') {
         wakeTick();
-        $('state').textContent = 'Đã nghe Moon — hãy nói tiếp';
+        $('state').textContent = 'Đã nghe Moon — đợi tín hiệu rồi hãy nói';
         $('wake').textContent = `Đã bắt wakeword: ${++wakes} lần (${msg.engine})`;
         addLog(`WAKE · ${msg.engine}`);
     }
+    if (msg.event === 'armed') $('state').textContent = 'Moon đang nghe — hãy nói câu hỏi';
     if (msg.event === 'processing') $('state').textContent = 'Đang chuyển thành text — mic vẫn thu';
     if (msg.event === 'transcript') addLog(`${msg.text || '(không có text tin cậy)'} · STT ${msg.latency_ms} ms · audio ${msg.duration_ms} ms`);
     if (msg.event === 'ignored') {

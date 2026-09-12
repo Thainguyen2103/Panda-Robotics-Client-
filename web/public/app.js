@@ -451,6 +451,11 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
         setVoiceState('listening');
         logToTerminal('WAKE: Moon — đang nghe', 'log-voice');
     }
+    if (msg.event === 'armed') {
+        hideThinking();
+        setOledAiMode('questioning');
+        setVoiceState('listening');
+    }
     if (msg.event === 'processing') {
         aiIdleHint.style.display = 'none';
         showThinking('Đang nhận diện giọng nói…');

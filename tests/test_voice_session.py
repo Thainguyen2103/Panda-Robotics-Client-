@@ -37,6 +37,35 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
         self.assertTrue(session.clips.empty())
 
+    async def test_acoustic_wake_tail_is_not_mistaken_for_question(self):
+        class Engine:
+            frame_length = 480
+            calls = 0
+
+            def process(self, pcm):
+                self.calls += 1
+                return 0 if self.calls == 1 else -1
+
+        class Vad:
+            def is_speech(self, pcm, rate):
+                return pcm != bytes(960)
+
+        socket = Socket()
+        session = Session(socket, None, Engine())
+        session.segmenter.calibration_frames = 0
+        session.segmenter.vad = Vad()
+        speech = b'\x88\x13' * 480  # int16 5000, trên ngưỡng RMS
+
+        # Phần còn lại của chính wakeword không được tạo clip câu hỏi.
+        for pcm in [speech] * 5 + [bytes(960)] * 4:
+            await session.feed(pcm)
+
+        self.assertTrue(session.listening)
+        self.assertFalse(session.waiting_for_wake_quiet)
+        self.assertTrue(session.clips.empty())
+        self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
+        self.assertEqual(sum(m['event'] == 'armed' for m in socket.messages), 1)
+
     async def run_clips(self, texts):
         socket = Socket()
         session = Session(socket, None)
