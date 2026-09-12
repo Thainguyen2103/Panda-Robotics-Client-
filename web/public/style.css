@@ -320,6 +320,16 @@ button:active { transform: translateY(0); }
     font-variant-numeric: tabular-nums;
     text-shadow: none;
 }
+.vision-status-box .emotion-ranking-row {
+    height: auto;
+    min-height: 72px;
+    align-items: start;
+}
+.vision-status-box .emotion-ranking-row .val {
+    display: block;
+    max-height: none;
+    overflow: visible;
+}
 
 /* ─── OLED Face ──────────────────────────────────────────────────────────── */
 .vision-note { font-size: 11px; line-height: 1.5; color: var(--text-muted); margin: 4px 0; }

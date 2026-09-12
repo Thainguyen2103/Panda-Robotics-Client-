@@ -37,9 +37,10 @@ hiệu hình học; đó không phải một kết luận về cảm xúc. Nhãn
 nhãn để xác nhận mức cải thiện độ chính xác.
 
 Dashboard cập nhật chữ theo nhịp 250 ms, chờ nhãn ổn định, giữ ngắn khi chưa rõ.
-Nhãn chính hiển thị dạng `Vui (82%)`; bảng chi tiết hiển thị phần trăm của đủ tám
-đầu ra FER+ và bảy mức kích hoạt hình học. Đây là độ tin cậy/độ kích hoạt ước lượng,
-không phải phép đo chắc chắn cảm xúc thật của người dùng.
+Nhãn chính hiển thị tối đa năm khả năng có điểm FER+ cao nhất theo thứ tự giảm dần,
+ví dụ `Vui (60%), Trung tính (30%), Ngạc nhiên (10%)`. Bảng chi tiết hiển thị phần
+trăm của đủ tám đầu ra FER+ và bảy mức kích hoạt hình học. Đây là độ tin cậy/độ
+kích hoạt ước lượng, không phải phép đo chắc chắn cảm xúc thật của người dùng.
 Bỏ log bản tin `panda/user_status` trùng để Activity Log không cuộn từng khung hình.
 
 ### Dữ liệu khớp cánh tay
