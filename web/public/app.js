@@ -1,6 +1,7 @@
 // ─── Socket.IO setup ──────────────────────────────────────────────────────────
 const socket = io();
 let voiceOnlyDashboard = false; // The web mic claims the display only during its session.
+let webVoiceAwake = false;      // Wake đã bắt; processing tiếp theo là STT câu hỏi.
 let transcriptTimer;
 function cancelTranscriptTimer() {
     clearTimeout(transcriptTimer);
@@ -433,8 +434,14 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
     // Meter/diagnostic packets arrive continuously; they must not erase the
     // active progress indicator or interrupt the OLED transition.
     if (['meter', 'ignored', 'transcript', 'calibrated'].includes(msg.event)) return;
-    if (['starting', 'ready'].includes(msg.event)) voiceOnlyDashboard = true;
-    if (msg.event === 'stopped') voiceOnlyDashboard = false;
+    if (['starting', 'ready'].includes(msg.event)) {
+        voiceOnlyDashboard = true;
+        webVoiceAwake = false;
+    }
+    if (msg.event === 'stopped') {
+        voiceOnlyDashboard = false;
+        webVoiceAwake = false;
+    }
     const sourceLabel = document.getElementById('voice-display-source');
     if (sourceLabel) sourceLabel.textContent = voiceOnlyDashboard ? 'Nguồn hiển thị: mic web — test STT' : 'Nguồn hiển thị: Brain qua MQTT (nếu đang chạy)';
     aiMoonBubble.style.display = 'none';
@@ -446,6 +453,7 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
         setOledAiMode('neutral');
     }
     if (msg.event === 'wake') {
+        webVoiceAwake = true;
         hideThinking();
         setOledAiMode('questioning');
         setVoiceState('listening');
@@ -460,9 +468,12 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
         aiIdleHint.style.display = 'none';
         showThinking('Đang nhận diện giọng nói…');
         setVoiceState('transcribing');
-        setOledAiMode('ai-thinking');
+        // Whisper processing không phải LLM thinking. Sau wake, giữ OLED ở
+        // trạng thái lắng nghe; trước wake thì giữ mặt neutral.
+        setOledAiMode(webVoiceAwake ? 'questioning' : 'neutral');
     }
     if (msg.event === 'question') {
+        webVoiceAwake = false;
         showUserQuestion(msg.text);
         hideThinking();
         setOledAiMode('hearing', msg.text);
@@ -484,6 +495,7 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
         logToTerminal(msg.text, 'sys');
     }
     if (['stopped', 'timeout', 'error'].includes(msg.event)) {
+        webVoiceAwake = false;
         hideThinking();
         setVoiceState('standby');
         setOledAiMode('neutral');
