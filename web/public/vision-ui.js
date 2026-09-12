@@ -63,7 +63,7 @@ class VisionPanel {
         const shownEmotion = this.fields.get('cv-emotion')?.shown || 'Chưa rõ';
         const hasCurrentScore = emotion !== 'unknown' && shownEmotion === emotionLabel && Number.isFinite(s.emotion_confidence);
         const fallbackEmotion = hasCurrentScore ? `${shownEmotion} (${Math.round(s.emotion_confidence*100)}%)` : shownEmotion;
-        const ranking = offline ? '' : this.emotionRanking(s.emotion_probs || {});
+        const ranking = offline ? '' : this.emotionRanking(s.emotion_scores || s.emotion_probs || {});
         this.text('cv-emotion',ranking || fallbackEmotion);
         if (emotionElement) emotionElement.title = ranking
             ? 'Tối đa 5 đầu ra FER+ có điểm cao nhất, xếp theo thứ tự giảm dần.'
@@ -99,7 +99,7 @@ class VisionPanel {
             .sort((a,b)=>b.value-a.value || a.index-b.index)
             .slice(0,5)
             .map(item=>`${VisionPanel.labels[item.name]} (${Math.round(Math.max(0,Math.min(1,item.value))*100)}%)`)
-            .join(', ');
+            .join('\n');
     }
     meters(probs, intensities = {}) {
         for (const name of VisionPanel.emotions) {

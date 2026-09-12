@@ -322,13 +322,15 @@ button:active { transform: translateY(0); }
 }
 .vision-status-box .emotion-ranking-row {
     height: auto;
-    min-height: 72px;
+    min-height: 98px;
     align-items: start;
 }
 .vision-status-box .emotion-ranking-row .val {
     display: block;
     max-height: none;
     overflow: visible;
+    white-space: pre-line;
+    text-align: left;
 }
 
 /* ─── OLED Face ──────────────────────────────────────────────────────────── */
