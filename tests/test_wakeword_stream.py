@@ -35,6 +35,7 @@ class WakewordStreamTests(unittest.TestCase):
         stopped = threading.Event()
         callback_stream_states = []
         fake_sd = types.SimpleNamespace(InputStream=FakeInputStream)
+        fake_np = types.SimpleNamespace(int16=object(), frombuffer=lambda data, dtype: data)
 
         def on_wake():
             callback_stream_states.append(FakeInputStream.active)
@@ -42,7 +43,7 @@ class WakewordStreamTests(unittest.TestCase):
 
         with patch.object(wakeword, "_porcupine", FakeEngine()), \
                 patch.object(wakeword, "_init_tried", True), \
-                patch.dict(sys.modules, {"sounddevice": fake_sd}):
+                patch.dict(sys.modules, {"sounddevice": fake_sd, "numpy": fake_np}):
             wakeword.run_loop(on_wake, stop_event=stopped)
 
         self.assertEqual(callback_stream_states, [False])
