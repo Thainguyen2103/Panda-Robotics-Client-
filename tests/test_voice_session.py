@@ -123,6 +123,20 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(m['event'] == 'verifying_wake' for m in socket.messages))
         self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
 
+    async def test_blank_primary_can_be_recovered_by_english_wake_pass(self):
+        socket = Socket()
+        session = Session(socket, None)
+        session.transcribe = lambda clip: asyncio.sleep(0, result='')
+        session.verify_wake = lambda clip: asyncio.sleep(0, result='Hey Moon')
+        worker = asyncio.create_task(session.worker())
+        session.clips.put_nowait((b'audio', False))
+        await asyncio.wait_for(session.clips.join(), 2)
+        worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker
+        self.assertTrue(session.listening)
+        self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
+
     async def test_real_vietnamese_words_do_not_enter_wake_verification(self):
         socket = Socket()
         session = Session(socket, None)

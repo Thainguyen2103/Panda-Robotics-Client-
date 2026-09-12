@@ -77,6 +77,13 @@ class VoiceCoreTests(unittest.TestCase):
         self.assertEqual(reliable_transcript({'text': 'Moon', 'segments': [{'no_speech_prob': .95}]}), '')
         self.assertEqual(reliable_transcript({'text': 'Moon', 'segments': [{'avg_logprob': -2}]}), '')
 
+    def test_known_whisper_outro_hallucinations_are_rejected(self):
+        result = {
+            'text': 'Hãy subscribe cho kênh Ghiền Mì Gõ để không bỏ lỡ những video hấp dẫn',
+            'segments': [{'no_speech_prob': .01, 'avg_logprob': -.1}],
+        }
+        self.assertEqual(reliable_transcript(result), '')
+
 
 if __name__ == '__main__':
     unittest.main()

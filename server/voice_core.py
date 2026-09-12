@@ -9,6 +9,13 @@ RATE = 16000
 FRAME_MS = 30
 FRAME_BYTES = 960
 
+_STT_HALLUCINATION_PHRASES = (
+    "subscribe", "subtitles by", "amara.org", "thank you for watching",
+    "thanks for watching", "like and subscribe", "see you next time",
+    "đăng ký kênh", "không bỏ lỡ", "video hấp dẫn", "hẹn gặp lại",
+    "ủng hộ kênh", "kênh ghiền",
+)
+
 
 def wake_tail(text):
     """Return original text after the complete token Moon; None means no wake.
@@ -110,6 +117,9 @@ class Segmenter:
 def reliable_transcript(result):
     """Keep the raw STT text; confidence rejects noise, never rewrites words."""
     text = (result.get('text') or '').strip()
+    normalized = text.casefold()
+    if any(phrase in normalized for phrase in _STT_HALLUCINATION_PHRASES):
+        return ''
     segments = result.get('segments') or []
     if segments and any(s.get('no_speech_prob', 0) > .45 or
                         s.get('avg_logprob', 0) < -1.0 or
