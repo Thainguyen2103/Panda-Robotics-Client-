@@ -66,7 +66,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
         self.assertEqual(sum(m['event'] == 'armed' for m in socket.messages), 1)
 
-    async def run_clips(self, texts):
+    async def run_clips(self, texts, captured_states=None):
         socket = Socket()
         session = Session(socket, None)
         iterator = iter(texts)
@@ -78,18 +78,30 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
             return result
         session.transcribe = transcribe
         worker = asyncio.create_task(session.worker())
-        for _ in texts:
-            session.clips.put_nowait(b'audio')
+        states = captured_states or [False] * len(texts)
+        for captured_while_listening in states:
+            session.clips.put_nowait((b'audio', captured_while_listening))
         await asyncio.wait_for(session.clips.join(), 2)
         worker.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await worker
         return session, socket.messages
 
-    async def test_wake_and_following_clip_while_stt_pending(self):
+    async def test_clip_captured_before_wake_result_is_not_a_question(self):
         session, messages = await self.run_clips(['Moon ơi', 'Tôi muốn học tiếng Anh.'])
-        self.assertEqual([m['text'] for m in messages if m['event'] == 'question'], ['Tôi muốn học tiếng Anh.'])
+        self.assertFalse(any(m['event'] == 'question' for m in messages))
         self.assertEqual(sum(m['event'] == 'wake' for m in messages), 1)
+        self.assertTrue(session.listening)
+
+    async def test_clip_captured_after_wake_is_the_question(self):
+        session, messages = await self.run_clips(
+            ['Moon ơi', 'Tôi muốn học tiếng Anh.'],
+            captured_states=[False, True],
+        )
+        self.assertEqual(
+            [m['text'] for m in messages if m['event'] == 'question'],
+            ['Tôi muốn học tiếng Anh.'],
+        )
         self.assertFalse(session.listening)
 
     async def test_same_utterance(self):

@@ -110,7 +110,10 @@ class Session:
                 await self.emit('error', text='STT không theo kịp. Hãy dừng và bật mic lại để tránh kết quả cũ.')
                 await self.ws.close(code=1013)
                 return
-            self.clips.put_nowait(clip)
+            # Ghi lại state TẠI THỜI ĐIỂM THU. Worker có thể xử lý muộn
+            # sau khi wake đã bật; nếu chỉ nhìn self.listening lúc đó, clip
+            # nhiễu cũ sẽ bị nhận nhầm thành câu hỏi.
+            self.clips.put_nowait((clip, self.listening))
 
     async def transcribe(self, pcm):
         wav = io.BytesIO()
@@ -127,7 +130,7 @@ class Session:
 
     async def worker(self):
         while True:
-            clip = await self.clips.get()
+            clip, captured_while_listening = await self.clips.get()
             self.busy = True
             start = time.monotonic()
             try:
@@ -135,22 +138,22 @@ class Session:
                 text = await self.transcribe(clip)
                 self.sequence += 1
                 # Unrelated standby ASR is diagnostic, not a user's question.
-                accepted = self.listening or wake_tail(text) is not None
+                tail = wake_tail(text) if not self.engine else None
+                accepted = ((captured_while_listening and self.listening)
+                            or (tail is not None and not self.listening))
                 await self.emit('transcript' if accepted else 'ignored', text=text, sequence=self.sequence,
                                 latency_ms=round((time.monotonic()-start)*1000),
                                 duration_ms=round(len(clip)/32))
                 if not text:
                     await self.emit('rejected', text='Không có lời nói đủ tin cậy trong đoạn âm thanh.')
-                elif self.listening:
+                elif captured_while_listening and self.listening:
                     await self.emit('question', text=text)
                     self.listening = False
-                elif not self.engine:
-                    tail = wake_tail(text)
-                    if tail is not None:
-                        await self.wake()
-                        if tail:
-                            await self.emit('question', text=tail)
-                            self.listening = False
+                elif tail is not None and not self.listening:
+                    await self.wake()
+                    if tail:
+                        await self.emit('question', text=tail)
+                        self.listening = False
             except Exception as exc:
                 # Do not expose SDK response bodies or credentials to the browser.
                 await self.emit('error', text=f'STT lỗi ({type(exc).__name__}). Kiểm tra key, mạng hoặc quota; thử lại.')
