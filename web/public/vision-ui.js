@@ -57,9 +57,17 @@ class VisionPanel {
             : s.identity === 'Guest' ? 'Khách' : 'Chưa rõ';
         this.stable('cv-identity',identity,identity === 'Chưa rõ' || !s.person_detected);
         const emotion = offline ? 'unknown' : s.emotion;
-        this.stable('cv-emotion',VisionPanel.labels[emotion] || 'Chưa rõ',emotion === 'unknown',150);
+        const emotionLabel = VisionPanel.labels[emotion] || 'Chưa rõ';
+        this.stable('cv-emotion',emotionLabel,emotion === 'unknown',150);
         const emotionElement = this.document.getElementById('cv-emotion');
-        if (emotionElement) emotionElement.title = `Nguồn: ${s.emotion_source || 'unknown'} · điểm ${Math.round((s.emotion_confidence || 0)*100)}% (không phải xác suất chính xác)`;
+        const shownEmotion = this.fields.get('cv-emotion')?.shown || 'Chưa rõ';
+        const hasCurrentScore = emotion !== 'unknown' && shownEmotion === emotionLabel && Number.isFinite(s.emotion_confidence);
+        const fallbackEmotion = hasCurrentScore ? `${shownEmotion} (${Math.round(s.emotion_confidence*100)}%)` : shownEmotion;
+        const ranking = offline ? '' : this.emotionRanking(s.emotion_scores || s.emotion_probs || {});
+        this.text('cv-emotion',ranking || fallbackEmotion);
+        if (emotionElement) emotionElement.title = ranking
+            ? 'Tối đa 5 đầu ra FER+ có điểm cao nhất, xếp theo thứ tự giảm dần.'
+            : `Nguồn: ${s.emotion_source || 'unknown'} · độ tin cậy ${Math.round((s.emotion_confidence || 0)*100)}% (ước lượng từ mô hình/tín hiệu mặt)`;
         if (offline) this.events.clear();
         const active = [...this.events.values()].filter(event=>this.now()-event.time<1800);
         this.text('cv-action',active.length ? active.map(event=>event.text).join(' · ') : 'Chưa rõ');
@@ -84,21 +92,31 @@ class VisionPanel {
         this.stable('cv-objects',names.join(', ') || 'Chưa thấy',!names.length,500);
         this.meters(offline ? {} : s.emotion_probs || {},offline ? {} : s.expression_intensities || {});
     }
+    emotionRanking(probs) {
+        return VisionPanel.emotions
+            .map((name,index)=>({name,index,value:Number(probs[name])}))
+            .filter(item=>Number.isFinite(item.value) && item.value >= .005)
+            .sort((a,b)=>b.value-a.value || a.index-b.index)
+            .slice(0,5)
+            .map(item=>`${VisionPanel.labels[item.name]} (${Math.round(Math.max(0,Math.min(1,item.value))*100)}%)`)
+            .join('\n');
+    }
     meters(probs, intensities = {}) {
-        for (const name of ['neutral','happy','surprised','sad','angry','disgust','fear','contempt']) {
+        for (const name of VisionPanel.emotions) {
             const value = Math.max(0,Math.min(1,probs[name] || 0));
             const meter = this.document.getElementById(`cv-prob-${name}`);
             if (meter) meter.value = value;
-            this.text(`cv-score-${name}`,probs[name] == null ? '—' : value.toFixed(2));
+            this.text(`cv-score-${name}`,probs[name] == null ? '—' : `${Math.round(value*100)}%`);
         }
-        for (const name of ['happy','surprised','sad','angry']) {
+        for (const name of ['happy','surprised','sad','angry','disgust','fear','contempt']) {
             const value = Math.max(0,Math.min(1,intensities[name] || 0));
             const meter = this.document.getElementById(`cv-intensity-${name}`);
             if (meter) meter.value = value;
-            this.text(`cv-intensity-score-${name}`,intensities[name] == null ? '—' : value.toFixed(2));
+            this.text(`cv-intensity-score-${name}`,intensities[name] == null ? '—' : `${Math.round(value*100)}%`);
         }
     }
 }
+VisionPanel.emotions = ['neutral','happy','surprised','sad','angry','disgust','fear','contempt'];
 VisionPanel.labels = {unknown:'Chưa rõ',neutral:'Trung tính',happy:'Vui',sad:'Buồn',angry:'Giận',
     surprised:'Ngạc nhiên',disgust:'Chán ghét',fear:'Sợ',contempt:'Khinh miệt',waving:'Vẫy tay chào',
     hand_raised:'Giơ một tay',both_hands_up:'Giơ hai tay',head_nod:'Gật đầu',head_shake:'Lắc đầu',

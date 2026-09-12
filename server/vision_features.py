@@ -37,10 +37,14 @@ class FaceDetails:
         scores = {v.category_name:float(v.score) for v in result.face_blendshapes[0]} if result.face_blendshapes else {}
         def pair(name):
             return (scores.get(name+"Left",0.)+scores.get(name+"Right",0.))/2
+        smile_left,smile_right = scores.get("mouthSmileLeft",0.),scores.get("mouthSmileRight",0.)
         cues = dict(brow_down=pair("browDown"),brow_inner_up=scores.get("browInnerUp",0.),
                     eye_squint=pair("eyeSquint"),mouth_frown=pair("mouthFrown"),
-                    mouth_press=pair("mouthPress"),smile=pair("mouthSmile"),
-                    jaw_open=scores.get("jawOpen",0.),eye_wide=pair("eyeWide"),brow_outer_up=pair("browOuterUp"))
+                    mouth_press=pair("mouthPress"),smile=(smile_left+smile_right)/2,
+                    smile_left=smile_left,smile_right=smile_right,
+                    jaw_open=scores.get("jawOpen",0.),eye_wide=pair("eyeWide"),
+                    brow_outer_up=pair("browOuterUp"),mouth_stretch=pair("mouthStretch"),
+                    nose_sneer=pair("noseSneer"),upper_lip_raise=pair("mouthUpperUp"))
         angles = None
         if result.facial_transformation_matrixes:
             matrix = np.asarray(result.facial_transformation_matrixes[0])[:3,:3]
@@ -60,10 +64,36 @@ class FaceDetails:
 def expression_intensities(cues):
     """Independent geometric activation scores, not probabilities summing to one."""
     c = cues or {}
+    smile_left,smile_right = c.get("smile_left",0),c.get("smile_right",0)
+    raised_brows = max(c.get("brow_inner_up",0),c.get("brow_outer_up",0))
     return dict(happy=float(c.get("smile",0)),
         surprised=float(min(c.get("jaw_open",0),max(c.get("eye_wide",0),c.get("brow_outer_up",0)))),
         angry=float(math.sqrt(c.get("brow_down",0)*max(c.get("eye_squint",0),c.get("mouth_press",0)))),
-        sad=float(math.sqrt(c.get("brow_inner_up",0)*c.get("mouth_frown",0))))
+        sad=float(math.sqrt(c.get("brow_inner_up",0)*c.get("mouth_frown",0))),
+        disgust=float(math.sqrt(c.get("nose_sneer",0)*c.get("upper_lip_raise",0))),
+        fear=float((raised_brows*c.get("eye_wide",0)*max(c.get("jaw_open",0),c.get("mouth_stretch",0)))**(1/3)),
+        contempt=float(math.sqrt(max(smile_left,smile_right)*abs(smile_left-smile_right))))
+
+
+def combined_emotion_scores(probs, cues):
+    """Fuse FER+ distribution and independent landmarks into a normalized ranking."""
+    labels = ("neutral","happy","surprised","sad","angry","disgust","fear","contempt")
+    if probs is None:
+        return {}
+    raw = np.clip(np.asarray(probs,dtype=float).reshape(-1),0,1)
+    if raw.size != len(labels) or not np.isfinite(raw).all() or raw.sum() <= 0:
+        return {}
+    raw /= raw.sum()
+    intensities = expression_intensities(cues)
+    scores = .75*raw
+    activation = max(intensities.values(),default=0.)
+    # FER+ frequently absorbs subtle expressions into neutral. Reduce neutral only
+    # when independent facial motion exists, then add class-specific evidence.
+    scores[0] *= max(.35,1-.65*activation)
+    for index,name in enumerate(labels[1:],1):
+        scores[index] += .25*np.clip(intensities.get(name,0.),0,1)
+    scores /= scores.sum()
+    return {name:float(value) for name,value in zip(labels,scores)}
 
 
 class ExpressionState:
@@ -75,17 +105,29 @@ class ExpressionState:
 
     def update(self,probs,cues,now):
         intensities = expression_intensities(cues)
-        # A visible smile can be recognized even if FER wrongly dominates with neutral.
-        if intensities["happy"] >= .45:
+        model_label,count,model_source = emotion_candidate(probs,cues) if probs is not None else ("unknown",3,"uncertain")
+        # Trust a decisive non-neutral FER result. Geometric cues primarily recover
+        # expressions that FER+ incorrectly collapses into its dominant neutral class.
+        if model_source == "fer" and model_label != "neutral":
+            label,dwell,source = model_label,.30,model_source
+        elif model_source == "fer+landmarks":
+            label,dwell,source = model_label,.45,model_source
+        elif intensities["happy"] >= .45:
             label,dwell,source = "happy",.18,"landmarks"
         elif intensities["surprised"] >= .30:
             label,dwell,source = "surprised",.18,"landmarks"
-        elif intensities["angry"] >= .35 and (cues or {}).get("brow_down",0) >= .5:
+        elif intensities["angry"] >= .30 and (cues or {}).get("brow_down",0) >= .42:
             label,dwell,source = "angry",.65,"landmarks"
-        elif intensities["sad"] >= .30 and (cues or {}).get("brow_inner_up",0) >= .35:
+        elif intensities["sad"] >= .24 and (cues or {}).get("brow_inner_up",0) >= .30:
             label,dwell,source = "sad",.65,"landmarks"
+        elif intensities["disgust"] >= .24:
+            label,dwell,source = "disgust",.55,"landmarks"
+        elif intensities["fear"] >= .20:
+            label,dwell,source = "fear",.55,"landmarks"
+        elif intensities["contempt"] >= .25:
+            label,dwell,source = "contempt",.65,"landmarks"
         elif probs is not None:
-            label,count,source = emotion_candidate(probs,cues)
+            label,source = model_label,model_source
             dwell = .65 if count == 5 else .30
         else:
             label,dwell,source = "unknown",.30,"uncertain"
@@ -98,7 +140,7 @@ class ExpressionState:
         labels = ("neutral","happy","surprised","sad","angry","disgust","fear","contempt")
         score = intensities.get(self.value,0.) if self.source == "landmarks" else float(probs[labels.index(self.value)]) if probs is not None and self.value in labels else 0.
         return dict(emotion=self.value,emotion_source=self.source,emotion_confidence=score,
-                    expression_intensities=intensities)
+                    emotion_scores=combined_emotion_scores(probs,cues),expression_intensities=intensities)
 
 
 class HeadMotion:
@@ -146,14 +188,23 @@ def emotion_candidate(probs, cues):
     labels = ("neutral","happy","surprised","sad","angry","disgust","fear","contempt")
     order = np.argsort(probs)
     top,runner = int(order[-1]),int(order[-2])
-    if probs[top] >= settings.VISION_EMOTION_THRESHOLD and probs[top]-probs[runner] >= settings.VISION_EMOTION_MARGIN:
+    decisive = probs[top] >= settings.VISION_EMOTION_THRESHOLD and probs[top]-probs[runner] >= settings.VISION_EMOTION_MARGIN
+    if decisive and top != 0:
         return labels[top],3,"fer"
     cues = cues or {}
     angry = cues.get("brow_down",0) >= .3 and max(cues.get("eye_squint",0),cues.get("mouth_press",0)) >= .12
     sad = cues.get("brow_inner_up",0) >= .25 and cues.get("mouth_frown",0) >= .12
-    for index,supported in ((3,sad),(4,angry)):
-        if supported and top in (0,index) and index in (top,runner) and probs[index] >= .25 and probs[index] >= probs[top]*.6:
+    disgust = cues.get("nose_sneer",0) >= .25 and cues.get("upper_lip_raise",0) >= .15
+    fear = (max(cues.get("brow_inner_up",0),cues.get("brow_outer_up",0)) >= .25
+            and cues.get("eye_wide",0) >= .18
+            and max(cues.get("jaw_open",0),cues.get("mouth_stretch",0)) >= .18)
+    smile_left,smile_right = cues.get("smile_left",0),cues.get("smile_right",0)
+    contempt = max(smile_left,smile_right) >= .35 and abs(smile_left-smile_right) >= .22
+    for index,supported in ((3,sad),(4,angry),(5,disgust),(6,fear),(7,contempt)):
+        if supported and top in (0,index) and index in (top,runner) and probs[index] >= .12 and probs[index] >= probs[top]*.28:
             return labels[index],5,"fer+landmarks"
+    if decisive:
+        return labels[top],3,"fer"
     return "unknown",3,"uncertain"
 
 

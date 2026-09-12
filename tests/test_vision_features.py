@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from server.vision_features import HeadMotion, emotion_candidate, upper_body
+from server.vision_features import ExpressionState, HeadMotion, combined_emotion_scores, emotion_candidate, expression_intensities, upper_body
 from server.vision import StableLabel, ArmGestures
 
 
@@ -29,15 +29,48 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(motion.update(dict(pitch=0,yaw=0,roll=0),.6),"unknown")
 
     def test_subtle_emotion_needs_two_sources(self):
-        for index,label,cues in ((3,"sad",dict(brow_inner_up=.4,mouth_frown=.2)),
-                                 (4,"angry",dict(brow_down=.5,eye_squint=.2))):
+        cases = ((3,"sad",dict(brow_inner_up=.4,mouth_frown=.2)),
+                 (4,"angry",dict(brow_down=.5,eye_squint=.2)),
+                 (5,"disgust",dict(nose_sneer=.5,upper_lip_raise=.3)),
+                 (6,"fear",dict(brow_outer_up=.4,eye_wide=.3,jaw_open=.3)),
+                 (7,"contempt",dict(smile_left=.6,smile_right=.1)))
+        for index,label,cues in cases:
             probs = np.zeros(8)
-            probs[0],probs[index],probs[2] = .45,.35,.20
+            probs[0],probs[index],probs[2] = .52,.28,.20
             self.assertEqual(emotion_candidate(probs,{})[0],"unknown")
             self.assertEqual(emotion_candidate(probs,cues),(label,5,"fer+landmarks"))
-            self.assertEqual(float(probs[index]),.35)
+            self.assertEqual(float(probs[index]),.28)
         probs = np.array([.05,.8,.05,.03,.03,.02,.01,.01])
         self.assertEqual(emotion_candidate(probs,dict(brow_down=.9,eye_squint=.8))[0],"happy")
+
+    def test_all_non_neutral_landmark_intensities_are_exposed(self):
+        cues = dict(smile=.7,jaw_open=.6,eye_wide=.6,brow_outer_up=.6,
+                    brow_down=.7,eye_squint=.5,brow_inner_up=.6,mouth_frown=.5,
+                    nose_sneer=.6,upper_lip_raise=.5,mouth_stretch=.6,
+                    smile_left=.7,smile_right=.1)
+        values = expression_intensities(cues)
+        self.assertEqual(set(values),{"happy","surprised","sad","angry","disgust","fear","contempt"})
+        self.assertTrue(all(0 < value <= 1 for value in values.values()))
+
+    def test_confident_fer_emotion_is_not_overridden_by_noisy_landmarks(self):
+        state = ExpressionState()
+        probs = np.array([.03,.03,.03,.03,.75,.05,.05,.03])
+        noisy = dict(smile=.9,jaw_open=.9,eye_wide=.9,brow_outer_up=.9)
+        state.update(probs,noisy,0)
+        result = state.update(probs,noisy,.4)
+        self.assertEqual(result["emotion"],"angry")
+        self.assertEqual(result["emotion_source"],"fer")
+
+    def test_supported_subtle_emotion_can_beat_neutral_bias(self):
+        probs = np.array([.65,.01,.08,.02,.02,.20,.01,.01])
+        cues = dict(nose_sneer=.55,upper_lip_raise=.40)
+        self.assertEqual(emotion_candidate(probs,cues),("disgust",5,"fer+landmarks"))
+        scores = combined_emotion_scores(probs,cues)
+        self.assertAlmostEqual(sum(scores.values()),1.,places=6)
+        self.assertGreater(scores["disgust"],float(probs[5]))
+        state = ExpressionState()
+        state.update(probs,cues,0)
+        self.assertEqual(state.update(probs,cues,.5)["emotion"],"disgust")
 
     def test_label_holds_brief_uncertainty_but_expires(self):
         label = StableLabel(count=2,hold=2)

@@ -35,6 +35,20 @@ def iou(a, b):
     return intersection/max(1, a[2]*a[3]+b[2]*b[3]-intersection)
 
 
+def emotion_face_crop(frame, box, padding=.12):
+    """Return a padded square face so resizing to FER+'s 64x64 does not stretch it."""
+    x,y,w,h = map(float,box[:4])
+    side = max(1,int(round(max(w,h)*(1+2*padding))))
+    left,top = int(round(x+w/2-side/2)),int(round(y+h/2-side/2))
+    right,bottom = left+side,top+side
+    pad_left,pad_top = max(0,-left),max(0,-top)
+    pad_right,pad_bottom = max(0,right-frame.shape[1]),max(0,bottom-frame.shape[0])
+    if pad_left or pad_top or pad_right or pad_bottom:
+        frame = cv2.copyMakeBorder(frame,pad_top,pad_bottom,pad_left,pad_right,cv2.BORDER_REPLICATE)
+        left,top = left+pad_left,top+pad_top
+    return frame[top:top+side,left:left+side]
+
+
 class StableLabel:
     def __init__(self, count=3, hold=0):
         self.count = count
@@ -181,7 +195,7 @@ def empty_result(status="ok"):
                 arm_action="unknown", face_box=None, person_box=None,
                 upper_body_joints={}, elbow_angles={}, pose_time=0.,
                 head_pose=None, expression_cues={}, emotion_source="uncertain",
-                actions=[],hands=[],objects=[],emotion_probs={},expression_intensities={},
+                actions=[],hands=[],objects=[],emotion_probs={},emotion_scores={},expression_intensities={},
                 eyes={"state":"unknown","gaze":"unknown","blink_rate_per_min":None},
                 distance={"cm":None,"source":"unavailable"},
                 inference_ms=0., frame_time=0.)
@@ -397,7 +411,7 @@ class VisionEngine:
                 if stage == "emotion":
                     self.emotion_time = now
                     def expression():
-                        gray = cv2.cvtColor(crop,cv2.COLOR_BGR2GRAY)
+                        gray = cv2.cvtColor(emotion_face_crop(frame,best),cv2.COLOR_BGR2GRAY)
                         blob = cv2.dnn.blobFromImage(gray,1.,(64,64),swapRB=False,crop=False)
                         self.models["emotion"].setInput(blob)
                         logits = self.models["emotion"].forward().reshape(-1)
