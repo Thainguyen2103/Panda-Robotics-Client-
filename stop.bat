@@ -6,6 +6,10 @@ echo ===================================
 echo.
 
 echo Dang tat Web Dashboard...
+taskkill /F /FI "WINDOWTITLE eq Administrator:  Moon System*" /T >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq Moon System*" /T >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq Administrator:  Moon Voice Dashboard*" /T >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq Moon Voice Dashboard*" /T >nul 2>&1
 taskkill /F /FI "WINDOWTITLE eq Administrator:  Moon Web Dashboard*" /T >nul 2>&1
 taskkill /F /FI "WINDOWTITLE eq Moon Web Dashboard*" /T >nul 2>&1
 
