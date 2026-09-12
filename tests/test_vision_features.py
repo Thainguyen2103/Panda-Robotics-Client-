@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from server.vision_features import ExpressionState, HeadMotion, emotion_candidate, expression_intensities, upper_body
+from server.vision_features import ExpressionState, HeadMotion, combined_emotion_scores, emotion_candidate, expression_intensities, upper_body
 from server.vision import StableLabel, ArmGestures
 
 
@@ -60,6 +60,17 @@ class FeatureTests(unittest.TestCase):
         result = state.update(probs,noisy,.4)
         self.assertEqual(result["emotion"],"angry")
         self.assertEqual(result["emotion_source"],"fer")
+
+    def test_supported_subtle_emotion_can_beat_neutral_bias(self):
+        probs = np.array([.65,.01,.08,.02,.02,.20,.01,.01])
+        cues = dict(nose_sneer=.55,upper_lip_raise=.40)
+        self.assertEqual(emotion_candidate(probs,cues),("disgust",5,"fer+landmarks"))
+        scores = combined_emotion_scores(probs,cues)
+        self.assertAlmostEqual(sum(scores.values()),1.,places=6)
+        self.assertGreater(scores["disgust"],float(probs[5]))
+        state = ExpressionState()
+        state.update(probs,cues,0)
+        self.assertEqual(state.update(probs,cues,.5)["emotion"],"disgust")
 
     def test_label_holds_brief_uncertainty_but_expires(self):
         label = StableLabel(count=2,hold=2)

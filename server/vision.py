@@ -195,7 +195,7 @@ def empty_result(status="ok"):
                 arm_action="unknown", face_box=None, person_box=None,
                 upper_body_joints={}, elbow_angles={}, pose_time=0.,
                 head_pose=None, expression_cues={}, emotion_source="uncertain",
-                actions=[],hands=[],objects=[],emotion_probs={},expression_intensities={},
+                actions=[],hands=[],objects=[],emotion_probs={},emotion_scores={},expression_intensities={},
                 eyes={"state":"unknown","gaze":"unknown","blink_rate_per_min":None},
                 distance={"cm":None,"source":"unavailable"},
                 inference_ms=0., frame_time=0.)
