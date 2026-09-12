@@ -57,9 +57,13 @@ class VisionPanel {
             : s.identity === 'Guest' ? 'Khách' : 'Chưa rõ';
         this.stable('cv-identity',identity,identity === 'Chưa rõ' || !s.person_detected);
         const emotion = offline ? 'unknown' : s.emotion;
-        this.stable('cv-emotion',VisionPanel.labels[emotion] || 'Chưa rõ',emotion === 'unknown',150);
+        const emotionLabel = VisionPanel.labels[emotion] || 'Chưa rõ';
+        this.stable('cv-emotion',emotionLabel,emotion === 'unknown',150);
         const emotionElement = this.document.getElementById('cv-emotion');
-        if (emotionElement) emotionElement.title = `Nguồn: ${s.emotion_source || 'unknown'} · điểm ${Math.round((s.emotion_confidence || 0)*100)}% (không phải xác suất chính xác)`;
+        const shownEmotion = this.fields.get('cv-emotion')?.shown || 'Chưa rõ';
+        const hasCurrentScore = emotion !== 'unknown' && shownEmotion === emotionLabel && Number.isFinite(s.emotion_confidence);
+        this.text('cv-emotion',hasCurrentScore ? `${shownEmotion} (${Math.round(s.emotion_confidence*100)}%)` : shownEmotion);
+        if (emotionElement) emotionElement.title = `Nguồn: ${s.emotion_source || 'unknown'} · độ tin cậy ${Math.round((s.emotion_confidence || 0)*100)}% (ước lượng từ mô hình/tín hiệu mặt)`;
         if (offline) this.events.clear();
         const active = [...this.events.values()].filter(event=>this.now()-event.time<1800);
         this.text('cv-action',active.length ? active.map(event=>event.text).join(' · ') : 'Chưa rõ');
@@ -89,13 +93,13 @@ class VisionPanel {
             const value = Math.max(0,Math.min(1,probs[name] || 0));
             const meter = this.document.getElementById(`cv-prob-${name}`);
             if (meter) meter.value = value;
-            this.text(`cv-score-${name}`,probs[name] == null ? '—' : value.toFixed(2));
+            this.text(`cv-score-${name}`,probs[name] == null ? '—' : `${Math.round(value*100)}%`);
         }
         for (const name of ['happy','surprised','sad','angry']) {
             const value = Math.max(0,Math.min(1,intensities[name] || 0));
             const meter = this.document.getElementById(`cv-intensity-${name}`);
             if (meter) meter.value = value;
-            this.text(`cv-intensity-score-${name}`,intensities[name] == null ? '—' : value.toFixed(2));
+            this.text(`cv-intensity-score-${name}`,intensities[name] == null ? '—' : `${Math.round(value*100)}%`);
         }
     }
 }

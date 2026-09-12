@@ -18,6 +18,12 @@ def arms(x=30.,visible=True):
 
 
 class VisionTests(unittest.TestCase):
+    def test_emotion_crop_is_square_and_padded_at_frame_edge(self):
+        frame = np.arange(80*100*3,dtype=np.uint8).reshape(80,100,3)
+        crop = v.emotion_face_crop(frame,[-5,5,30,50])
+        self.assertEqual(crop.shape[0],crop.shape[1])
+        self.assertGreater(crop.shape[0],50)
+
     def test_waving_requires_motion_and_no_legs(self):
         classifier = v.ArmGestures()
         for i in range(12):
