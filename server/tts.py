@@ -413,6 +413,7 @@ class SentencePlayer:
 
     def _play_worker(self):
         """Phát tuần tự các câu đã tổng hợp."""
+        global _speech_end_t
         first = True
         try:
             with _tts_lock:
