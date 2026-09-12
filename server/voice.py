@@ -127,6 +127,8 @@ _paused_event = threading.Event()    # set = tạm dừng vòng lặp nghe (khi 
 _abort_event  = threading.Event()    # set = ngắt bản ghi âm hiện tại ngay lập tức
 _external_mic = threading.Event()    # set = mic trình duyệt đang nghe liên tục → loop server nghỉ
 _mic_lock     = threading.Lock()     # chỉ 1 luồng được mở mic tại 1 thời điểm
+_standby_stream_lock = threading.Lock()
+_standby_stream = None               # stream VAD standby; dừng hẳn khi pipeline chiếm mic
 _device_cache = None                 # (index, name) — cache sau lần dò đầu tiên
 
 _on_transcript_cbs = []
@@ -600,21 +602,49 @@ def pause_listening():
     """Tạm dừng vòng lặp nghe (khi AI đang listening/thinking/speaking)."""
     _paused_event.set()
     _abort_event.set()      # ngắt cả bản ghi âm đang chạy
+    # Không chỉ bỏ qua callback: phải nhả thiết bị để
+    # listen_for_question() có thể mở mic mà không tranh stream standby.
+    _stop_standby_stream()
 
 
 def resume_listening():
     """Tiếp tục nghe (khi AI quay về standby)."""
     _abort_event.clear()
     _paused_event.clear()
+    if not _external_mic.is_set():
+        _start_standby_stream()
+
+
+def _stop_standby_stream():
+    with _standby_stream_lock:
+        if _standby_stream is not None:
+            try:
+                if _standby_stream.active:
+                    _standby_stream.stop()
+            except Exception as e:
+                print(f"⚠️  [VOICE] Không dừng được stream standby: {e}")
+
+
+def _start_standby_stream():
+    with _standby_stream_lock:
+        if _standby_stream is not None:
+            try:
+                if not _standby_stream.active:
+                    _standby_stream.start()
+            except Exception as e:
+                print(f"⚠️  [VOICE] Không khởi động lại được stream standby: {e}")
 
 
 def set_external_mic(on: bool):
     """Bật/tắt chế độ mic trình duyệt liên tục → vòng lặp server nhường đường."""
     if on:
         _external_mic.set()
+        _stop_standby_stream()
         print("🎙️ [VOICE] Mic trình duyệt liên tục BẬT — loop server tạm nghỉ.")
     else:
         _external_mic.clear()
+        if not _paused_event.is_set():
+            _start_standby_stream()
         print("🎙️ [VOICE] Mic trình duyệt TẮT — loop server nghe lại.")
 
 
@@ -695,8 +725,11 @@ def continuous_listen_loop():
     min_blocks  = int(MIN_SPEECH_SEC * 1000 / BLOCK_MS)
     preroll_max = int(1.5 * 1000 / BLOCK_MS)
 
+    global _standby_stream
     with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="int16",
-                        device=dev[0], blocksize=BLOCK_FRAMES, callback=_cb):
+                        device=dev[0], blocksize=BLOCK_FRAMES, callback=_cb) as stream:
+        with _standby_stream_lock:
+            _standby_stream = stream
         # ── warm-up 0.4s + hiệu chuẩn ồn nền 0.6–1s — MỘT lần duy nhất ──
         # Theo THỜI GIAN (không theo số block quiet) → không bao giờ treo
         # kể cả khi phòng ồn hơn 0.10 RMS; lấy trung vị chống outlier giọng nói.
@@ -721,51 +754,56 @@ def continuous_listen_loop():
         clip, peak, speech_blocks = [], 0.0, 0
         last_speech, speech_start = 0.0, 0.0
 
-        while True:
-            # AI bận / mic ngoài / TTS phát → xả hàng đợi & reset (chống tự kích)
-            if _paused_event.is_set() or _external_mic.is_set() or _tts_speaking():
-                while not q.empty():
-                    try:
-                        q.get_nowait()
-                    except queue.Empty:
-                        break
-                state, clip, peak, speech_blocks = "idle", [], 0.0, 0
-                preroll.clear()
-                time.sleep(0.1)
-                continue
-
-            try:
-                data = q.get(timeout=1.0)
-            except queue.Empty:
-                continue
-
-            now = time.time()
-            rms = _rms_of_block(data)
-            rel = peak * 0.55 if state == "speech" else 0.0
-            is_sp = (rms >= threshold_base and rms >= rel
-                     and _spectral_flatness(data) < SPEECH_FLAT_MAX)
-
-            if state == "idle":
-                if is_sp:
-                    state = "speech"
-                    clip = list(preroll) + [data]
-                    peak, speech_blocks = rms, 1
-                    last_speech = speech_start = now
-                else:
-                    ambient = ambient * 0.9 + rms * 0.1   # thích nghi liên tục
-                    threshold_base = max(VAD_NOISE_FLOOR, ambient * VAD_AMBIENT_MULT)
-                    preroll.append(data)
-            else:
-                clip.append(data)
-                if is_sp:
-                    peak = max(peak, rms)
-                    speech_blocks += 1
-                    last_speech = now
-                if (state == "speech" and now - last_speech >= WAKE_SILENCE_SEC) \
-                        or (state == "speech" and now - speech_start > 8.0):
-                    if speech_blocks >= min_blocks:
-                        _emit_clip(b"".join(clip))   # nền — không chặn tai
+        try:
+            while True:
+                # AI bận / mic ngoài / TTS phát → xả hàng đợi & reset (chống tự kích)
+                if _paused_event.is_set() or _external_mic.is_set() or _tts_speaking():
+                    while not q.empty():
+                        try:
+                            q.get_nowait()
+                        except queue.Empty:
+                            break
                     state, clip, peak, speech_blocks = "idle", [], 0.0, 0
+                    preroll.clear()
+                    time.sleep(0.1)
+                    continue
+
+                try:
+                    data = q.get(timeout=1.0)
+                except queue.Empty:
+                    continue
+
+                now = time.time()
+                rms = _rms_of_block(data)
+                rel = peak * 0.55 if state == "speech" else 0.0
+                is_sp = (rms >= threshold_base and rms >= rel
+                         and _spectral_flatness(data) < SPEECH_FLAT_MAX)
+
+                if state == "idle":
+                    if is_sp:
+                        state = "speech"
+                        clip = list(preroll) + [data]
+                        peak, speech_blocks = rms, 1
+                        last_speech = speech_start = now
+                    else:
+                        ambient = ambient * 0.9 + rms * 0.1   # thích nghi liên tục
+                        threshold_base = max(VAD_NOISE_FLOOR, ambient * VAD_AMBIENT_MULT)
+                        preroll.append(data)
+                else:
+                    clip.append(data)
+                    if is_sp:
+                        peak = max(peak, rms)
+                        speech_blocks += 1
+                        last_speech = now
+                    if (state == "speech" and now - last_speech >= WAKE_SILENCE_SEC) \
+                            or (state == "speech" and now - speech_start > 8.0):
+                        if speech_blocks >= min_blocks:
+                            _emit_clip(b"".join(clip))   # nền — không chặn tai
+                        state, clip, peak, speech_blocks = "idle", [], 0.0, 0
+        finally:
+            with _standby_stream_lock:
+                if _standby_stream is stream:
+                    _standby_stream = None
 
 
 def listen_for_question() -> str | None:
