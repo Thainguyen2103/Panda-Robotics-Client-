@@ -150,6 +150,10 @@ void handleAiCmd(String subtopic, String payload) {
     } else if (strcmp(stage, "thinking") == 0) {
       faceMode = "ai-thinking";
       Serial.println("[AI] thinking/thinking -> thinking eyes");
+    } else if (strcmp(stage, "answer") == 0) {
+      oledText = String(text);
+      faceMode = oledText.length() > 0 ? "answering" : "speaking";
+      Serial.println("[AI] thinking/answer -> answer preview");
     } else if (strcmp(stage, "answering") == 0) {
       // Giữ transcript hoặc chuẩn bị sang speaking
       Serial.println("[AI] thinking/answering -> face " + faceMode);

@@ -68,6 +68,12 @@ const {chromium} = require('playwright');
         assert.equal(await page.locator('#ai-user-text').textContent(), 'Ronaldo là ai?');
         assert.equal(await page.locator('#ai-thinking-bar').isVisible(), true);
         assert.match(await page.locator('#oled-face').getAttribute('class'), /ai-thinking/);
+        await page.evaluate(() => socket.listeners('mqtt_message')[0]({
+            topic: 'panda/ai/thinking',
+            payload: JSON.stringify({stage: 'answer', text: 'Câu trả lời đầu tiên.'})
+        }));
+        assert.match(await page.locator('#oled-face').getAttribute('class'), /answering/);
+        assert.equal(await page.locator('#oled-text').textContent(), '"Câu trả lời đầu tiên."');
         await page.evaluate(() => {
             const receive = socket.listeners('mqtt_message')[0];
             receive({topic: 'panda/ai/state', payload: 'speaking'});

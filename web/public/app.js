@@ -346,6 +346,10 @@ socket.on('mqtt_message', (data) => {
                     setOledAiMode('ai-thinking');
                     // OLED vẫn giữ transcript
                     break;
+                case 'answer':
+                    hideThinking();
+                    setOledAiMode('answering', msg.text || '');
+                    break;
                 case 'done':
                     hideThinking();
                     break;

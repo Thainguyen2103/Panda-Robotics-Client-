@@ -347,7 +347,7 @@ def _classify_emotion(question: str, answer: str):
     return None
 
 
-def _publish_answer_caption(answer: str):
+def _publish_answer_caption(answer: str, is_active=lambda: True):
     """Sau khi LLM trả lời: tóm tắt trọng tâm thành nhãn ≤12 ký tự (1+1=2, Everest...)
     và cập nhật live lên OLED trong lúc TTS vẫn đang đọc."""
     cap = llm.quick(
@@ -356,7 +356,7 @@ def _publish_answer_caption(answer: str):
         "Câu trả lời: " + answer[:400])
     cap = (cap or "").strip().strip("\"'`*. ")
     cap = _EMOJI_RE.sub("", cap).strip()   # caption neon không kèm emoji màu
-    if 0 < len(cap) <= 12:
+    if is_active() and 0 < len(cap) <= 12:
         mqtt_bridge.publish(settings.TOPIC_AI_TOPIC, json.dumps({
             "id": _current_topic[0], "cap": cap,
         }))
@@ -408,6 +408,8 @@ def _handle_wake_word(trigger_text: str):
     print(f"🐼 [BRAIN] Wake-word! Trigger: \"{trigger_text}\"")
 
     player = None   # SentencePlayer — tạo trước LLM, cleanup trong finally
+    session_cancelled = threading.Event()
+    callback_lock = threading.Lock()
     _t_wake = time.time()   # đồng hồ bấm giờ từng chặng (soi trễ)
     try:
         # Ack kiểu Anki Vector: bíp kép + buzz + face vui báo "tôi nghe thấy bạn gọi"
@@ -433,6 +435,11 @@ def _handle_wake_word(trigger_text: str):
             _publish_thinking("idle")
             return   # finally sẽ reset state
 
+        # Hiển thị ngay kết quả STT. Các bước phân loại/sửa nhẹ phía sau
+        # không được làm người dùng chờ mới thấy Moon đã nghe gì.
+        _publish_thinking("question", question)
+        print(f"❓ [BRAIN] Câu nghe được: \"{question}\"")
+
         # ASR post-editing + phân loại chủ đề HYBRID:
         # keyword bắt được → dùng ngay (0ms); hụt → LLM chọn (gộp chung call sửa lỗi)
         kw = classify_topic(question)
@@ -440,7 +447,6 @@ def _handle_wake_word(trigger_text: str):
         print(f"⏱ [BRAIN] wake→câu hỏi sẵn sàng: {time.time()-_t_wake:.1f}s")
 
         # ── BƯỚC 2: Hiển thị câu hỏi người dùng lên màn hình LED ─────────────
-        _publish_thinking("question", question)
         # Chủ đề câu hỏi → OLED hiện icon + caption dữ liệu thật khi trả lời
         _tid = kw if kw != "chat" else (llm_topic or "chat")
         _current_topic[0] = _tid
@@ -464,60 +470,78 @@ def _handle_wake_word(trigger_text: str):
         # ── TTS streaming theo câu: câu nào xong trước đọc trước (Vector-like) ──
         def _on_speech_start():
             """Audio đầu tiên bắt đầu vang lên → tick + chuyển state speaking."""
-            print(f"⏱ [BRAIN] wake→tiếng đầu tiên: {time.time()-_t_wake:.1f}s")
-            tts.play_tick()
-            _set_voice_ai_state("speaking")
-            mqtt_bridge.publish(settings.TOPIC_FACE, "speaking")  # equalizer bars
+            with callback_lock:
+                if session_cancelled.is_set():
+                    return
+                print(f"⏱ [BRAIN] wake→tiếng đầu tiên: {time.time()-_t_wake:.1f}s")
+                tts.play_tick()
+                _set_voice_ai_state("speaking")
 
         player = SentencePlayer(on_play_start=_on_speech_start)
         sentence_buffer = [""]
+        answer_preview_shown = [False]
 
         def _push_sentence(raw: str):
             """Làm sạch markdown + emoji rồi đẩy 1 câu vào hàng đợi TTS."""
             s = re.sub(r"[*_#`>]+", "", raw)
             s = _EMOJI_RE.sub("", s).strip()
             if s:
+                # Câu đầu tiên xuất hiện trên OLED trước khi TTS tổng hợp
+                # xong audio, đảm bảo thứ tự thinking → answer → speaking.
+                if not answer_preview_shown[0]:
+                    answer_preview_shown[0] = True
+                    _publish_thinking("answer", s)
                 player.push(s)
 
         def on_thinking(stage: str):
-            if stage == "thinking":
-                _publish_thinking("thinking", "Moon đang suy nghĩ...")
-                print("🧠 [BRAIN] LLM thinking...")
-            elif stage == "answering":
-                _publish_thinking("answering", "Moon đang soạn câu trả lời...")
-                print("✍️  [BRAIN] LLM answering...")
+            with callback_lock:
+                if session_cancelled.is_set():
+                    return
+                if stage == "thinking":
+                    _publish_thinking("thinking", "Moon đang suy nghĩ...")
+                    print("🧠 [BRAIN] LLM thinking...")
+                elif stage == "answering":
+                    _publish_thinking("answering", "Moon đang soạn câu trả lời...")
+                    print("✍️  [BRAIN] LLM answering...")
 
         def on_chunk(chunk: str):
             """Stream từng token lên dashboard + tách câu đẩy sang TTS ngay."""
-            response_chunks.append(chunk)
-            partial = "".join(response_chunks)
-            mqtt_bridge.publish(settings.TOPIC_AI_RESPONSE, json.dumps({
-                "done": False,
-                "text": partial,
-            }))
-            # Tách câu tại dấu kết thúc (. ! ? …) — câu xong trước đọc trước
-            sentence_buffer[0] += chunk
-            parts = re.split(r"(?<=[.!?…])\s+", sentence_buffer[0])
-            if len(parts) > 1:
-                for part in parts[:-1]:
-                    _push_sentence(part)
-                sentence_buffer[0] = parts[-1]
+            with callback_lock:
+                if session_cancelled.is_set():
+                    return
+                response_chunks.append(chunk)
+                partial = "".join(response_chunks)
+                mqtt_bridge.publish(settings.TOPIC_AI_RESPONSE, json.dumps({
+                    "done": False,
+                    "text": partial,
+                }))
+                # Tách câu tại dấu kết thúc (. ! ? …) — câu xong trước đọc trước
+                sentence_buffer[0] += chunk
+                parts = re.split(r"(?<=[.!?…])\s+", sentence_buffer[0])
+                if len(parts) > 1:
+                    for part in parts[:-1]:
+                        _push_sentence(part)
+                    sentence_buffer[0] = parts[-1]
 
         def on_done(text: str):
             """LLM hoàn thành — lưu full text, flush câu cuối và signal."""
-            full_response[0] = text
-            mqtt_bridge.publish(settings.TOPIC_AI_RESPONSE, json.dumps({
-                "done": True,
-                "text": text,
-            }))
-            _publish_thinking("done")
-            _push_sentence(sentence_buffer[0])   # phần cuối không có dấu kết thúc
-            sentence_buffer[0] = ""
-            player.finish()
-            # Caption = trọng tâm câu TRẢ LỜI (1+1=2, Everest...) — chạy nền
-            threading.Thread(target=_publish_answer_caption,
-                             args=(text,), daemon=True).start()
-            llm_done_event.set()
+            with callback_lock:
+                if session_cancelled.is_set():
+                    return
+                full_response[0] = text
+                mqtt_bridge.publish(settings.TOPIC_AI_RESPONSE, json.dumps({
+                    "done": True,
+                    "text": text,
+                }))
+                _publish_thinking("done")
+                _push_sentence(sentence_buffer[0])   # phần cuối không có dấu kết thúc
+                sentence_buffer[0] = ""
+                player.finish()
+                # Caption = trọng tâm câu TRẢ LỜI (1+1=2, Everest...) — chạy nền
+                threading.Thread(target=_publish_answer_caption,
+                                 args=(text, lambda: not session_cancelled.is_set()),
+                                 daemon=True).start()
+                llm_done_event.set()
 
         # Chạy LLM trong thread riêng (non-blocking) với timeout
         llm_thread = llm.chat_async(
@@ -531,6 +555,8 @@ def _handle_wake_word(trigger_text: str):
         finished = llm_done_event.wait(timeout=LLM_TIMEOUT_SEC)
         if not finished:
             print(f"⚠️  [BRAIN] LLM timeout sau {LLM_TIMEOUT_SEC}s!")
+            with callback_lock:
+                session_cancelled.set()
             player.stop()
             return   # finally reset state
 
@@ -563,6 +589,8 @@ def _handle_wake_word(trigger_text: str):
         _publish_thinking("idle")
 
     finally:
+        with callback_lock:
+            session_cancelled.set()
         if player:
             player.stop()   # an toàn gọi nhiều lần — no-op nếu đã phát xong
         # Luôn trả về standby, dù pipeline thành công hay lỗi/timeout
