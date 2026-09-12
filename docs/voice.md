@@ -42,14 +42,15 @@ không âm thầm giả vờ đang chạy Porcupine.
 
 ## Những gì cần quan sát
 
-1. Nói “Moon”, nghe tiếng tick, xem số lần wake tăng và trạng thái **Đã nghe Moon**.
+1. Nói “Moon”, nghe tiếng tick, xem số lần wake tăng, sau đó
+   chờ dòng **Moon đang nghe — hãy nói câu hỏi**.
 2. Nói “Hôm nay tôi muốn học tiếng Anh”. Text xuất hiện trong ô câu nói;
    nhật ký giữ bản STT nguyên văn, độ dài audio và thời gian API xử lý.
 3. Thử nói liền “Moon, hôm nay trời đẹp quá”; không cần mở lại mic.
 4. Thử 20 lần mỗi điều kiện: phòng yên, bật quạt, nói nhỏ, cách mic 0.5–1m.
    Ghi số wake đúng/bỏ sót/nhận nhầm, thời gian cảm nhận và lỗi text.
 5. Để im lặng 60 giây, gõ bàn phím, rồi nói câu không có Moon. Kiểm tra wake giả.
-6. Sau wake không nói: khoảng 8 giây sau trở lại chờ. Thử dừng/bật lại mic,
+6. Sau wake không nói: khoảng 12 giây sau trở lại chờ. Thử dừng/bật lại mic,
    từ chối quyền mic, ngắt mạng và khôi phục mạng.
 
 Âm thanh được gửi tới Groq để STT; không lưu file audio, không gửi qua MQTT.
@@ -57,7 +58,7 @@ Nhật ký tối đa 60 mục nằm trong trang. Tắt mic đóng socket và h�
 đang chờ. Thu âm dùng AEC/NS của trình duyệt, tắt AGC để tránh khuếch đại quạt,
 lọc high-pass 150Hz và hiệu chuẩn nền 1.8 giây, PCM mono 16kHz,
 WebRTC VAD, pre-roll 300ms, onset 3/5 frame, tối thiểu 180ms giọng nói.
-Câu sau wake kết thúc sau 850ms im lặng, giới hạn 15 giây mỗi đoạn.
+Câu sau wake kết thúc sau 1,2 giây im lặng, giới hạn 15 giây mỗi đoạn.
 Hàng đợi giới hạn 3 đoạn; mạng quá chậm sẽ báo lỗi và dừng thay vì phát text cũ.
 
 Tinh chỉnh `VOICE_*`, `WAKE_SENSITIVITY` trong `config/settings.py` rồi restart.
