@@ -2,7 +2,7 @@ import math
 import struct
 import unittest
 
-from server.voice_core import Segmenter, wake_tail, reliable_transcript
+from server.voice_core import Segmenter, wake_tail, possible_moon_miss, reliable_transcript
 
 
 def frame(amplitude=1500):
@@ -37,6 +37,12 @@ class VoiceCoreTests(unittest.TestCase):
         self.assertEqual(wake_tail('Moon!'), '')
         for text in ['muốn ăn', 'môn học', 'món ngon', 'moonlight', 'honeymoon', 'Panda', 'Anna', 'Amanda']:
             self.assertIsNone(wake_tail(text), text)
+
+    def test_only_narrow_moon_misses_are_eligible_for_verification(self):
+        for text in ['', 'Mun', 'Mùn ơi', 'Hey Muôn', 'muun']:
+            self.assertTrue(possible_moon_miss(text), text)
+        for text in ['muốn', 'môn', 'món', 'muốn ăn', 'môn học', 'moonlight', 'xin chào']:
+            self.assertFalse(possible_moon_miss(text), text)
 
     def test_silence_and_click_do_not_make_clip(self):
         s = Segmenter(EnergyVad())

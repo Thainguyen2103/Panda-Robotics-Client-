@@ -12,7 +12,8 @@ from groq import AsyncGroq
 import webrtcvad
 
 from config import settings
-from server.voice_core import Segmenter, wake_tail, reliable_transcript, RATE, FRAME_BYTES
+from server.voice_core import (Segmenter, wake_tail, possible_moon_miss,
+                               reliable_transcript, RATE, FRAME_BYTES)
 
 
 def acoustic_engine():
@@ -128,6 +129,19 @@ class Session:
             response_format='verbose_json')
         return reliable_transcript(result.model_dump())
 
+    async def verify_wake(self, pcm):
+        """English pass only for a likely missed Moon; never used for questions."""
+        wav = io.BytesIO()
+        with wave.open(wav, 'wb') as f:
+            f.setnchannels(1)
+            f.setsampwidth(2)
+            f.setframerate(RATE)
+            f.writeframes(pcm)
+        result = await self.client.audio.transcriptions.create(
+            file=('moon-wake.wav', wav.getvalue()), model=settings.STT_MODEL,
+            language='en', temperature=0, response_format='verbose_json')
+        return reliable_transcript(result.model_dump())
+
     async def worker(self):
         while True:
             clip, captured_while_listening = await self.clips.get()
@@ -136,6 +150,15 @@ class Session:
             try:
                 await self.emit('processing')
                 text = await self.transcribe(clip)
+                # Whisper vi often writes the English name as Mun/Mùn/Muôn or
+                # returns blank. Verify only those narrow cases with an English
+                # pass; common Vietnamese words muốn/môn/món never enter here.
+                if (not self.engine and not captured_while_listening
+                        and wake_tail(text) is None and possible_moon_miss(text)):
+                    await self.emit('verifying_wake', text=text)
+                    verified = await self.verify_wake(clip)
+                    if wake_tail(verified) is not None:
+                        text = verified
                 self.sequence += 1
                 # Unrelated standby ASR is diagnostic, not a user's question.
                 tail = wake_tail(text) if not self.engine else None

@@ -50,6 +50,7 @@ function event(msg) {
     }
     if (msg.event === 'armed') $('state').textContent = 'Moon đang nghe — hãy nói câu hỏi';
     if (msg.event === 'processing') $('state').textContent = 'Đang chuyển thành text — mic vẫn thu';
+    if (msg.event === 'verifying_wake') $('state').textContent = 'Đang xác minh tên Moon…';
     if (msg.event === 'transcript') addLog(`${msg.text || '(không có text tin cậy)'} · STT ${msg.latency_ms} ms · audio ${msg.duration_ms} ms`);
     if (msg.event === 'ignored') {
         $('diagnostic').textContent = `Bỏ qua khi chờ Moon (có thể là nhiễu): ${msg.text || '(không đủ tin cậy)'} · ${msg.latency_ms} ms`;

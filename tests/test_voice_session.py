@@ -108,6 +108,41 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         _, messages = await self.run_clips(['Moon, Hôm nay Thứ Ba.'])
         self.assertEqual([m['text'] for m in messages if m['event'] == 'question'], ['Hôm nay Thứ Ba.'])
 
+    async def test_likely_vietnamese_miss_requires_english_confirmation(self):
+        socket = Socket()
+        session = Session(socket, None)
+        session.transcribe = lambda clip: asyncio.sleep(0, result='Mun')
+        session.verify_wake = lambda clip: asyncio.sleep(0, result='Moon')
+        worker = asyncio.create_task(session.worker())
+        session.clips.put_nowait((b'audio', False))
+        await asyncio.wait_for(session.clips.join(), 2)
+        worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker
+        self.assertTrue(session.listening)
+        self.assertTrue(any(m['event'] == 'verifying_wake' for m in socket.messages))
+        self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
+
+    async def test_real_vietnamese_words_do_not_enter_wake_verification(self):
+        socket = Socket()
+        session = Session(socket, None)
+        session.transcribe = lambda clip: asyncio.sleep(0, result='môn')
+        verification_calls = []
+
+        async def verify(clip):
+            verification_calls.append(clip)
+            return 'Moon'
+
+        session.verify_wake = verify
+        worker = asyncio.create_task(session.worker())
+        session.clips.put_nowait((b'audio', False))
+        await asyncio.wait_for(session.clips.join(), 2)
+        worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker
+        self.assertFalse(verification_calls)
+        self.assertFalse(session.listening)
+
     async def test_no_wake_no_question(self):
         _, messages = await self.run_clips(['Tôi muốn ăn món ngon.'])
         self.assertFalse(any(m['event'] in ('wake', 'question') for m in messages))

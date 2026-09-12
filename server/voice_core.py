@@ -23,6 +23,25 @@ def wake_tail(text):
     return re.sub(r"^ơi\b[\s,.!?:;—-]*", "", tail, flags=re.I).strip()
 
 
+def possible_moon_miss(text):
+    """True only for short Vietnamese/ASCII spellings commonly produced for Moon.
+
+    This is merely a gate for a second English STT verification. It never wakes
+    by itself, and deliberately excludes real Vietnamese words muốn/môn/món.
+    """
+    normalized = unicodedata.normalize("NFC", text or "").lower()
+    normalized = re.sub(r"[^\w\s]", " ", normalized, flags=re.UNICODE)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    if not normalized:
+        return True
+    return normalized in {
+        "mun", "mun ơi", "hey mun",
+        "mùn", "mùn ơi", "hey mùn",
+        "muôn", "muôn ơi", "hey muôn",
+        "muun", "muun ơi", "hey muun",
+    }
+
+
 class Segmenter:
     """30ms PCM frames; short pre-roll, confirmed onset, bounded utterances.
 

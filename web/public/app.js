@@ -472,6 +472,12 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
         // trạng thái lắng nghe; trước wake thì giữ mặt neutral.
         setOledAiMode(webVoiceAwake ? 'questioning' : 'neutral');
     }
+    if (msg.event === 'verifying_wake') {
+        aiIdleHint.style.display = 'none';
+        showThinking('Đang xác minh tên Moon…');
+        setVoiceState('transcribing');
+        setOledAiMode('neutral');
+    }
     if (msg.event === 'question') {
         webVoiceAwake = false;
         showUserQuestion(msg.text);
