@@ -31,11 +31,12 @@ bài test này vì lệnh đó khởi động toàn bộ Brain.
   tải model đúng hệ điều hành/kiến trúc về `server/moon.ppn`;
   điền `PICOVOICE_ACCESS_KEY` trong `config/secrets.py`. Có thể dùng biến môi trường
   `MOON_PPN_PATH` trỏ đến model. Đổi tên file model Panda không biến nó thành model Moon.
-- **Whisper dự phòng**: dùng ngay khi có Groq key, không cần `.ppn`. Gửi một lượt
-  STT sau 450ms ngắt câu; thời gian wake còn phụ thuộc mạng/API. Chỉ khớp từ Moon
-  hoàn chỉnh, không coi “muốn/môn/món” là tên robot. Không dùng prompt mớm tên,
-  fuzzy matching hay LLM sửa lời nói. Chế độ này có thể bỏ sót nếu Whisper viết
-  sai tên, và không có độ trễ tức thì như mô hình âm học.
+- **Whisper dự phòng**: dùng ngay khi có Groq key, không cần `.ppn`. Pass
+  tiếng Việt làm nhận dạng chính. Nếu kết quả rỗng hoặc là một biến thể hẹp
+  mà Whisper hay ghi cho Moon (Mun/Mùn/Muôn), server chạy thêm pass tiếng Anh
+  trên cùng audio và chỉ wake khi pass này xác nhận token Moon. Các từ Việt thật
+  “muốn/môn/món” bị loại trước bước xác minh. Dashboard hiện kết quả
+  pass đầu trong mục chẩn đoán để tinh chỉnh theo mic/giọng thật.
 
 Dashboard luôn hiện chế độ thực tế. Key/model có cấu hình nhưng lỗi sẽ báo lỗi;
 không âm thầm giả vờ đang chạy Porcupine.
