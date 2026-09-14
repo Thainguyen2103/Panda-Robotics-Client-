@@ -106,9 +106,16 @@ def finger_gesture(points):
     for base in (5,9,13,17):
         extended.append(angle(p[base],p[base+1],p[base+3]) > 155 and np.linalg.norm(p[base+3]-p[0]) > 1.12*np.linalg.norm(p[base+1]-p[0]))
     thumb = angle(p[1],p[2],p[4]) > 150 and np.linalg.norm(p[4]-p[9]) > .7*palm
+    thumb_index_touch = np.linalg.norm(p[4]-p[8]) < .32*palm
+    if thumb_index_touch and extended[1:] == [True,True,True]: return "ok_sign"
+    if thumb_index_touch and not all(extended[1:]): return "pinch"
     if extended == [True,True,False,False] and np.linalg.norm(p[8]-p[12]) > .25*palm: return "victory"
     if not any(extended) and thumb and p[4,1] < p[3,1] < p[2,1]: return "thumbs_up"
     if all(extended) and thumb: return "open_palm"
+    if all(extended) and not thumb: return "four_fingers"
+    if extended == [True,True,True,False]: return "three_fingers"
+    if extended == [True,False,False,True] and not thumb: return "rock_sign"
+    if extended == [False,False,False,True] and thumb: return "shaka"
     if extended == [True,False,False,False] and not thumb: return "pointing"
     if not any(extended) and not thumb: return "fist"
     return "unknown"

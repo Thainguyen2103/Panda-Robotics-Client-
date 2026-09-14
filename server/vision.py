@@ -143,7 +143,7 @@ class HeadGestures:
 
 
 class ArmGestures:
-    """Only shoulders/elbows/wrists are required; lower-body points are unused."""
+    """Upper-body gestures that also work when only one arm is in frame."""
     def __init__(self):
         self.history = {9: deque(), 10: deque()}
         self.stable = StableLabel(2)
@@ -160,13 +160,22 @@ class ArmGestures:
             return "unknown"
         def visible(*indices):
             return all(p[i,2] >= settings.VISION_KEYPOINT_THRESHOLD for i in indices)
-        if not visible(5,6):
+        visible_shoulders = [i for i in (5,6) if visible(i)]
+        if not visible_shoulders:
             self.reset()
             return "unknown"
-        scale = max(float(np.linalg.norm(p[5,:2]-p[6,:2])),20.)
+        if len(visible_shoulders) == 2:
+            scale = float(np.linalg.norm(p[5,:2]-p[6,:2]))
+        else:
+            shoulder = visible_shoulders[0]
+            elbow = 7 if shoulder == 5 else 8
+            wrist = 9 if shoulder == 5 else 10
+            limb = elbow if visible(elbow) else wrist if visible(wrist) else shoulder
+            scale = float(np.linalg.norm(p[shoulder,:2]-p[limb,:2]))*1.35
+        scale = max(scale,20.)
         raised, waving = [], False
         for shoulder, elbow, wrist in ((5,7,9),(6,8,10)):
-            up = visible(wrist) and p[wrist,1] < p[shoulder,1]-.15*scale
+            up = visible(shoulder,wrist) and p[wrist,1] < p[shoulder,1]-.15*scale
             raised.append(up)
             history = self.history[wrist]
             if not up:
@@ -183,8 +192,19 @@ class ArmGestures:
                 history.popleft()
             if len(history) >= 4 and history[-1][0]-history[0][0] >= .45:
                 waving |= excursions([v[1] for v in history], .16) >= 1
-        label = ("waving" if waving else "both_hands_up" if all(raised)
-                 else "hand_raised" if any(raised) else "unknown")
+        available = [(s,e,w) for s,e,w in ((5,7,9),(6,8,10)) if visible(s,w)]
+        out = [abs(p[w,0]-p[s,0]) > .65*scale and abs(p[w,1]-p[s,1]) < .40*scale
+               for s,e,w in available]
+        hips = [visible(s,e,w) and p[w,1] > p[s,1]+.30*scale
+                and abs(p[w,0]-p[s,0]) < .65*scale
+                and abs(p[e,0]-p[s,0]) > .25*scale for s,e,w in available]
+        crossed = (visible(5,6,9,10) and p[9,0] > p[10,0]
+                   and max(p[9,1],p[10,1]) < max(p[5,1],p[6,1])+1.05*scale)
+        label = ("waving" if waving else "both_hands_up" if len(available)==2 and all(raised)
+                 else "hand_raised" if any(raised) else "arms_crossed" if crossed
+                 else "arms_out" if len(out)==2 and all(out)
+                 else "arm_out" if any(out) else "hands_on_hips" if len(hips)==2 and all(hips)
+                 else "hand_on_hip" if any(hips) else "unknown")
         return self.stable.update(label)
 
 
@@ -295,7 +315,8 @@ class VisionEngine:
             if name in self.models: self.models[name].close()
 
     def _objects(self,frame,now):
-        prediction = self.models["objects"].predict(frame,imgsz=320,conf=.45,device=settings.VISION_DEVICE,verbose=False)[0]
+        prediction = self.models["objects"].predict(frame,imgsz=settings.VISION_OBJECTS_SIZE,
+            conf=settings.VISION_OBJECTS_CONFIDENCE,device=settings.VISION_DEVICE,verbose=False)[0]
         objects = []
         for box,score,category in zip(prediction.boxes.xyxy.cpu().numpy(),prediction.boxes.conf.cpu().numpy(),prediction.boxes.cls.cpu().numpy()):
             label = prediction.names[int(category)]
@@ -304,6 +325,21 @@ class VisionEngine:
             objects.append(dict(label=label,confidence=round(float(score),3),timestamp=now,
                 box=[x/frame.shape[1],y/frame.shape[0],(r-x)/frame.shape[1],(b-y)/frame.shape[0]]))
         return objects
+
+    def _person_region_for_hands(self, frame):
+        """Use pose when available, otherwise associate hands near the tracked face.
+
+        The fallback deliberately stays inside the image and only affects whether a
+        hand gesture belongs to the tracked person; it does not fabricate arm joints.
+        """
+        if self.pose_box:
+            return self.pose_box
+        if not self.face_box:
+            return None
+        x,y,w,h = self.face_box
+        left=max(0.,x-1.8*w); top=max(0.,y-.4*h)
+        right=min(float(frame.shape[1]),x+2.8*w); bottom=min(float(frame.shape[0]),y+5.0*h)
+        return left,top,right-left,bottom-top
 
     def _schedule(self,now,face):
         # One expensive secondary model per frame keeps eye/head sampling responsive.
@@ -453,7 +489,8 @@ class VisionEngine:
         head_action = self.head_action if now < self.head_until else "unknown"
         if stage == "hands":
             self.hands_time = now
-            self.hands = self._run("hands",lambda:self.models["hands"].detect(frame,now,self.joints,self.pose_box)) or []
+            body_hint = self._person_region_for_hands(frame)
+            self.hands = self._run("hands",lambda:self.models["hands"].detect(frame,now,self.joints,body_hint)) or []
         if now-self.hands_time > .6: self.hands = []
         if stage == "objects":
             self.objects_time = now

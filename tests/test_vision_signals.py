@@ -98,6 +98,30 @@ class SignalTests(unittest.TestCase):
         self.assertEqual(finger_gesture(p),'thumbs_up')
         self.assertEqual(finger_gesture(np.zeros((21,3))),'unknown')
 
+    def test_more_finger_gestures(self):
+        three=self.hand({5,9,13})
+        self.assertEqual(finger_gesture(three),'three_fingers')
+        four=self.hand({5,9,13,17})
+        self.assertEqual(finger_gesture(four),'four_fingers')
+        rock=self.hand({5,17})
+        self.assertEqual(finger_gesture(rock),'rock_sign')
+        okay=self.hand({5,9,13,17})
+        okay[4]=okay[8]+[.02,.02,0]
+        self.assertEqual(finger_gesture(okay),'ok_sign')
+        pinch=self.hand(set())
+        pinch[4]=pinch[8]+[.02,.02,0]
+        self.assertEqual(finger_gesture(pinch),'pinch')
+
+    def test_face_region_associates_hands_when_pose_is_partial(self):
+        engine=VisionEngine.__new__(VisionEngine)
+        engine.pose_box=None
+        engine.face_box=(250.,50.,100.,100.)
+        region=engine._person_region_for_hands(np.zeros((480,640,3)))
+        x,y,w,h=region
+        self.assertLessEqual(x,100)
+        self.assertGreaterEqual(x+w,500)
+        self.assertEqual(y+h,480)
+
     def test_scheduler_shares_budget_and_skips_face_models_when_absent(self):
         engine=VisionEngine.__new__(VisionEngine)
         engine.models={name:object() for name in ('identity','emotion','pose','hands','objects')}

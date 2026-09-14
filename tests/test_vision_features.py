@@ -28,6 +28,19 @@ class FeatureTests(unittest.TestCase):
         motion.update(None,.5)
         self.assertEqual(motion.update(dict(pitch=0,yaw=0,roll=0),.6),"unknown")
 
+    def test_stable_head_poses_include_tilt_turn_and_vertical_look(self):
+        cases = (("roll",-18,"head_tilt_left"),("roll",18,"head_tilt_right"),
+                 ("yaw",-22,"head_turn_left"),("yaw",22,"head_turn_right"),
+                 ("pitch",-18,"head_up"),("pitch",18,"head_down"))
+        for axis,value,label in cases:
+            motion = HeadMotion()
+            found=[]
+            for i in range(12):
+                angles=dict(pitch=0.,yaw=0.,roll=0.)
+                angles[axis]=value
+                found.append(motion.update(angles,i*.1))
+            self.assertIn(label,found,(axis,value,found))
+
     def test_subtle_emotion_needs_two_sources(self):
         cases = ((3,"sad",dict(brow_inner_up=.4,mouth_frown=.2)),
                  (4,"angry",dict(brow_down=.5,eye_squint=.2)),
@@ -104,6 +117,18 @@ class FeatureTests(unittest.TestCase):
         gestures.reset()
         labels = [gestures.update(points(0,x),i*.2) for i,x in enumerate([0,20,40,20,0,20,40])]
         self.assertIn("waving",labels)
+
+    def test_single_visible_arm_is_enough_for_arm_actions(self):
+        gestures=ArmGestures()
+        raised=np.zeros((17,3))
+        raised[5],raised[7],raised[9]=(100,150,1),(100,110,1),(100,60,1)
+        self.assertEqual(gestures.update(raised,0),"unknown")
+        self.assertEqual(gestures.update(raised,.2),"hand_raised")
+        gestures.reset()
+        extended=np.zeros((17,3))
+        extended[5],extended[7],extended[9]=(100,150,1),(150,150,1),(210,150,1)
+        gestures.update(extended,0)
+        self.assertEqual(gestures.update(extended,.2),"arm_out")
 
 
 if __name__ == "__main__":

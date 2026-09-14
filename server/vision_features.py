@@ -144,7 +144,7 @@ class ExpressionState:
 
 
 class HeadMotion:
-    """Recognize an out-and-back rotation; a one-way turn is not a gesture."""
+    """Recognize motion gestures and stable head poses from face rotation."""
     def __init__(self):
         self.reset()
 
@@ -152,6 +152,8 @@ class HeadMotion:
         self.history = deque()
         self.smoothed = None
         self.last_event = -float("inf")
+        self.pose_candidate = "unknown"
+        self.pose_since = 0.
 
     def update(self, angles, now):
         if angles is None or not all(np.isfinite(angles[k]) for k in ("pitch","yaw","roll")):
@@ -180,7 +182,22 @@ class HeadMotion:
                     self.last_event = now
                     self.history.clear()
                     return label
-        return "unknown"
+        # A pose must settle before it is published. This prevents a normal nod or
+        # shake on its way to the peak from being mislabeled as a held posture.
+        recent = samples[-4:]
+        settled = len(recent) == 4 and np.max(np.ptp(recent,axis=0)) <= 2.5
+        pitch,yaw,roll = self.smoothed
+        candidate = "unknown"
+        if settled:
+            if abs(roll) >= settings.VISION_HEAD_TILT_DEGREES and abs(roll) > max(abs(pitch),abs(yaw))*.75:
+                candidate = "head_tilt_right" if roll > 0 else "head_tilt_left"
+            elif abs(yaw) >= settings.VISION_HEAD_TURN_DEGREES and abs(yaw) > abs(pitch)*1.15:
+                candidate = "head_turn_right" if yaw > 0 else "head_turn_left"
+            elif abs(pitch) >= settings.VISION_HEAD_LOOK_DEGREES and abs(pitch) > abs(yaw)*1.15:
+                candidate = "head_down" if pitch > 0 else "head_up"
+        if candidate != self.pose_candidate:
+            self.pose_candidate,self.pose_since = candidate,now
+        return candidate if candidate != "unknown" and now-self.pose_since >= .25 else "unknown"
 
 
 def emotion_candidate(probs, cues):
