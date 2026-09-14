@@ -51,6 +51,17 @@ from server import tts   # module object — cho tts.play_beep()/play_tick()
 from server import llm
 from server.topics import classify_topic, TOPIC_LABELS
 
+
+# Mic trình duyệt chạy ở process riêng nên không thấy trực tiếp cờ
+# tts.is_speaking(). Đồng bộ trạng thái loa qua MQTT để Voice Lab loại toàn bộ
+# audio của chính Moon, kể cả câu chào tự động khi vừa mở dashboard.
+tts.register_activity_callback(
+    lambda active: mqtt_bridge.publish(
+        settings.TOPIC_TTS_ACTIVE, "1" if active else "0", retain=True
+    )
+)
+mqtt_bridge.publish(settings.TOPIC_TTS_ACTIVE, "0", retain=True)
+
 # ─── Hằng số timeout ─────────────────────────────────────────────────────────
 LLM_TIMEOUT_SEC = 30.0   # Nếu LLM không trả lời sau 30s → tự về standby
 TTS_TIMEOUT_SEC = 60.0   # Nếu TTS treo sau 60s → tự về standby

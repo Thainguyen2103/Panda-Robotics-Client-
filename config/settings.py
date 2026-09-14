@@ -33,6 +33,7 @@ TOPIC_BROWSER_AUDIO = "panda/ai/voice_audio"   # push-to-talk từ dashboard (ba
 TOPIC_BROWSER_CLIP  = "panda/ai/clip"          # clip PCM từ live-mic trình duyệt
 TOPIC_MIC_LIVE      = "panda/ai/mic_live"      # trạng thái live-mic on/off
 TOPIC_BROWSER_QUESTION = "panda/ai/question"    # text đã STT từ Moon Voice → Brain
+TOPIC_TTS_ACTIVE    = "panda/audio/tts_active"  # 1/0: chặn mic web tự nghe loa Moon
 TOPIC_CAMERA = "panda/camera"
 
 # AI Models Configuration
@@ -215,7 +216,7 @@ VOICE_VAD_MODE = 2
 VOICE_MIN_RMS = 0.003
 VOICE_WAKE_SILENCE_SEC = 0.45
 VOICE_QUESTION_SILENCE_SEC = 1.2
-VOICE_WAIT_SEC = 12.0
+VOICE_WAIT_SEC = 20.0
 VOICE_MAX_SEC = 15.0
 VOICE_WAKE_VERIFY_MAX_SEC = 3.0
 VOICE_WAKE_VERIFY_MAX_WORDS = 3

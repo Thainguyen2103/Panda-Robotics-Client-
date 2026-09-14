@@ -13,7 +13,7 @@ function attachVoice(server) {
             socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return;
         }
         wss.handleUpgrade(req, socket, head, downstream => {
-            let upstream, retryTimer, attempts = 0;
+            let upstream, retryTimer, pendingControl, attempts = 0;
             const fail = () => {
                 if (downstream.readyState === WebSocket.OPEN) {
                     downstream.send(JSON.stringify({event: 'error', text: 'Voice service không khởi động được sau 15 giây. Kiểm tra môi trường Python.'}));
@@ -28,7 +28,14 @@ function attachVoice(server) {
                 });
                 upstream = candidate;
                 let opened = false;
-                candidate.on('open', () => { opened = true; });
+                candidate.on('open', () => {
+                    opened = true;
+                    attempts = 0;
+                    if (pendingControl) {
+                        candidate.send(pendingControl,{binary:false});
+                        pendingControl = null;
+                    }
+                });
                 candidate.on('error', () => {});
                 candidate.on('message', data => {
                     if (candidate !== upstream || downstream.readyState !== WebSocket.OPEN) return;
@@ -45,9 +52,13 @@ function attachVoice(server) {
             };
             downstream.on('message', (data, binary) => {
                 if ((binary && data.length !== 960) || (!binary && data.length > 100)) { downstream.close(1003); return; }
-                if (!upstream || upstream.readyState !== WebSocket.OPEN || upstream.bufferedAmount > 32000) {
-                    downstream.close(1013); return;
+                if (!upstream || upstream.readyState !== WebSocket.OPEN) {
+                    // During cold start, retain only the latest pause/resume
+                    // command and drop audio rather than bouncing the browser.
+                    if (!binary) pendingControl = data.toString();
+                    return;
                 }
+                if (upstream.bufferedAmount > 32000) { downstream.close(1013); return; }
                 upstream.send(data,{binary});
             });
             downstream.on('close', () => { clearTimeout(retryTimer); upstream?.terminate(); });

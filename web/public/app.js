@@ -4,6 +4,8 @@ let voiceOnlyDashboard = false; // The web mic claims the display only during it
 let webVoiceAwake = false;      // Wake đã bắt; processing tiếp theo là STT câu hỏi.
 let webVoiceHandedOff = false;  // Brain owns OLED/LLM/TTS while web mic is paused.
 let webVoiceHandoffTimer;
+let robotTtsActive = false;
+let robotTtsResumeTimer;
 let transcriptTimer;
 function cancelTranscriptTimer() {
     clearTimeout(transcriptTimer);
@@ -242,7 +244,32 @@ socket.on('mqtt_message', (data) => {
     if (voiceOnlyDashboard && !webVoiceHandedOff && (topic.startsWith('panda/ai/') || topic.startsWith('panda/log/voice'))) return;
 
     // ── Sensor status ─────────────────────────────────────────────────────────
-    if (topic === 'panda/status') {
+    if (topic === 'panda/audio/tts_active') {
+        robotTtsActive = payload === '1';
+        clearTimeout(robotTtsResumeTimer);
+        if (robotTtsActive) {
+            webVoiceAwake = false;
+            if (voiceOnlyDashboard) {
+                window.dispatchEvent(new CustomEvent('moon-voice-control', {
+                    detail: {command: 'pause', reason: 'tts'}
+                }));
+                const sourceLabel = document.getElementById('voice-display-source');
+                if (sourceLabel) sourceLabel.textContent = 'Moon đang nói — mic tạm nghỉ để không tự nghe';
+            }
+        } else {
+            // Đợi tiếng loa/echo trong phòng tắt hẳn rồi mới nghe wakeword lại.
+            robotTtsResumeTimer = setTimeout(() => {
+                if (voiceOnlyDashboard && !webVoiceHandedOff && !robotTtsActive) {
+                    window.dispatchEvent(new CustomEvent('moon-voice-control', {
+                        detail: {command: 'resume', reason: 'tts'}
+                    }));
+                    const sourceLabel = document.getElementById('voice-display-source');
+                    if (sourceLabel) sourceLabel.textContent = 'Nguồn hiển thị: mic web — đang chờ Moon';
+                }
+            }, 1200);
+        }
+
+    } else if (topic === 'panda/status') {
         try {
             const status = JSON.parse(payload);
             distVal.textContent = status.dist + ' cm';
@@ -459,6 +486,9 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
         webVoiceAwake = false;
         webVoiceHandedOff = false;
         if (msg.event === 'starting') socket.emit('mic_live','1');
+        if (robotTtsActive) window.dispatchEvent(new CustomEvent('moon-voice-control', {
+            detail: {command: 'pause', reason: 'tts'}
+        }));
     }
     if (msg.event === 'stopped') {
         voiceOnlyDashboard = false;
@@ -516,7 +546,7 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
         logToTerminal(`VOICE: ${msg.text}`, 'log-voice');
         socket.emit('voice_question',msg.text);
         webVoiceHandedOff = true;
-        window.dispatchEvent(new CustomEvent('moon-voice-control',{detail:{command:'pause'}}));
+        window.dispatchEvent(new CustomEvent('moon-voice-control',{detail:{command:'pause',reason:'brain'}}));
         clearTimeout(webVoiceHandoffTimer);
         webVoiceHandoffTimer = setTimeout(() => {
             if (!webVoiceHandedOff) return;
@@ -540,7 +570,15 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
         hideThinking();
         logToTerminal(msg.text, 'sys');
     }
-    if (['stopped', 'timeout', 'error'].includes(msg.event)) {
+    if (msg.event === 'timeout') {
+        webVoiceAwake = false;
+        hideThinking();
+        setVoiceState('standby');
+        setOledAiMode('hearing', 'Mình chưa nghe rõ câu hỏi');
+        transcriptTimer = setTimeout(() => setOledAiMode('neutral'), 2500);
+        if (msg.text) logToTerminal(msg.text, 'sys');
+    }
+    if (['stopped', 'error'].includes(msg.event)) {
         webVoiceAwake = false;
         hideThinking();
         setVoiceState('standby');

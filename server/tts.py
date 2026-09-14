@@ -168,6 +168,26 @@ def _normalize_tts_text(text: str) -> str:
 # (tránh vòng lặp tự kích hoạt: Moon nghe thấy chữ "Moon" trong câu chào của mình).
 _speaking_event = threading.Event()
 _speech_end_t = 0.0   # mốc thời gian lần phát cuối kết thúc (echo guard cho clip browser)
+_activity_callback = None
+
+
+def register_activity_callback(callback):
+    """Notify the owner whenever Moon's speaker starts/stops producing TTS."""
+    global _activity_callback
+    _activity_callback = callback
+
+
+def _set_speaking(active: bool):
+    changed = _speaking_event.is_set() != active
+    if active:
+        _speaking_event.set()
+    else:
+        _speaking_event.clear()
+    if changed and _activity_callback:
+        try:
+            _activity_callback(active)
+        except Exception:
+            pass
 
 
 def is_speaking() -> bool:
@@ -352,14 +372,14 @@ def speak(text: str, blocking: bool = True):
 
     def _run():
         with _tts_lock:
-            _speaking_event.set()
+            _set_speaking(True)
             try:
                 success = _speak_fish(text)
                 if not success:
                     print("⚠️ [TTS] Chuyển sang pyttsx3 fallback...")
                     _speak_fallback(text)
             finally:
-                _speaking_event.clear()
+                _set_speaking(False)
                 global _speech_end_t
                 _speech_end_t = time.time()
 
@@ -426,7 +446,7 @@ class SentencePlayer:
                     text, audio = item
                     if first:
                         first = False
-                        _speaking_event.set()   # báo voice.py: loa đang bật
+                        _set_speaking(True)   # báo mọi nguồn mic: loa đang bật
                         if self._on_play_start:
                             try:
                                 self._on_play_start()
@@ -438,7 +458,7 @@ class SentencePlayer:
                         print("⚠️ [TTS] Câu này Fish Audio lỗi — dùng pyttsx3 fallback.")
                         _speak_fallback(text)
         finally:
-            _speaking_event.clear()
+            _set_speaking(False)
             _speech_end_t = time.time()
 
     def push(self, sentence: str):

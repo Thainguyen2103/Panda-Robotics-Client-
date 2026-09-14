@@ -80,6 +80,30 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
             await session.feed(pcm)
         self.assertFalse(session.clips.empty())
 
+    async def test_tts_pause_invalidates_transcript_already_in_flight(self):
+        socket = Socket()
+        session = Session(socket, None)
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def transcribe(clip):
+            started.set()
+            await release.wait()
+            return 'Hey Moon'
+
+        session.transcribe = transcribe
+        worker = asyncio.create_task(session.worker())
+        session.clips.put_nowait((b'audio', False, session.audio_epoch))
+        await asyncio.wait_for(started.wait(), 1)
+        session.pause()
+        release.set()
+        await asyncio.wait_for(session.clips.join(), 1)
+        worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker
+        self.assertFalse(any(m['event'] == 'wake' for m in socket.messages))
+        self.assertFalse(session.listening)
+
     async def run_clips(self, texts, captured_states=None):
         socket = Socket()
         session = Session(socket, None)
@@ -94,7 +118,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         worker = asyncio.create_task(session.worker())
         states = captured_states or [False] * len(texts)
         for captured_while_listening in states:
-            session.clips.put_nowait((b'audio', captured_while_listening))
+            session.clips.put_nowait((b'audio', captured_while_listening, session.audio_epoch))
         await asyncio.wait_for(session.clips.join(), 2)
         worker.cancel()
         with contextlib.suppress(asyncio.CancelledError):
@@ -131,7 +155,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         session.transcribe = lambda clip: asyncio.sleep(0, result='Mun')
         session.verify_wake = lambda clip: asyncio.sleep(0, result='Moon')
         worker = asyncio.create_task(session.worker())
-        session.clips.put_nowait((b'audio', False))
+        session.clips.put_nowait((b'audio', False, session.audio_epoch))
         await asyncio.wait_for(session.clips.join(), 2)
         worker.cancel()
         with contextlib.suppress(asyncio.CancelledError):
@@ -146,7 +170,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         session.transcribe = lambda clip: asyncio.sleep(0, result='')
         session.verify_wake = lambda clip: asyncio.sleep(0, result='Hey Moon')
         worker = asyncio.create_task(session.worker())
-        session.clips.put_nowait((b'audio', False))
+        session.clips.put_nowait((b'audio', False, session.audio_epoch))
         await asyncio.wait_for(session.clips.join(), 2)
         worker.cancel()
         with contextlib.suppress(asyncio.CancelledError):
@@ -161,7 +185,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         session.verify_wake = lambda clip: asyncio.sleep(0, result='')
         worker = asyncio.create_task(session.worker())
         for _ in range(3):
-            session.clips.put_nowait((b'audio', False))
+            session.clips.put_nowait((b'audio', False, session.audio_epoch))
         await asyncio.wait_for(session.clips.join(), 2)
         worker.cancel()
         with contextlib.suppress(asyncio.CancelledError):
@@ -182,7 +206,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
 
         session.verify_wake = verify
         worker = asyncio.create_task(session.worker())
-        session.clips.put_nowait((b'audio', False))
+        session.clips.put_nowait((b'audio', False, session.audio_epoch))
         await asyncio.wait_for(session.clips.join(), 2)
         worker.cancel()
         with contextlib.suppress(asyncio.CancelledError):

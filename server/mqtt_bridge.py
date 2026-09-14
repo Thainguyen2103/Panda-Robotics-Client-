@@ -24,11 +24,11 @@ def connect():
     except Exception as e:
         print(f"❌ [MQTT BRIDGE] Connection failed: {e}")
 
-def publish(topic, payload):
+def publish(topic, payload, retain=False):
     try:
         if isinstance(payload, dict):
             payload = json.dumps(payload,default=_json_default)
-        client.publish(topic, str(payload))
+        client.publish(topic, str(payload), retain=retain)
         # print(f"↗️ [PUBLISH] {topic}: {payload}")
     except Exception as e:
         print(f"❌ [MQTT BRIDGE] Publish failed: {e}")

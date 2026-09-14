@@ -45,6 +45,7 @@ class Session:
         self.last_meter = 0
         self.busy = False
         self.paused = False
+        self.audio_epoch = 0
         self.standby_rejects = 0
         # Porcupine bắt keyword khi từ "Moon" chưa kết thúc hẳn. Không cho
         # phần đuôi keyword rơi vào clip câu hỏi.
@@ -58,6 +59,26 @@ class Session:
         self.listening = True
         self.deadline = time.monotonic() + settings.VOICE_WAIT_SEC
         await self.emit('wake', engine='porcupine' if self.engine else 'whisper')
+
+    def pause(self):
+        """Invalidate buffered/in-flight audio when Moon's own speaker starts."""
+        self.paused = True
+        self.audio_epoch += 1
+        self.listening = False
+        self.waiting_for_wake_quiet = False
+        self.wake_quiet_frames = 0
+        self.segmenter.reset()
+        while True:
+            try:
+                self.clips.get_nowait()
+                self.clips.task_done()
+            except asyncio.QueueEmpty:
+                break
+
+    async def resume(self):
+        self.paused = False
+        self.segmenter.reset()
+        await self.emit('resumed')
 
     async def feed(self, pcm):
         if len(pcm) != FRAME_BYTES:
@@ -119,7 +140,7 @@ class Session:
             # Ghi lại state TẠI THỜI ĐIỂM THU. Worker có thể xử lý muộn
             # sau khi wake đã bật; nếu chỉ nhìn self.listening lúc đó, clip
             # nhiễu cũ sẽ bị nhận nhầm thành câu hỏi.
-            self.clips.put_nowait((clip, self.listening))
+            self.clips.put_nowait((clip, self.listening, self.audio_epoch))
 
     async def transcribe(self, pcm):
         wav = io.BytesIO()
@@ -149,15 +170,22 @@ class Session:
 
     async def worker(self):
         while True:
-            clip, captured_while_listening = await self.clips.get()
+            clip, captured_while_listening, audio_epoch = await self.clips.get()
             self.busy = True
+            publish_state = True
             start = time.monotonic()
             try:
+                if self.paused or audio_epoch != self.audio_epoch:
+                    publish_state = False
+                    continue
                 # A question may already be queued while the preceding Moon clip
                 # is still being transcribed over the network.
                 question_context = self.listening
                 await self.emit('processing',phase='question' if question_context else 'wake')
                 text = await self.transcribe(clip)
+                if self.paused or audio_epoch != self.audio_epoch:
+                    publish_state = False
+                    continue
                 # Whisper vi often writes the English name as Mun/Mùn/Muôn or
                 # returns blank. Verify only those narrow cases with an English
                 # pass; common Vietnamese words muốn/môn/món never enter here.
@@ -170,6 +198,9 @@ class Session:
                     verified = await self.verify_wake(clip)
                     if wake_tail(verified) is not None:
                         text = verified
+                if self.paused or audio_epoch != self.audio_epoch:
+                    publish_state = False
+                    continue
                 self.sequence += 1
                 # Unrelated standby ASR is diagnostic, not a user's question.
                 tail = wake_tail(text) if not self.engine else None
@@ -210,7 +241,8 @@ class Session:
             finally:
                 self.busy = False
                 self.clips.task_done()
-                await self.emit('state', state='listening' if self.listening else 'standby')
+                if publish_state and not self.paused and audio_epoch == self.audio_epoch:
+                    await self.emit('state', state='listening' if self.listening else 'standby')
 
     async def watchdog(self):
         while True:
@@ -252,14 +284,9 @@ async def socket_handler(request):
                     except Exception:
                         command = None
                     if command == 'pause':
-                        session.paused = True
-                        session.listening = False
-                        session.waiting_for_wake_quiet = False
-                        session.segmenter.reset()
+                        session.pause()
                     elif command == 'resume':
-                        session.paused = False
-                        session.segmenter.reset()
-                        await session.emit('resumed')
+                        await session.resume()
     except Exception as exc:
         if not ws.closed:
             await ws.send_json(dict(event='error', text=f'Voice lỗi ({type(exc).__name__}). Kiểm tra cấu hình model/mic.'))

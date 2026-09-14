@@ -2,6 +2,7 @@
 const $ = id => document.getElementById(id === 'question' ? 'ai-user-text' : `voice-${id}`);
 let stream, context, capture, source, highpass, ws, starting = false, generation = 0, wakes = 0;
 let reconnectTimer, reconnectAttempts = 0;
+let pausedReason = '';
 function wakeTick() {
     if (!context || context.state !== 'running') return;
     const tone = context.createOscillator(), volume = context.createGain();
@@ -39,7 +40,11 @@ async function stop(forgetAutoStart = false) {
 }
 function event(msg) {
     window.dispatchEvent(new CustomEvent('moon-voice', {detail: msg}));
-    if (msg.event === 'ready') { $('engine').textContent = msg.engine; $('state').textContent = msg.calibrating ? 'Đo tiếng nền 1.8 giây — hãy giữ im lặng' : 'Đang chờ Moon'; }
+    if (msg.event === 'ready') {
+        $('engine').textContent = msg.engine;
+        $('state').textContent = pausedReason === 'tts' ? 'Moon đang nói — mic tạm nghỉ chống tự nghe'
+            : (msg.calibrating ? 'Đo tiếng nền 1.8 giây — hãy giữ im lặng' : 'Đang chờ Moon');
+    }
     if (msg.event === 'calibrated') {
         $('state').textContent = 'Đang chờ Moon';
         $('noise').textContent = `Nền ${msg.noise} · ngưỡng giọng ${msg.threshold}. Nếu đổi vị trí/quạt, dừng và bật mic để đo lại.`;
@@ -164,8 +169,10 @@ $('test-sound').onclick = async () => {
 };
 window.addEventListener('moon-voice-control',({detail}) => {
     if (ws?.readyState === WebSocket.OPEN && ['pause','resume'].includes(detail?.command)) {
+        pausedReason = detail.command === 'pause' ? (detail.reason || 'brain') : '';
         ws.send(JSON.stringify({command:detail.command}));
-        if (detail.command === 'pause') $('state').textContent = 'Brain đang xử lý — mic tạm nghỉ';
+        if (detail.command === 'pause') $('state').textContent = detail.reason === 'tts'
+            ? 'Moon đang nói — mic tạm nghỉ chống tự nghe' : 'Brain đang xử lý — mic tạm nghỉ';
         else $('state').textContent = 'Đang chờ Moon';
     }
 });

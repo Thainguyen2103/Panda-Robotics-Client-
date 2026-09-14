@@ -38,6 +38,7 @@ mqttClient.on('connect', () => {
     mqttClient.subscribe('panda/ai/thinking');
     mqttClient.subscribe('panda/ai/response');
     mqttClient.subscribe('panda/ai/topic');
+    mqttClient.subscribe('panda/audio/tts_active');
 });
 
 mqttClient.on('message', (topic, message) => {
