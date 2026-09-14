@@ -108,6 +108,9 @@ $env:PANDA_CAMERA_SOURCE = 'http://<dia-chi-esp32>:81/stream'
 .\server\venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
+Diagnostic trả thêm `hand_frames`, `object_frames`, `hand_gestures` và
+`object_labels`, tiện kiểm tra riêng trường hợp chỉ đưa bàn tay/cẳng tay vào ảnh.
+
 Các file cần ở `server/`: `face_detection_yunet_2023mar.onnx`,
 `face_recognition_sface_2021dec.onnx`, `emotion-ferplus-8.onnx`, `yolov8n-pose.pt`,
 `face_landmarker.task` (3,8 MB).
