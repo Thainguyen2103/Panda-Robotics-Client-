@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Panda Demo Dashboard</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+      body {
+        font-family: sans-serif;
+        max-width: 480px;
+        margin: 40px auto;
+        padding: 0 16px;
+      }
+      #status {
+        font-weight: bold;
+      }
+      .stats {
+        display: flex;
+        gap: 24px;
+        font-size: 2rem;
+        margin: 16px 0;
+      }
+      .correct {
+        color: #2e7d32;
+      }
+      .wrong {
+        color: #c62828;
+      }
+      #log {
+        border: 1px solid #ccc;
+        padding: 8px;
+        height: 220px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Panda Firmware Demo &ndash; Tiến độ học tập</h1>
+    <div id="status">Đang kết nối MQTT...</div>
+    <div class="stats">
+      <div class="correct">Đúng: <span id="correctCount">0</span></div>
+      <div class="wrong">Sai: <span id="wrongCount">0</span></div>
+    </div>
+    <div id="log"></div>
+
+    <script>
+      // Broker công cộng dùng chung với firmware-demo/src/main.cpp
+      const BROKER_URL = "ws://broker.hivemq.com:8000/mqtt";
+      const TOPIC_RESULT = "panda/demo/khoa/result";
+      const TOPIC_PROGRESS = "panda/demo/khoa/progress";
+
+      const statusEl = document.getElementById("status");
+      const logEl = document.getElementById("log");
+      const correctEl = document.getElementById("correctCount");
+      const wrongEl = document.getElementById("wrongCount");
+
+      const client = mqtt.connect(BROKER_URL);
+
+      client.on("connect", () => {
+        statusEl.textContent = "Đã kết nối MQTT (" + BROKER_URL + ")";
+        client.subscribe([TOPIC_RESULT, TOPIC_PROGRESS]);
+      });
+
+      client.on("error", (err) => {
+        statusEl.textContent = "Lỗi kết nối: " + err.message;
+      });
+
+      client.on("message", (topic, message) => {
+        const text = message.toString();
+        const line = document.createElement("div");
+        line.textContent =
+          "[" + new Date().toLocaleTimeString() + "] " + topic + ": " + text;
+        logEl.prepend(line);
+
+        if (topic === TOPIC_PROGRESS) {
+          try {
+            const data = JSON.parse(text);
+            correctEl.textContent = data.correct;
+            wrongEl.textContent = data.wrong;
+          } catch (e) {
+            // bỏ qua message không đúng định dạng JSON
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
