@@ -120,6 +120,23 @@ VisionPanel.emotions = ['neutral','happy','surprised','sad','angry','disgust','f
 VisionPanel.labels = {unknown:'Chưa rõ',neutral:'Trung tính',happy:'Vui',sad:'Buồn',angry:'Giận',
     surprised:'Ngạc nhiên',disgust:'Chán ghét',fear:'Sợ',contempt:'Khinh miệt',waving:'Vẫy tay chào',
     hand_raised:'Giơ một tay',both_hands_up:'Giơ hai tay',head_nod:'Gật đầu',head_shake:'Lắc đầu',
-    victory:'Hai ngón V / hello',thumbs_up:'Ngón cái / like',open_palm:'Xòe bàn tay',pointing:'Chỉ một ngón',fist:'Nắm tay'};
-VisionPanel.objects = {'cup':'Ly/cốc','bottle':'Chai','book':'Sách','cell phone':'Điện thoại','laptop':'Laptop','remote':'Điều khiển'};
+    head_tilt_left:'Nghiêng đầu trái',head_tilt_right:'Nghiêng đầu phải',
+    head_turn_left:'Quay đầu trái',head_turn_right:'Quay đầu phải',head_up:'Nhìn lên',head_down:'Nhìn xuống',
+    arm_out:'Duỗi một tay ngang',arms_out:'Duỗi hai tay ngang',arms_crossed:'Khoanh tay',
+    hand_on_hip:'Chống một tay vào hông',hands_on_hips:'Chống hai tay vào hông',
+    victory:'Hai ngón V / hello',thumbs_up:'Ngón cái / like',open_palm:'Xòe bàn tay',pointing:'Chỉ một ngón',fist:'Nắm tay',
+    ok_sign:'Dấu OK',pinch:'Chụm ngón tay',three_fingers:'Ba ngón tay',four_fingers:'Bốn ngón tay',
+    rock_sign:'Dấu rock',shaka:'Dấu shaka'};
+VisionPanel.objects = {
+    bicycle:'Xe đạp',car:'Ô tô',motorcycle:'Xe máy',airplane:'Máy bay',bus:'Xe buýt',train:'Tàu hỏa',truck:'Xe tải',boat:'Thuyền',
+    'traffic light':'Đèn giao thông','fire hydrant':'Trụ cứu hỏa','stop sign':'Biển dừng','parking meter':'Đồng hồ đỗ xe',bench:'Ghế băng',
+    bird:'Chim',cat:'Mèo',dog:'Chó',horse:'Ngựa',sheep:'Cừu',cow:'Bò',elephant:'Voi',bear:'Gấu',zebra:'Ngựa vằn',giraffe:'Hươu cao cổ',
+    backpack:'Ba lô',umbrella:'Ô/dù',handbag:'Túi xách',tie:'Cà vạt',suitcase:'Va li',frisbee:'Đĩa bay',skis:'Ván trượt tuyết',snowboard:'Ván trượt',
+    'sports ball':'Bóng thể thao',kite:'Diều','baseball bat':'Gậy bóng chày','baseball glove':'Găng bóng chày',skateboard:'Ván trượt',surfboard:'Ván lướt sóng','tennis racket':'Vợt tennis',
+    bottle:'Chai','wine glass':'Ly rượu',cup:'Ly/cốc',fork:'Nĩa',knife:'Dao',spoon:'Muỗng',bowl:'Tô/bát',banana:'Chuối',apple:'Táo',sandwich:'Bánh sandwich',
+    orange:'Cam',broccoli:'Bông cải xanh',carrot:'Cà rốt','hot dog':'Bánh hot dog',pizza:'Pizza',donut:'Bánh donut',cake:'Bánh kem',
+    chair:'Ghế',couch:'Ghế sofa','potted plant':'Chậu cây',bed:'Giường','dining table':'Bàn ăn',toilet:'Bồn cầu',tv:'Tivi',laptop:'Laptop',mouse:'Chuột máy tính',
+    remote:'Điều khiển',keyboard:'Bàn phím','cell phone':'Điện thoại',microwave:'Lò vi sóng',oven:'Lò nướng',toaster:'Máy nướng bánh',sink:'Bồn rửa',refrigerator:'Tủ lạnh',
+    book:'Sách',clock:'Đồng hồ',vase:'Bình hoa',scissors:'Kéo','teddy bear':'Gấu bông','hair drier':'Máy sấy tóc',toothbrush:'Bàn chải đánh răng'
+};
 if (typeof module !== 'undefined') module.exports = {VisionPanel};

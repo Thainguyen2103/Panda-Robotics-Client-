@@ -41,3 +41,11 @@ now=17000;panel.tick();
 assert.equal(elements.get('cv-score-happy').textContent,'—');
 assert.equal(elements.get('cv-left-hand').textContent,'Chưa rõ');
 console.log('Vision UI: simultaneous actions, continuous scores and stale clearing passed');
+send({actions:[{channel:'head',label:'head_tilt_left'},{channel:'arms',label:'arms_crossed'},
+    {channel:'left_hand',label:'ok_sign'}],objects:[{label:'scissors'},{label:'teddy bear'}]},17250);
+assert.equal(elements.get('cv-head').textContent,'Nghiêng đầu trái');
+assert.equal(elements.get('cv-arms').textContent,'Khoanh tay');
+assert.equal(elements.get('cv-left-hand').textContent,'Dấu OK');
+send({objects:[{label:'scissors'},{label:'teddy bear'}]},17800);
+assert.equal(elements.get('cv-objects').textContent,'Kéo, Gấu bông');
+console.log('Vision UI: expanded gesture and object labels passed');
