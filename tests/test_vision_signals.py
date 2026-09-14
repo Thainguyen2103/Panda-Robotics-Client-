@@ -1,4 +1,5 @@
 import unittest
+import json
 from unittest.mock import patch
 import numpy as np
 from server.vision_signals import EyeState, distance_estimate, finger_gesture, finger_states, combined_actions, nearby_objects
@@ -67,6 +68,7 @@ class SignalTests(unittest.TestCase):
         result=combined_actions('unknown','unknown',hands)
         self.assertEqual(len(result),2)
         self.assertFalse(result[0]['associated'])
+        json.dumps(result)
 
     def test_strong_brow_expression_requires_sustained_evidence(self):
         for cues,label in (({'brow_down':.7,'eye_squint':.5},'angry'),({'brow_inner_up':.6,'mouth_frown':.4},'sad')):

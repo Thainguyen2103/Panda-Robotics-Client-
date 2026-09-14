@@ -174,7 +174,7 @@ class HandDetails:
             previous = self.history.get(side)
             count = previous[1]+1 if previous and previous[0] == candidate and now-previous[2] < .5 and np.linalg.norm(wrist-previous[3]) < .2 else 1
             new_history[side] = candidate,count,now,wrist
-            hands.append(dict(side=side,associated=associated,confidence=round(float(handedness.score),3),
+            hands.append(dict(side=side,associated=bool(associated),confidence=round(float(handedness.score),3),
                 gesture=candidate if count >= 2 else "unknown",gesture_candidate=candidate,
                 stability=count,extended_fingers=extended_count,
                 center=np.round(coords[:,:2].mean(axis=0),5).tolist(),

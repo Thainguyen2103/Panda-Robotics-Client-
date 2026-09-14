@@ -8,6 +8,14 @@ from config import settings
 
 client = mqtt.Client()
 
+
+def _json_default(value):
+    """Convert NumPy-style scalar values without coupling MQTT to NumPy."""
+    item = getattr(value,"item",None)
+    if callable(item):
+        return item()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
 def connect():
     try:
         client.connect(settings.MQTT_BROKER, settings.MQTT_PORT, 60)
@@ -19,7 +27,7 @@ def connect():
 def publish(topic, payload):
     try:
         if isinstance(payload, dict):
-            payload = json.dumps(payload)
+            payload = json.dumps(payload,default=_json_default)
         client.publish(topic, str(payload))
         # print(f"↗️ [PUBLISH] {topic}: {payload}")
     except Exception as e:
