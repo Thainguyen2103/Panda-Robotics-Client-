@@ -60,6 +60,8 @@ không âm thầm giả vờ đang chạy Porcupine.
 MQTT. Khi chạy đầy đủ bằng `start.bat`, text câu hỏi đã xác nhận được chuyển qua
 MQTT tới Brain để chạy LLM, TTS và OLED. `start-voice.bat` chỉ khởi động web +
 Voice service nên vẫn dùng được để test STT độc lập, nhưng không có câu trả lời AI.
+Trong lúc Moon phát câu chào hoặc TTS, mic web tự tạm nghỉ và bỏ mọi audio/STT
+đang chờ; sau khi loa im 1.2 giây mic mới nghe lại để tránh Moon tự gọi chính mình.
 Nhật ký tối đa 60 mục nằm trong trang. Tắt mic đóng socket và hủy yêu cầu STT
 đang chờ. Thu âm dùng AEC/NS của trình duyệt, tắt AGC để tránh khuếch đại quạt,
 lọc high-pass 150Hz và hiệu chuẩn nền 1.8 giây, PCM mono 16kHz,
