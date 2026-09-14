@@ -64,7 +64,9 @@ class SignalTests(unittest.TestCase):
         self.assertEqual(len(result),4)
         self.assertEqual({x['channel'] for x in result},{'head','arms','left_hand','right_hand'})
         hands[0]['associated']=False
-        self.assertEqual(len(combined_actions('unknown','unknown',hands)),1)
+        result=combined_actions('unknown','unknown',hands)
+        self.assertEqual(len(result),2)
+        self.assertFalse(result[0]['associated'])
 
     def test_strong_brow_expression_requires_sustained_evidence(self):
         for cues,label in (({'brow_down':.7,'eye_squint':.5},'angry'),({'brow_inner_up':.6,'mouth_frown':.4},'sad')):
@@ -111,6 +113,13 @@ class SignalTests(unittest.TestCase):
         pinch=self.hand(set())
         pinch[4]=pinch[8]+[.02,.02,0]
         self.assertEqual(finger_gesture(pinch),'pinch')
+        love=self.hand({5,17})
+        love[1],love[2],love[3],love[4]=[-.5,-.3,0],[-.6,-.7,0],[-.7,-1.1,0],[-1.1,-1.4,0]
+        self.assertEqual(finger_gesture(love),'i_love_you')
+        down=self.hand(set())
+        down[1],down[2],down[3],down[4]=[-.5,-.3,0],[-.6,-.7,0],[-.7,-1.1,0],[-.8,-1.6,0]
+        down[:,1]*=-1
+        self.assertEqual(finger_gesture(down),'thumbs_down')
 
     def test_face_region_associates_hands_when_pose_is_partial(self):
         engine=VisionEngine.__new__(VisionEngine)

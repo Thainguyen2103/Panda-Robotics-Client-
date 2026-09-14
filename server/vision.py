@@ -491,11 +491,11 @@ class VisionEngine:
             self.hands_time = now
             body_hint = self._person_region_for_hands(frame)
             self.hands = self._run("hands",lambda:self.models["hands"].detect(frame,now,self.joints,body_hint)) or []
-        if now-self.hands_time > .6: self.hands = []
+        if now-self.hands_time > settings.VISION_HANDS_STALE_SEC: self.hands = []
         if stage == "objects":
             self.objects_time = now
             self.objects = self._run("objects",lambda:self._objects(frame,now)) or []
-        if now-self.objects_time > 1.5: self.objects = []
+        if now-self.objects_time > settings.VISION_OBJECTS_STALE_SEC: self.objects = []
         actions = combined_actions(head_action,self.pose_action,self.hands)
         result.update(person_detected=best is not None or self.pose_box is not None,
                       person_box=list(self.pose_box) if self.pose_box else None,
@@ -504,6 +504,7 @@ class VisionEngine:
                       pose_time=self.pose_time if np.isfinite(self.pose_time) else 0.,
                       head_pose=self.head_pose,expression_cues=self.cues,
                       actions=actions,hands=self.hands,objects=nearby_objects(self.objects,self.hands),
+                      hand_count=len(self.hands),object_count=len(self.objects),
                       secondary_stage=stage,
                       frame_size=[frame.shape[1],frame.shape[0]],
                       action=" + ".join(item["label"] for item in actions) or "unknown",
