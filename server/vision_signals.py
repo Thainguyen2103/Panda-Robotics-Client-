@@ -96,16 +96,27 @@ def angle(a,b,c):
 HAND_EDGES = tuple((i,i+1) for start in (1,5,9,13,17) for i in range(start,start+3))+((0,1),(0,5),(5,9),(9,13),(13,17),(0,17))
 
 
+def finger_states(points):
+    """Return four non-thumb extension states with tolerance for curved fingers."""
+    p = np.asarray(points)
+    if p.shape != (21,3) or not np.isfinite(p).all(): return None
+    states=[]
+    for base in (5,9,13,17):
+        straight = angle(p[base],p[base+1],p[base+3]) >= settings.VISION_FINGER_STRAIGHT_DEGREES
+        reaches = np.linalg.norm(p[base+3]-p[0]) >= settings.VISION_FINGER_EXTENSION_RATIO*np.linalg.norm(p[base+1]-p[0])
+        states.append(bool(straight and reaches))
+    return states
+
+
 def finger_gesture(points):
     """Geometry rules in aspect-corrected image coordinates, invariant to hand scale."""
     p = np.asarray(points)
     if p.shape != (21,3) or not np.isfinite(p).all(): return "unknown"
     palm = np.linalg.norm(p[0]-p[9])
     if palm < 1e-5: return "unknown"
-    extended = []
-    for base in (5,9,13,17):
-        extended.append(angle(p[base],p[base+1],p[base+3]) > 155 and np.linalg.norm(p[base+3]-p[0]) > 1.12*np.linalg.norm(p[base+1]-p[0]))
-    thumb = angle(p[1],p[2],p[4]) > 150 and np.linalg.norm(p[4]-p[9]) > .7*palm
+    extended = finger_states(p)
+    thumb = (angle(p[1],p[2],p[4]) >= settings.VISION_THUMB_STRAIGHT_DEGREES
+             and np.linalg.norm(p[4]-p[9]) > .65*palm)
     thumb_index_touch = np.linalg.norm(p[4]-p[8]) < .32*palm
     if thumb_index_touch and extended[1:] == [True,True,True]: return "ok_sign"
     if thumb_index_touch and not all(extended[1:]): return "pinch"
@@ -158,8 +169,8 @@ class HandDetails:
                 associated = x <= wrist[0]*frame.shape[1] <= x+w and y <= wrist[1]*frame.shape[0] <= y+h
             corrected = coords*np.array([frame.shape[1],frame.shape[0],frame.shape[1]])
             candidate = finger_gesture(corrected)
-            extended_count = sum(angle(corrected[base],corrected[base+1],corrected[base+3]) > 155
-                                 for base in (5,9,13,17))
+            states = finger_states(corrected)
+            extended_count = sum(states) if states is not None else 0
             previous = self.history.get(side)
             count = previous[1]+1 if previous and previous[0] == candidate and now-previous[2] < .5 and np.linalg.norm(wrist-previous[3]) < .2 else 1
             new_history[side] = candidate,count,now,wrist

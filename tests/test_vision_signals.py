@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 import numpy as np
-from server.vision_signals import EyeState, distance_estimate, finger_gesture, combined_actions, nearby_objects
+from server.vision_signals import EyeState, distance_estimate, finger_gesture, finger_states, combined_actions, nearby_objects
 from server.vision_features import ExpressionState
 from server.vision import VisionEngine
 
@@ -120,6 +120,14 @@ class SignalTests(unittest.TestCase):
         down[1],down[2],down[3],down[4]=[-.5,-.3,0],[-.6,-.7,0],[-.7,-1.1,0],[-.8,-1.6,0]
         down[:,1]*=-1
         self.assertEqual(finger_gesture(down),'thumbs_down')
+
+    def test_slightly_curved_fingers_are_still_extended(self):
+        hand=self.hand({5,9})
+        # Bend the two fingertips while keeping them clearly farther than PIP.
+        hand[8,0]+=.45
+        hand[12,0]+=.45
+        self.assertEqual(finger_states(hand),[True,True,False,False])
+        self.assertEqual(finger_gesture(hand),'victory')
 
     def test_face_region_associates_hands_when_pose_is_partial(self):
         engine=VisionEngine.__new__(VisionEngine)
