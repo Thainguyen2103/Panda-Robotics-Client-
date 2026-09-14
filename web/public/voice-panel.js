@@ -19,7 +19,8 @@ function addLog(text) {
     $('log').prepend(li);
     while ($('log').children.length > 60) $('log').lastChild.remove();
 }
-async function stop() {
+async function stop(forgetAutoStart = false) {
+    if (forgetAutoStart) localStorage.setItem('moonVoiceAutoStart','0');
     generation++;
     starting = false;
     if (capture) { capture.port.onmessage = null; capture.disconnect(); capture = null; }
@@ -49,7 +50,8 @@ function event(msg) {
         addLog(`WAKE · ${msg.engine}`);
     }
     if (msg.event === 'armed') $('state').textContent = 'Moon đang nghe — hãy nói câu hỏi';
-    if (msg.event === 'processing') $('state').textContent = 'Đang chuyển thành text — mic vẫn thu';
+    if (msg.event === 'processing') $('state').textContent = msg.phase === 'question'
+        ? 'Đang nhận diện câu hỏi — mic vẫn thu' : 'Đang kiểm tra từ khóa Moon — mic vẫn thu';
     if (msg.event === 'verifying_wake') {
         $('state').textContent = 'Đang xác minh tên Moon…';
         $('diagnostic').textContent = msg.text
@@ -66,7 +68,7 @@ function event(msg) {
     if (msg.event === 'error') { $('error').textContent = msg.text; addLog(msg.text); }
     if (msg.event === 'rejected') addLog(msg.text);
 }
-$('start').onclick = async () => {
+async function start(auto = false) {
     if (starting || stream) return;
     starting = true;
     window.dispatchEvent(new CustomEvent('moon-voice', {detail: {event: 'starting'}}));
@@ -125,11 +127,16 @@ $('start').onclick = async () => {
         source.connect(highpass); highpass.connect(capture);
         capture.connect(context.destination); // Worklet outputs silence.
         starting = false;
+        localStorage.setItem('moonVoiceAutoStart','1');
     } catch (err) {
-        if (token === generation) { $('error').textContent = err.message; await stop(); }
+        if (token === generation) {
+            $('error').textContent = auto ? `${err.message} Hãy bấm Bật microphone để thử lại.` : err.message;
+            await stop();
+        }
     }
-};
-$('stop').onclick = stop;
+}
+$('start').onclick = () => start(false);
+$('stop').onclick = () => stop(true);
 $('clear').onclick = () => { $('log').replaceChildren(); };
 $('test-sound').onclick = async () => {
     // User gesture unlocks audio without requiring microphone permission.
@@ -137,6 +144,16 @@ $('test-sound').onclick = async () => {
     await context.resume();
     wakeTick();
 };
-window.addEventListener('pagehide', stop);
+window.addEventListener('pagehide', () => stop());
+
+// Browsers require one manual permission grant. On later dashboard loads,
+// resume automatically unless the user explicitly pressed Dừng mic.
+setTimeout(async () => {
+    if (localStorage.getItem('moonVoiceAutoStart') === '0' || !navigator.permissions) return;
+    try {
+        const permission = await navigator.permissions.query({name:'microphone'});
+        if (permission.state === 'granted') start(true);
+    } catch (_) { /* Firefox/older browsers may not expose microphone permission. */ }
+},500);
 
 })();

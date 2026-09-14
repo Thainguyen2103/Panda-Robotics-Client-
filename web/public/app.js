@@ -467,11 +467,11 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
     }
     if (msg.event === 'processing') {
         aiIdleHint.style.display = 'none';
-        showThinking('Đang nhận diện giọng nói…');
+        const questionPhase = msg.phase === 'question' || webVoiceAwake;
+        showThinking(questionPhase ? 'Đang nhận diện câu hỏi…' : 'Đang kiểm tra từ khóa Moon…');
         setVoiceState('transcribing');
-        // Whisper processing không phải LLM thinking. Sau wake, giữ OLED ở
-        // trạng thái lắng nghe; trước wake thì giữ mặt neutral.
-        setOledAiMode(webVoiceAwake ? 'questioning' : 'neutral');
+        // Show immediate visual feedback while network wake verification runs.
+        setOledAiMode('questioning');
     }
     if (msg.event === 'verifying_wake') {
         aiIdleHint.style.display = 'none';

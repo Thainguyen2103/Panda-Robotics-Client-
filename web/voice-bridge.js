@@ -13,32 +13,46 @@ function attachVoice(server) {
             socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return;
         }
         wss.handleUpgrade(req, socket, head, downstream => {
-            const upstream = new WebSocket('ws://127.0.0.1:8765/ws', {
-                origin: 'http://127.0.0.1:8765', handshakeTimeout: 5000,
-                maxPayload: 1024 * 1024
-            });
+            let upstream, retryTimer, attempts = 0;
             const fail = () => {
                 if (downstream.readyState === WebSocket.OPEN) {
-                    downstream.send(JSON.stringify({event: 'error', text: 'Voice service chưa sẵn sàng. Chờ vài giây rồi bật mic lại; kiểm tra môi trường Python nếu vẫn lỗi.'}));
+                    downstream.send(JSON.stringify({event: 'error', text: 'Voice service không khởi động được sau 15 giây. Kiểm tra môi trường Python.'}));
                     downstream.close(1011);
                 }
             };
-            upstream.on('error', fail);
-            upstream.on('message', data => {
+            const connectUpstream = () => {
                 if (downstream.readyState !== WebSocket.OPEN) return;
-                if (downstream.bufferedAmount > 1024 * 1024) { downstream.close(1013); return; }
-                downstream.send(data.toString());
-            });
+                const candidate = new WebSocket('ws://127.0.0.1:8765/ws', {
+                    origin: 'http://127.0.0.1:8765', handshakeTimeout: 1500,
+                    maxPayload: 1024 * 1024
+                });
+                upstream = candidate;
+                let opened = false;
+                candidate.on('open', () => { opened = true; });
+                candidate.on('error', () => {});
+                candidate.on('message', data => {
+                    if (candidate !== upstream || downstream.readyState !== WebSocket.OPEN) return;
+                    if (downstream.bufferedAmount > 1024 * 1024) { downstream.close(1013); return; }
+                    downstream.send(data.toString());
+                });
+                candidate.on('close', () => {
+                    if (candidate !== upstream || downstream.readyState !== WebSocket.OPEN) return;
+                    upstream = null;
+                    if (opened) { downstream.close(); return; }
+                    if (++attempts >= 30) { fail(); return; }
+                    retryTimer = setTimeout(connectUpstream,500);
+                });
+            };
             downstream.on('message', (data, binary) => {
                 if (!binary || data.length !== 960) { downstream.close(1003); return; }
-                if (upstream.readyState !== WebSocket.OPEN || upstream.bufferedAmount > 32000) {
+                if (!upstream || upstream.readyState !== WebSocket.OPEN || upstream.bufferedAmount > 32000) {
                     downstream.close(1013); return;
                 }
                 upstream.send(data);
             });
-            downstream.on('close', () => upstream.terminate());
-            downstream.on('error', () => upstream.terminate());
-            upstream.on('close', () => downstream.close());
+            downstream.on('close', () => { clearTimeout(retryTimer); upstream?.terminate(); });
+            downstream.on('error', () => { clearTimeout(retryTimer); upstream?.terminate(); });
+            connectUpstream();
         });
     });
 }
