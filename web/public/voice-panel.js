@@ -1,6 +1,7 @@
 (() => {
 const $ = id => document.getElementById(id === 'question' ? 'ai-user-text' : `voice-${id}`);
 let stream, context, capture, source, highpass, ws, starting = false, generation = 0, wakes = 0;
+let reconnectTimer, reconnectAttempts = 0;
 function wakeTick() {
     if (!context || context.state !== 'running') return;
     const tone = context.createOscillator(), volume = context.createGain();
@@ -21,6 +22,7 @@ function addLog(text) {
 }
 async function stop(forgetAutoStart = false) {
     if (forgetAutoStart) localStorage.setItem('moonVoiceAutoStart','0');
+    clearTimeout(reconnectTimer);
     generation++;
     starting = false;
     if (capture) { capture.port.onmessage = null; capture.disconnect(); capture = null; }
@@ -42,6 +44,7 @@ function event(msg) {
         $('state').textContent = 'Đang chờ Moon';
         $('noise').textContent = `Nền ${msg.noise} · ngưỡng giọng ${msg.threshold}. Nếu đổi vị trí/quạt, dừng và bật mic để đo lại.`;
     }
+    if (msg.event === 'recalibrating') $('state').textContent = 'Nhiễu thay đổi — đang tự đo nền lại 1.2 giây';
     if (msg.event === 'meter') { $('level').value = msg.rms; $('speech').textContent = msg.speech ? 'Có giọng nói' : 'Nền / im lặng'; }
     if (msg.event === 'wake') {
         wakeTick();
@@ -69,7 +72,7 @@ function event(msg) {
     if (msg.event === 'rejected') addLog(msg.text);
 }
 async function start(auto = false) {
-    if (starting || stream) return;
+    if (starting || stream) return true;
     starting = true;
     window.dispatchEvent(new CustomEvent('moon-voice', {detail: {event: 'starting'}}));
     const token = ++generation;
@@ -105,13 +108,17 @@ async function start(auto = false) {
             socket.onmessage = e => {
                 if (token !== generation) return;
                 const msg = JSON.parse(e.data); event(msg);
-                if (msg.event === 'ready') { clearTimeout(timeout); resolve(); }
+                if (msg.event === 'ready') { clearTimeout(timeout); reconnectAttempts = 0; resolve(); }
                 if (msg.event === 'error') { clearTimeout(timeout); reject(new Error(msg.text)); }
             };
         });
         if (token !== generation) return;
         socket.onmessage = e => { if (token === generation) event(JSON.parse(e.data)); };
-        socket.onclose = () => { $('error').textContent ||= 'Mất kết nối Voice server. Bật mic để thử lại.'; stop(); };
+        socket.onclose = async () => {
+            $('error').textContent ||= 'Mất kết nối Voice server — đang tự nối lại.';
+            await stop();
+            scheduleReconnect();
+        };
         source = context.createMediaStreamSource(stream);
         capture = new AudioWorkletNode(context, 'moon-capture');
         capture.port.onmessage = e => {
@@ -128,12 +135,23 @@ async function start(auto = false) {
         capture.connect(context.destination); // Worklet outputs silence.
         starting = false;
         localStorage.setItem('moonVoiceAutoStart','1');
+        return true;
     } catch (err) {
         if (token === generation) {
             $('error').textContent = auto ? `${err.message} Hãy bấm Bật microphone để thử lại.` : err.message;
             await stop();
         }
+        return false;
     }
+}
+function scheduleReconnect() {
+    if (localStorage.getItem('moonVoiceAutoStart') === '0') return;
+    const delay = Math.min(1000 * 2 ** reconnectAttempts++, 10000);
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(async () => {
+        $('state').textContent = 'Đang nối lại Voice…';
+        if (!await start(true)) scheduleReconnect();
+    }, delay);
 }
 $('start').onclick = () => start(false);
 $('stop').onclick = () => stop(true);

@@ -14,7 +14,7 @@ import webrtcvad
 
 from config import settings
 from server.voice_core import (Segmenter, wake_tail, should_verify_wake,
-                               reliable_transcript, RATE, FRAME_BYTES)
+                               reliable_transcript, RATE, FRAME_BYTES, FRAME_MS)
 
 
 def acoustic_engine():
@@ -45,6 +45,7 @@ class Session:
         self.last_meter = 0
         self.busy = False
         self.paused = False
+        self.standby_rejects = 0
         # Porcupine bắt keyword khi từ "Moon" chưa kết thúc hẳn. Không cho
         # phần đuôi keyword rơi vào clip câu hỏi.
         self.waiting_for_wake_quiet = False
@@ -178,16 +179,30 @@ class Session:
                 await self.emit('transcript' if accepted else 'ignored', text=text, sequence=self.sequence,
                                 latency_ms=round((time.monotonic()-start)*1000),
                                 duration_ms=round(len(clip)/32))
-                if not text:
-                    await self.emit('rejected', text='Không có lời nói đủ tin cậy trong đoạn âm thanh.')
+                if not text and question_clip and self.listening:
+                    await self.emit('rejected', text='Chưa nghe rõ câu hỏi — Moon vẫn đang nghe.')
+                elif not text:
+                    # Nhiễu nền bị VAD xem là giọng có thể tạo clip rỗng liên
+                    # tục. Không spam UI; sau ba lần thì tự đo nền lại.
+                    self.standby_rejects += 1
+                    if self.standby_rejects >= 3:
+                        self.standby_rejects = 0
+                        self.segmenter.reset()
+                        self.segmenter.calibration = []
+                        self.segmenter.calibration_frames = round(1200 / FRAME_MS)
+                        await self.emit('recalibrating')
                 elif question_clip and self.listening:
+                    self.standby_rejects = 0
                     await self.emit('question', text=tail if tail else text)
                     self.listening = False
                 elif tail is not None and not self.listening:
+                    self.standby_rejects = 0
                     await self.wake()
                     if tail:
                         await self.emit('question', text=tail)
                         self.listening = False
+                else:
+                    self.standby_rejects = 0
             except Exception as exc:
                 # Do not expose SDK response bodies or credentials to the browser.
                 await self.emit('error', text=f'STT lỗi ({type(exc).__name__}). Kiểm tra key, mạng hoặc quota; thử lại.')

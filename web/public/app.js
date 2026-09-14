@@ -323,7 +323,15 @@ socket.on('mqtt_message', (data) => {
             if (!oledFace.classList.contains('answering')) setOledAiMode('speaking');
         }
         else if (payload === 'standby') {
-            hideThinking(); aiCursor.style.display = 'none'; setOledAiMode('neutral');
+            hideThinking(); aiCursor.style.display = 'none';
+            // Giữ câu trả lời đủ lâu để người dùng kịp nhìn, nhưng cho mic
+            // quay lại chờ wakeword ngay lập tức.
+            if (oledFace.classList.contains('answering')) {
+                cancelTranscriptTimer();
+                transcriptTimer = setTimeout(() => setOledAiMode('neutral'), 4000);
+            } else {
+                setOledAiMode('neutral');
+            }
             if (webVoiceHandedOff) {
                 clearTimeout(webVoiceHandoffTimer);
                 webVoiceHandedOff = false;
@@ -496,7 +504,7 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
         aiIdleHint.style.display = 'none';
         showThinking('Đang xác minh tên Moon…');
         setVoiceState('transcribing');
-        setOledAiMode('neutral');
+        setOledAiMode('questioning');
     }
     if (msg.event === 'question') {
         webVoiceAwake = false;

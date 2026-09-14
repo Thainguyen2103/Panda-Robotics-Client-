@@ -154,6 +154,22 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(session.listening)
         self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
 
+    async def test_repeated_blank_standby_noise_recalibrates_without_log_spam(self):
+        socket = Socket()
+        session = Session(socket, None)
+        session.transcribe = lambda clip: asyncio.sleep(0, result='')
+        session.verify_wake = lambda clip: asyncio.sleep(0, result='')
+        worker = asyncio.create_task(session.worker())
+        for _ in range(3):
+            session.clips.put_nowait((b'audio', False))
+        await asyncio.wait_for(session.clips.join(), 2)
+        worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker
+        self.assertFalse(any(m['event'] == 'rejected' for m in socket.messages))
+        self.assertEqual(sum(m['event'] == 'recalibrating' for m in socket.messages), 1)
+        self.assertEqual(session.segmenter.calibration_frames, 40)
+
     async def test_real_vietnamese_words_do_not_enter_wake_verification(self):
         socket = Socket()
         session = Session(socket, None)
