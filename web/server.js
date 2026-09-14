@@ -74,6 +74,11 @@ io.on('connection', (socket) => {
         console.log(`🎙️ [WEB] Live mic: ${st}`);
         mqttClient.publish('panda/ai/mic_live', st);
     });
+    socket.on('voice_question', (text) => {
+        if (typeof text !== 'string') return;
+        text = text.trim().slice(0, 1000);
+        if (text) mqttClient.publish('panda/ai/question', text);
+    });
 });
 
 const PORT = process.env.PORT || 3000;

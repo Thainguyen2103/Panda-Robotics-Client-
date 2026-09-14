@@ -187,7 +187,7 @@
                         <div class="ai-idle-hint" id="ai-idle-hint">
                             <div class="ai-idle-icon">🎙️</div>
                             <p>Nói <strong>"Moon..."</strong> để kiểm tra giọng nói</p>
-                            <p class="ai-idle-sub">Bật mic web để test STT; khi mic web tắt, theo dõi hội thoại từ Brain.</p>
+                            <p class="ai-idle-sub">Gọi “Moon”, nói câu hỏi; transcript sẽ được chuyển sang Brain để trả lời.</p>
                         </div>
 
                         <!-- Bubble câu hỏi người dùng -->
@@ -226,7 +226,7 @@
                         <span id="voice-speech"></span>
                         <p id="voice-noise">Giữ im lặng 1.8 giây khi bật mic để đo tiếng nền.</p>
                         <p id="voice-wake">Đã bắt wakeword: 0 lần</p>
-                        <p id="voice-engine">Âm thanh được gửi tới Groq để nhận diện; không qua Brain/LLM.</p>
+                        <p id="voice-engine">Âm thanh được gửi tới Groq để nhận diện; chỉ text câu hỏi được chuyển sang Brain/LLM.</p>
                         <p id="voice-error" role="alert"></p>
                         <details><summary>Chẩn đoán Voice và transcript nguyên văn</summary>
                             <p id="voice-diagnostic"></p>
@@ -274,8 +274,8 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="vision-ui.js?v=20260914e"></script>
-    <script src="app.js?v=20260914f"></script>
-    <script src="voice-panel.js?v=20260914f"></script>
+    <script src="app.js?v=20260914i"></script>
+    <script src="voice-panel.js?v=20260914i"></script>
     <script>
         lucide.createIcons();
     </script>

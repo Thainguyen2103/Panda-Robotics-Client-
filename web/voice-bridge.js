@@ -44,11 +44,11 @@ function attachVoice(server) {
                 });
             };
             downstream.on('message', (data, binary) => {
-                if (!binary || data.length !== 960) { downstream.close(1003); return; }
+                if ((binary && data.length !== 960) || (!binary && data.length > 100)) { downstream.close(1003); return; }
                 if (!upstream || upstream.readyState !== WebSocket.OPEN || upstream.bufferedAmount > 32000) {
                     downstream.close(1013); return;
                 }
-                upstream.send(data);
+                upstream.send(data,{binary});
             });
             downstream.on('close', () => { clearTimeout(retryTimer); upstream?.terminate(); });
             downstream.on('error', () => { clearTimeout(retryTimer); upstream?.terminate(); });

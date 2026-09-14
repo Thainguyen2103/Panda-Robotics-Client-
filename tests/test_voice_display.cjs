@@ -27,15 +27,20 @@ const {chromium} = require('playwright');
         assert.match(await page.locator('#oled-face').getAttribute('class'), /hearing/);
         assert.equal(await page.locator('#oled-text').textContent(), '"Ronaldo là ai?"');
         assert.equal(await page.locator('#ai-thinking-bar').isVisible(), false);
-        const text = 'Tôi muốn học tiếng Việt, dấu hỏi, dấu ngã và ký hiệu <b>nguyên văn</b>. '.repeat(8);
-        await say({event: 'question', text});
+        // Once Voice has a question, Brain owns MQTT → OLED/LLM/TTS progression.
         await page.evaluate(() => {
             const receive = socket.listeners('mqtt_message')[0];
+            receive({topic: 'panda/ai/state', payload: 'thinking'});
             receive({topic: 'panda/ai/thinking', payload: JSON.stringify({stage: 'thinking'})});
-            receive({topic: 'panda/ai/response', payload: JSON.stringify({text: 'STALE', done: false})});
-            receive({topic: 'panda/ai/state', payload: 'speaking'});
-            receive({topic: 'panda/cmd/face', payload: 'happy'});
         });
+        assert.equal(await page.locator('#ai-thinking-bar').isVisible(), true);
+        assert.match(await page.locator('#oled-face').getAttribute('class'), /ai-thinking/);
+        await page.evaluate(() => socket.listeners('mqtt_message')[0]({topic: 'panda/ai/state', payload: 'standby'}));
+        assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/);
+
+        await say({event: 'wake'});
+        const text = 'Tôi muốn học tiếng Việt, dấu hỏi, dấu ngã và ký hiệu <b>nguyên văn</b>. '.repeat(8);
+        await say({event: 'question', text});
         assert.equal(await page.locator('#ai-user-text').textContent(), text);
         assert.equal(await page.locator('#oled-text').textContent(), `"${text}"`);
         assert.equal(await page.locator('#ai-thinking-bar').isVisible(), false);
@@ -49,13 +54,7 @@ const {chromium} = require('playwright');
         }));
         assert.deepEqual(layout, {animation: 'none', overflow: 'auto', canScroll: true});
         await page.locator('#oled-face').screenshot({path: '.voice-venv/oled-transcript.png'});
-        await page.waitForFunction(() => document.getElementById('oled-face').classList.contains('neutral'), null, {timeout: 8000});
-        assert.equal(await page.locator('#ai-user-text').textContent(), text);
-        await say({event: 'question', text: 'Câu trước'});
-        await say({event: 'wake'});
-        await page.waitForTimeout(6100);
-        assert.match(await page.locator('#oled-face').getAttribute('class'), /questioning/, 'old timer must not clear new wake');
-        await say({event: 'timeout'});
+        await page.evaluate(() => socket.listeners('mqtt_message')[0]({topic: 'panda/ai/state', payload: 'standby'}));
         assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/);
         await say({event: 'question', text: 'Câu cuối'});
         await say({event: 'stopped'});
@@ -89,6 +88,6 @@ const {chromium} = require('playwright');
         await page.evaluate(() => socket.listeners('mqtt_message')[0]({topic: 'panda/ai/state', payload: 'standby'}));
         assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/);
         assert.deepEqual(errors, []);
-        console.log('Voice display: stale MQTT isolation, literal long text, hold timer, wake and stop reset passed');
+        console.log('Voice display: Brain handoff, literal long text, MQTT progression and stop reset passed');
     } finally { await browser.close(); }
 })().catch(error => {console.error(error); process.exitCode = 1;});

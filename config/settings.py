@@ -32,6 +32,7 @@ TOPIC_AI_TOPIC      = "panda/ai/topic"        # chủ đề câu hỏi → emoji
 TOPIC_BROWSER_AUDIO = "panda/ai/voice_audio"   # push-to-talk từ dashboard (base64 webm)
 TOPIC_BROWSER_CLIP  = "panda/ai/clip"          # clip PCM từ live-mic trình duyệt
 TOPIC_MIC_LIVE      = "panda/ai/mic_live"      # trạng thái live-mic on/off
+TOPIC_BROWSER_QUESTION = "panda/ai/question"    # text đã STT từ Moon Voice → Brain
 TOPIC_CAMERA = "panda/camera"
 
 # AI Models Configuration
@@ -209,7 +210,7 @@ MIC_DEVICE_INDEX = None
 #              robot bằng dev_mic_bridge (mic laptop giả lập mic robot)
 MIC_SOURCE = "auto"
 
-# Standalone Voice Lab (browser DSP + WebRTC VAD, no Brain/LLM).
+# Browser DSP + WebRTC VAD + STT; accepted questions can be handed to Brain.
 VOICE_VAD_MODE = 2
 VOICE_MIN_RMS = 0.003
 VOICE_WAKE_SILENCE_SEC = 0.45

@@ -66,6 +66,20 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
         self.assertEqual(sum(m['event'] == 'armed' for m in socket.messages), 1)
 
+    async def test_paused_session_ignores_tts_audio_until_resumed(self):
+        session=Session(Socket(),None)
+        session.segmenter.calibration_frames=0
+        session.segmenter.vad=type('Vad',(),{'is_speech':lambda self,pcm,rate: pcm != bytes(960)})()
+        session.paused=True
+        for _ in range(20):
+            await session.feed(b'\x88\x13'*480)
+        self.assertTrue(session.clips.empty())
+        self.assertFalse(session.segmenter.active)
+        session.paused=False
+        for pcm in [b'\x88\x13'*480]*8+[bytes(960)]*45:
+            await session.feed(pcm)
+        self.assertFalse(session.clips.empty())
+
     async def run_clips(self, texts, captured_states=None):
         socket = Socket()
         session = Session(socket, None)

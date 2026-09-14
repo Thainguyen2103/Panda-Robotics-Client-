@@ -705,6 +705,17 @@ def on_mic_live(client, userdata, msg):
     voice.set_external_mic(on)
 
 
+def on_browser_question(client, userdata, msg):
+    """Route text already transcribed by Moon Voice through the full pipeline."""
+    try:
+        question = msg.payload.decode("utf-8",errors="strict").strip()
+    except Exception:
+        return
+    if not question or len(question) > 1000:
+        return
+    threading.Thread(target=_handle_wake_word,args=(f"Moon, {question}",),daemon=True).start()
+
+
 def on_browser_clip(client, userdata, msg):
     """Clip PCM sạch (DSP trình duyệt) từ live-mic → route như transcript standby."""
     if voice_ai_state != "standby":
@@ -786,6 +797,8 @@ def main():
     mqtt_bridge.client.message_callback_add(settings.TOPIC_BROWSER_CLIP, on_browser_clip)
     mqtt_bridge.client.subscribe(settings.TOPIC_MIC_LIVE)
     mqtt_bridge.client.message_callback_add(settings.TOPIC_MIC_LIVE, on_mic_live)
+    mqtt_bridge.client.subscribe(settings.TOPIC_BROWSER_QUESTION)
+    mqtt_bridge.client.message_callback_add(settings.TOPIC_BROWSER_QUESTION, on_browser_question)
 
     # Wake-word on-device (Porcupine) nếu đã cấu hình — đúng kiểu Anki Vector:
     # KWS local bắt "Moon" mọi ngôn ngữ, ASR cloud xử lý phần còn lại.

@@ -2,6 +2,7 @@
 import asyncio
 import contextlib
 import io
+import json
 import struct
 import time
 import wave
@@ -43,6 +44,7 @@ class Session:
         self.sequence = 0
         self.last_meter = 0
         self.busy = False
+        self.paused = False
         # Porcupine bắt keyword khi từ "Moon" chưa kết thúc hẳn. Không cho
         # phần đuôi keyword rơi vào clip câu hỏi.
         self.waiting_for_wake_quiet = False
@@ -59,6 +61,8 @@ class Session:
     async def feed(self, pcm):
         if len(pcm) != FRAME_BYTES:
             raise ValueError('Audio frame must be 30ms PCM16 mono / 16kHz')
+        if self.paused:
+            return
         calibrating = self.segmenter.calibration_frames > 0
         if self.engine and not calibrating:
             self.acoustic_buffer.extend(pcm)
@@ -227,6 +231,20 @@ async def socket_handler(request):
                     await session.feed(msg.data)
                 elif msg.type == WSMsgType.ERROR:
                     break
+                elif msg.type == WSMsgType.TEXT:
+                    try:
+                        command = json.loads(msg.data).get('command')
+                    except Exception:
+                        command = None
+                    if command == 'pause':
+                        session.paused = True
+                        session.listening = False
+                        session.waiting_for_wake_quiet = False
+                        session.segmenter.reset()
+                    elif command == 'resume':
+                        session.paused = False
+                        session.segmenter.reset()
+                        await session.emit('resumed')
     except Exception as exc:
         if not ws.closed:
             await ws.send_json(dict(event='error', text=f'Voice lỗi ({type(exc).__name__}). Kiểm tra cấu hình model/mic.'))

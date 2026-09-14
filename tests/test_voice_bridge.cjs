@@ -18,9 +18,13 @@ socket.on('message', data => {
     }
     if (msg.event === 'calibrated') {
         assert(msg.threshold > 0);
+        socket.send(JSON.stringify({command:'pause'}));
+        socket.send(JSON.stringify({command:'resume'}));
+    }
+    if (msg.event === 'resumed') {
         clearTimeout(timeout);
         socket.close();
-        console.log('Dashboard voice proxy: readiness, binary audio and calibration passed');
+        console.log('Dashboard voice proxy: readiness, audio, calibration and pause/resume passed');
     }
     if (msg.event === 'error') {throw new Error(msg.text);}
 });

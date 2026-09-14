@@ -2,6 +2,8 @@
 const socket = io();
 let voiceOnlyDashboard = false; // The web mic claims the display only during its session.
 let webVoiceAwake = false;      // Wake đã bắt; processing tiếp theo là STT câu hỏi.
+let webVoiceHandedOff = false;  // Brain owns OLED/LLM/TTS while web mic is paused.
+let webVoiceHandoffTimer;
 let transcriptTimer;
 function cancelTranscriptTimer() {
     clearTimeout(transcriptTimer);
@@ -235,9 +237,9 @@ function finalizeMoonResponse() {
 // ─── MQTT message handler ─────────────────────────────────────────────────────
 socket.on('mqtt_message', (data) => {
     const { topic, payload } = data;
-    // This dashboard tests Voice without Brain: stale/retained AI messages must
-    // never overwrite the local transcript or leave a reply spinner running.
-    if (voiceOnlyDashboard && (topic.startsWith('panda/ai/') || topic.startsWith('panda/log/voice'))) return;
+    // Before a question is accepted, retained AI messages must not overwrite
+    // local wake/STT progress. After handoff, live Brain messages own the UI.
+    if (voiceOnlyDashboard && !webVoiceHandedOff && (topic.startsWith('panda/ai/') || topic.startsWith('panda/log/voice'))) return;
 
     // ── Sensor status ─────────────────────────────────────────────────────────
     if (topic === 'panda/status') {
@@ -320,7 +322,16 @@ socket.on('mqtt_message', (data) => {
             hideThinking();
             if (!oledFace.classList.contains('answering')) setOledAiMode('speaking');
         }
-        else if (payload === 'standby') { hideThinking(); aiCursor.style.display = 'none'; setOledAiMode('neutral'); }
+        else if (payload === 'standby') {
+            hideThinking(); aiCursor.style.display = 'none'; setOledAiMode('neutral');
+            if (webVoiceHandedOff) {
+                clearTimeout(webVoiceHandoffTimer);
+                webVoiceHandedOff = false;
+                window.dispatchEvent(new CustomEvent('moon-voice-control',{detail:{command:'resume'}}));
+                const sourceLabel = document.getElementById('voice-display-source');
+                if (sourceLabel) sourceLabel.textContent = 'Nguồn hiển thị: mic web — đang chờ Moon';
+            }
+        }
         logToTerminal(`AI State: ${payload}`, 'ai-state');
 
     // ── AI thinking / stages ────────────────────────────────────────────────────────────────
@@ -438,11 +449,19 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
     if (['starting', 'ready'].includes(msg.event)) {
         voiceOnlyDashboard = true;
         webVoiceAwake = false;
+        webVoiceHandedOff = false;
+        if (msg.event === 'starting') socket.emit('mic_live','1');
     }
     if (msg.event === 'stopped') {
         voiceOnlyDashboard = false;
         webVoiceAwake = false;
+        webVoiceHandedOff = false;
+        clearTimeout(webVoiceHandoffTimer);
+        socket.emit('mic_live','0');
     }
+    // After handing a recognized question to Brain, ignore Voice Lab's final
+    // standby packet so it cannot erase the real LLM/TTS/OLED progression.
+    if (webVoiceHandedOff && !['stopped'].includes(msg.event)) return;
     const sourceLabel = document.getElementById('voice-display-source');
     if (sourceLabel) sourceLabel.textContent = voiceOnlyDashboard ? 'Nguồn hiển thị: mic web — test STT' : 'Nguồn hiển thị: Brain qua MQTT (nếu đang chạy)';
     aiMoonBubble.style.display = 'none';
@@ -487,6 +506,18 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
         aiCursor.style.display = 'none';
         transcriptTimer = setTimeout(() => setOledAiMode('neutral'), 6000);
         logToTerminal(`VOICE: ${msg.text}`, 'log-voice');
+        socket.emit('voice_question',msg.text);
+        webVoiceHandedOff = true;
+        window.dispatchEvent(new CustomEvent('moon-voice-control',{detail:{command:'pause'}}));
+        clearTimeout(webVoiceHandoffTimer);
+        webVoiceHandoffTimer = setTimeout(() => {
+            if (!webVoiceHandedOff) return;
+            webVoiceHandedOff = false;
+            window.dispatchEvent(new CustomEvent('moon-voice-control',{detail:{command:'resume'}}));
+            logToTerminal('Brain không phản hồi sau 60 giây — mic đã nghe lại.', 'sys');
+        },60000);
+        const sourceLabel = document.getElementById('voice-display-source');
+        if (sourceLabel) sourceLabel.textContent = 'Nguồn hiển thị: Brain đang xử lý câu hỏi từ mic web';
     }
     if (msg.event === 'state') {
         hideThinking();

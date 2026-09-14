@@ -9,11 +9,16 @@ const {chromium} = require('playwright');
         const context = await browser.newContext({permissions: ['microphone']});
         const page = await context.newPage();
         const errors = [];
+        const controls = [];
         page.on('pageerror', e => errors.push(e.message));
         let frames = 0;
         await page.routeWebSocket('**/voice/ws', socket => {
             socket.send(JSON.stringify({event: 'ready', engine: 'TEST mock'}));
             socket.onMessage(data => {
+                if (typeof data === 'string') {
+                    controls.push(JSON.parse(data).command);
+                    return;
+                }
                 assert.equal(data.length, 960);
                 if (++frames === 4) {
                     for (const msg of [{event: 'wake', engine: 'mock'},
@@ -49,6 +54,7 @@ const {chromium} = require('playwright');
         assert.deepEqual(errors, []);
         assert.equal(await page.locator('#ai-user-bubble').isVisible(), true);
         assert.match(await page.locator('#terminal-log').innerText(), /VOICE: Tôi muốn học tiếng Anh/);
+        assert(controls.includes('pause'), 'recognized question must pause browser audio during Brain handoff');
         assert(frames >= 4);
         console.log('Voice browser: fake mic PCM stream, transcript, restart, mobile layout passed');
     } finally { await browser.close(); }

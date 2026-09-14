@@ -144,6 +144,13 @@ $('test-sound').onclick = async () => {
     await context.resume();
     wakeTick();
 };
+window.addEventListener('moon-voice-control',({detail}) => {
+    if (ws?.readyState === WebSocket.OPEN && ['pause','resume'].includes(detail?.command)) {
+        ws.send(JSON.stringify({command:detail.command}));
+        if (detail.command === 'pause') $('state').textContent = 'Brain đang xử lý — mic tạm nghỉ';
+        else $('state').textContent = 'Đang chờ Moon';
+    }
+});
 window.addEventListener('pagehide', () => stop());
 
 // Browsers require one manual permission grant. On later dashboard loads,
