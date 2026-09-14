@@ -18,8 +18,10 @@ py -3.12 -m venv .voice-venv
 .\start-voice.bat
 ```
 
-Mở [Dashboard](http://localhost:3000) trong Chrome/Edge, bấm **Bật microphone**,
-cho phép dùng mic, giữ im lặng 1.8 giây để đo nền rồi mới gọi Moon. Có thể đổi thiết bị sau khi dừng.
+Mở [Dashboard](http://localhost:3000) trong Chrome/Edge. Lần đầu cần bấm
+**Bật microphone** để cấp quyền, giữ im lặng 1.8 giây để đo nền rồi mới gọi Moon.
+Các lần tải trang sau mic tự bật khi quyền vẫn được cấp; bấm **Dừng mic** để tắt
+tự động. Có thể đổi thiết bị sau khi dừng.
 Nút **Thử tiếng tick** kiểm tra loa; mỗi wake thật phát tiếng tick 80ms. Không chạy `start.bat` cho
 bài test này vì lệnh đó khởi động toàn bộ Brain.
 
@@ -54,7 +56,10 @@ không âm thầm giả vờ đang chạy Porcupine.
 6. Sau wake không nói: khoảng 12 giây sau trở lại chờ. Thử dừng/bật lại mic,
    từ chối quyền mic, ngắt mạng và khôi phục mạng.
 
-Âm thanh được gửi tới Groq để STT; không lưu file audio, không gửi qua MQTT.
+Âm thanh được gửi tới Groq để STT; không lưu file và không gửi raw audio qua
+MQTT. Khi chạy đầy đủ bằng `start.bat`, text câu hỏi đã xác nhận được chuyển qua
+MQTT tới Brain để chạy LLM, TTS và OLED. `start-voice.bat` chỉ khởi động web +
+Voice service nên vẫn dùng được để test STT độc lập, nhưng không có câu trả lời AI.
 Nhật ký tối đa 60 mục nằm trong trang. Tắt mic đóng socket và hủy yêu cầu STT
 đang chờ. Thu âm dùng AEC/NS của trình duyệt, tắt AGC để tránh khuếch đại quạt,
 lọc high-pass 150Hz và hiệu chuẩn nền 1.8 giây, PCM mono 16kHz,
@@ -95,7 +100,7 @@ Text không có Moon khi standby chỉ hiện ở ô chẩn đoán “Bỏ qua�
 nhật ký câu nhận diện. Đây là phân loại kết quả, không phải bằng chứng đã
 khử hết tiếng ồn. Kết quả chứa segment confidence thấp bị từ chối.
 
-`start-voice.bat` nay chạy web dashboard; Node tự khởi động Python Voice khi
+`start-voice.bat` chạy web dashboard; Node tự khởi động Python Voice khi
 port 8765 chưa có service. Port 8765 chỉ là backend nội bộ; đường `/` cũ
 chuyển tới dashboard 3000. Không còn trang test Voice riêng.
 Text câu sau wake hiện ở **Bạn đã nói**, OLED mô phỏng và Activity Log.
@@ -107,6 +112,7 @@ Brain qua MQTT và hiển thị đầy đủ câu hỏi → suy nghĩ → nói �
 vẫn giữ trong khung Bạn đã nói. Chữ dài xuống dòng, có thể cuộn trong OLED.
 Kiểm tra hồi quy giao diện: `node tests/test_voice_display.cjs` (cần Playwright).
 
-Dòng Nguồn hiển thị cho biết bên nào đang điều khiển OLED. Voice STT chỉ
-hiện tiến trình nhận diện, không tự tạo câu trả lời LLM. Câu trả lời có sẵn
-từ Brain chỉ được hiển thị khi không test bằng mic web.
+Dòng Nguồn hiển thị cho biết bên nào đang điều khiển OLED. Khi nhận xong câu
+hỏi, Voice tạm nghỉ mic để Brain điều khiển OLED, gọi LLM/TTS và tránh tự nghe
+tiếng loa; Brain về standby thì mic web tự nghe lại. Nếu Brain không phản hồi
+trong 60 giây, dashboard tự trả mic về chế độ chờ Moon.

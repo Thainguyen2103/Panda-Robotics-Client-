@@ -47,7 +47,10 @@ tools/       bench_topics.py, dev_mic_bridge.py
 
 ## 🎙️ Test Voice trên dashboard (công việc hiện tại)
 
-Chạy `start-voice.bat`, mở http://localhost:3000 và bật microphone.
+Để test riêng nhận dạng giọng nói, chạy `start-voice.bat`, mở
+http://localhost:3000 và bật microphone. Chế độ này không khởi động Brain nên
+không có phản hồi LLM/TTS/OLED. Để thử hội thoại Moon hoàn chỉnh, chạy
+`start.bat`; sau lần cấp quyền đầu tiên, dashboard sẽ tự bật lại microphone.
 Cài môi trường lần đầu theo [docs/voice.md](docs/voice.md). Không cần Brain/LLM.
 Wake âm học tức thời cần model Moon `.ppn` và Picovoice key; nếu chưa có,
 dashboard dùng Whisper dự phòng và hiển thị rõ độ trễ phụ thuộc ngắt câu/mạng.
