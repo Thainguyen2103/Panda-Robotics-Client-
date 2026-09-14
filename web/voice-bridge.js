@@ -14,9 +14,14 @@ function attachVoice(server) {
         }
         wss.handleUpgrade(req, socket, head, downstream => {
             let upstream, retryTimer, pendingControl, attempts = 0;
+            const sendDownstream = payload => {
+                if (downstream.readyState !== WebSocket.OPEN) return false;
+                try { downstream.send(payload); return true; }
+                catch (_) { return false; }
+            };
             const fail = () => {
                 if (downstream.readyState === WebSocket.OPEN) {
-                    downstream.send(JSON.stringify({event: 'error', text: 'Voice service không khởi động được sau 15 giây. Kiểm tra môi trường Python.'}));
+                    sendDownstream(JSON.stringify({event: 'error', text: 'Voice service không khởi động được sau 15 giây. Kiểm tra môi trường Python.'}));
                     downstream.close(1011);
                 }
             };
@@ -40,7 +45,7 @@ function attachVoice(server) {
                 candidate.on('message', data => {
                     if (candidate !== upstream || downstream.readyState !== WebSocket.OPEN) return;
                     if (downstream.bufferedAmount > 1024 * 1024) { downstream.close(1013); return; }
-                    downstream.send(data.toString());
+                    sendDownstream(data.toString());
                 });
                 candidate.on('close', () => {
                     if (candidate !== upstream || downstream.readyState !== WebSocket.OPEN) return;
@@ -59,7 +64,8 @@ function attachVoice(server) {
                     return;
                 }
                 if (upstream.bufferedAmount > 32000) { downstream.close(1013); return; }
-                upstream.send(data,{binary});
+                try { upstream.send(data,{binary}); }
+                catch (_) { downstream.close(1013); }
             });
             downstream.on('close', () => { clearTimeout(retryTimer); upstream?.terminate(); });
             downstream.on('error', () => { clearTimeout(retryTimer); upstream?.terminate(); });

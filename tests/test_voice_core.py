@@ -2,7 +2,9 @@ import math
 import struct
 import unittest
 
-from server.voice_core import Segmenter, wake_tail, possible_moon_miss, should_verify_wake, reliable_transcript
+from server.voice_core import (Segmenter, wake_tail, possible_moon_miss,
+                               should_verify_wake, confirmed_wake_tail,
+                               reliable_transcript)
 
 
 def frame(amplitude=1500):
@@ -51,6 +53,13 @@ class VoiceCoreTests(unittest.TestCase):
             self.assertFalse(should_verify_wake(text,1200),text)
         self.assertFalse(should_verify_wake('một câu nói dài hơn ba từ',1200))
         self.assertFalse(should_verify_wake('Moon',4000))
+
+    def test_two_stt_passes_can_confirm_a_moon_spelling_variant(self):
+        self.assertEqual(confirmed_wake_tail('Mun', 'Hey Mun'), '')
+        self.assertEqual(confirmed_wake_tail('', 'Mùn ơi'), '')
+        self.assertEqual(confirmed_wake_tail('Mun', 'Hey Moon'), '')
+        self.assertIsNone(confirmed_wake_tail('Mun', 'Mom'))
+        self.assertIsNone(confirmed_wake_tail('xin chào', 'Hey Mun'))
 
     def test_silence_and_click_do_not_make_clip(self):
         s = Segmenter(EnergyVad())

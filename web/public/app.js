@@ -534,7 +534,9 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
         aiIdleHint.style.display = 'none';
         showThinking('Đang xác minh tên Moon…');
         setVoiceState('transcribing');
-        setOledAiMode('questioning');
+        // Chưa phải wake đã xác nhận: chỉ hiện trạng thái xử lý. Dấu ? chỉ
+        // xuất hiện sau event `wake` thật sự để không gây hiểu nhầm.
+        setOledAiMode('ai-thinking');
     }
     if (msg.event === 'question') {
         webVoiceAwake = false;

@@ -23,7 +23,7 @@ const {chromium} = require('playwright');
         assert.match(await page.locator('#oled-face').getAttribute('class'), /questioning/);
         await say({event: 'processing'});
         await say({event: 'verifying_wake'});
-        assert.match(await page.locator('#oled-face').getAttribute('class'), /questioning/);
+        assert.match(await page.locator('#oled-face').getAttribute('class'), /ai-thinking/);
         await say({event: 'question', text: 'Ronaldo là ai?'});
         await say({event: 'state', state: 'standby'});
         assert.match(await page.locator('#oled-face').getAttribute('class'), /hearing/);

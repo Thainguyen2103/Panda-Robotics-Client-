@@ -14,7 +14,8 @@ import webrtcvad
 
 from config import settings
 from server.voice_core import (Segmenter, wake_tail, should_verify_wake,
-                               reliable_transcript, RATE, FRAME_BYTES, FRAME_MS)
+                               confirmed_wake_tail, reliable_transcript,
+                               RATE, FRAME_BYTES, FRAME_MS)
 
 
 def acoustic_engine():
@@ -196,8 +197,9 @@ class Session:
                             settings.VOICE_WAKE_VERIFY_MAX_WORDS)):
                     await self.emit('verifying_wake', text=text)
                     verified = await self.verify_wake(clip)
-                    if wake_tail(verified) is not None:
-                        text = verified
+                    confirmed_tail = confirmed_wake_tail(text, verified)
+                    if confirmed_tail is not None:
+                        text = 'Moon' + (f', {confirmed_tail}' if confirmed_tail else '')
                 if self.paused or audio_epoch != self.audio_epoch:
                     publish_state = False
                     continue

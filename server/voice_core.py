@@ -64,6 +64,23 @@ def should_verify_wake(text, duration_ms, max_sec=3.0, max_words=3):
             and not protected.intersection(words))
 
 
+def confirmed_wake_tail(primary, verification):
+    """Confirm Moon using the independent Vietnamese and English STT passes.
+
+    Exact ``Moon`` always wins. A targeted English pass returning a Moon-like
+    short result (for example ``Mun`` / ``Hey Mun``) also confirms a primary
+    result that was blank or another narrowly allowed Moon miss.
+    """
+    exact = wake_tail(verification)
+    if exact is not None:
+        return exact
+    if ((verification or '').strip()
+            and possible_moon_miss(primary)
+            and possible_moon_miss(verification)):
+        return ''
+    return None
+
+
 class Segmenter:
     """30ms PCM frames; short pre-roll, confirmed onset, bounded utterances.
 
