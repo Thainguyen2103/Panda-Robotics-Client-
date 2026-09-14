@@ -12,7 +12,7 @@ from groq import AsyncGroq
 import webrtcvad
 
 from config import settings
-from server.voice_core import (Segmenter, wake_tail, possible_moon_miss,
+from server.voice_core import (Segmenter, wake_tail, should_verify_wake,
                                reliable_transcript, RATE, FRAME_BYTES)
 
 
@@ -148,13 +148,19 @@ class Session:
             self.busy = True
             start = time.monotonic()
             try:
-                await self.emit('processing')
+                # A question may already be queued while the preceding Moon clip
+                # is still being transcribed over the network.
+                question_context = self.listening
+                await self.emit('processing',phase='question' if question_context else 'wake')
                 text = await self.transcribe(clip)
                 # Whisper vi often writes the English name as Mun/Mùn/Muôn or
                 # returns blank. Verify only those narrow cases with an English
                 # pass; common Vietnamese words muốn/môn/món never enter here.
                 if (not self.engine and not captured_while_listening
-                        and wake_tail(text) is None and possible_moon_miss(text)):
+                        and not question_context and wake_tail(text) is None
+                        and should_verify_wake(text,len(clip)/32,
+                            settings.VOICE_WAKE_VERIFY_MAX_SEC,
+                            settings.VOICE_WAKE_VERIFY_MAX_WORDS)):
                     await self.emit('verifying_wake', text=text)
                     verified = await self.verify_wake(clip)
                     if wake_tail(verified) is not None:
@@ -162,15 +168,16 @@ class Session:
                 self.sequence += 1
                 # Unrelated standby ASR is diagnostic, not a user's question.
                 tail = wake_tail(text) if not self.engine else None
-                accepted = ((captured_while_listening and self.listening)
+                question_clip = captured_while_listening or question_context
+                accepted = ((question_clip and self.listening)
                             or (tail is not None and not self.listening))
                 await self.emit('transcript' if accepted else 'ignored', text=text, sequence=self.sequence,
                                 latency_ms=round((time.monotonic()-start)*1000),
                                 duration_ms=round(len(clip)/32))
                 if not text:
                     await self.emit('rejected', text='Không có lời nói đủ tin cậy trong đoạn âm thanh.')
-                elif captured_while_listening and self.listening:
-                    await self.emit('question', text=text)
+                elif question_clip and self.listening:
+                    await self.emit('question', text=tail if tail else text)
                     self.listening = False
                 elif tail is not None and not self.listening:
                     await self.wake()

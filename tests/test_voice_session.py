@@ -87,11 +87,14 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
             await worker
         return session, socket.messages
 
-    async def test_clip_captured_before_wake_result_is_not_a_question(self):
+    async def test_question_spoken_while_wake_stt_is_pending_is_preserved(self):
         session, messages = await self.run_clips(['Moon ơi', 'Tôi muốn học tiếng Anh.'])
-        self.assertFalse(any(m['event'] == 'question' for m in messages))
+        self.assertEqual([m['text'] for m in messages if m['event'] == 'question'],
+                         ['Tôi muốn học tiếng Anh.'])
         self.assertEqual(sum(m['event'] == 'wake' for m in messages), 1)
-        self.assertTrue(session.listening)
+        self.assertFalse(session.listening)
+        phases=[m.get('phase') for m in messages if m['event']=='processing']
+        self.assertEqual(phases,['wake','question'])
 
     async def test_clip_captured_after_wake_is_the_question(self):
         session, messages = await self.run_clips(

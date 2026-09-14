@@ -49,6 +49,21 @@ def possible_moon_miss(text):
     }
 
 
+def should_verify_wake(text, duration_ms, max_sec=3.0, max_words=3):
+    """Request English confirmation for a short possible wake utterance.
+
+    Confirmation still requires the complete token Moon. Common Vietnamese
+    near-homophones are protected from the extra network request.
+    """
+    if possible_moon_miss(text):
+        return True
+    normalized = unicodedata.normalize("NFC",text or "").casefold()
+    words = re.findall(r"\w+",normalized,flags=re.UNICODE)
+    protected = {"muốn","môn","món"}
+    return (0 < len(words) <= max_words and duration_ms <= max_sec*1000
+            and not protected.intersection(words))
+
+
 class Segmenter:
     """30ms PCM frames; short pre-roll, confirmed onset, bounded utterances.
 
