@@ -164,8 +164,8 @@ def _normalize_tts_text(text: str) -> str:
     return _re.sub(r"\d+", lambda m: _num2vi(int(m.group(0))), text)
 
 # Cờ toàn cục: True trong lúc loa đang phát TTS.
-# voice.py dùng cờ này để KHÔNG thu âm thanh loa của chính Panda
-# (tránh vòng lặp tự kích hoạt: Panda nghe thấy chữ "Panda" trong câu chào của mình).
+# voice.py dùng cờ này để KHÔNG thu âm thanh loa của chính Moon
+# (tránh vòng lặp tự kích hoạt: Moon nghe thấy chữ "Moon" trong câu chào của mình).
 _speaking_event = threading.Event()
 _speech_end_t = 0.0   # mốc thời gian lần phát cuối kết thúc (echo guard cho clip browser)
 
@@ -199,12 +199,12 @@ def _play_blips(seq):
 
 
 def play_beep():
-    """Bíp kép tăng dần khi nhận wake-word — 'Panda nghe thấy bạn!'."""
+    """Bíp kép tăng dần khi nhận wake-word — 'Moon nghe thấy bạn!'."""
     _play_blips([(880, 0.09), (1320, 0.12)])
 
 
 def play_tick():
-    """Tick ngắn ngay trước khi Panda bắt đầu nói."""
+    """Tick ngắn ngay trước khi Moon bắt đầu nói."""
     _play_blips([(2000, 0.045)])
 
 
@@ -226,9 +226,9 @@ def _play_mp3_bytes(mp3_bytes: bytes) -> bool:
         winmm = ctypes.windll.winmm
 
         # Mở file bằng MCI
-        open_cmd  = f'open "{tmp_path}" type mpegvideo alias pandatts'
-        play_cmd  = 'play pandatts wait'       # wait = đồng bộ, chờ xong
-        close_cmd = 'close pandatts'
+        open_cmd  = f'open "{tmp_path}" type mpegvideo alias moontts'
+        play_cmd  = 'play moontts wait'       # wait = đồng bộ, chờ xong
+        close_cmd = 'close moontts'
 
         ret = winmm.mciSendStringW(open_cmd,  None, 0, None)
         if ret != 0:
@@ -276,7 +276,7 @@ def _stop_mci_playback():
     """Ngắt phát MCI đang chạy (dùng cho barge-in / stop pipeline)."""
     try:
         import ctypes
-        ctypes.windll.winmm.mciSendStringW("stop pandatts", None, 0, None)
+        ctypes.windll.winmm.mciSendStringW("stop moontts", None, 0, None)
     except Exception:
         pass
 
@@ -413,6 +413,7 @@ class SentencePlayer:
 
     def _play_worker(self):
         """Phát tuần tự các câu đã tổng hợp."""
+        global _speech_end_t
         first = True
         try:
             with _tts_lock:
@@ -471,6 +472,6 @@ class SentencePlayer:
 # ─── Test ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print("=== Test TTS Module ===")
-    speak("Xin chào! Mình là Panda, rất vui được gặp bạn!")
+    speak("Xin chào! Mình là Moon, rất vui được gặp bạn!")
     time.sleep(0.5)
     speak("Bạn có khỏe không?")

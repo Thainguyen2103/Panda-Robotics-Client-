@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   Panda Dashboard — Premium UI
+   Moon Dashboard — Premium UI
    Font: Inter (Google Fonts)
    Theme: Dark glassmorphism, cyan accent
 ═══════════════════════════════════════════════════════════════════════════ */
@@ -588,7 +588,7 @@ button:active { transform: translateY(0); }
     text-transform: uppercase; letter-spacing: 1px;
     margin-bottom: 12px;
 }
-.panda-icon-h3 { font-size: 16px; }
+.moon-icon-h3 { font-size: 16px; }
 
 .ai-chat-panel {
     background: linear-gradient(160deg, #0d1117, #10151e);
@@ -650,9 +650,9 @@ button:active { transform: translateY(0); }
 .user-bubble .bubble-label { color: #58a6ff; }
 .user-bubble .bubble-text  { color: #cdd9e5; }
 
-.panda-bubble { background: rgba(162,155,254,0.07); border: 1px solid rgba(162,155,254,0.18); }
-.panda-bubble .bubble-label { color: var(--purple); }
-.panda-bubble .bubble-text  { color: #e2defe; }
+.moon-bubble { background: rgba(162,155,254,0.07); border: 1px solid rgba(162,155,254,0.18); }
+.moon-bubble .bubble-label { color: var(--purple); }
+.moon-bubble .bubble-text  { color: #e2defe; }
 
 .bubble-cursor {
     display: inline; color: var(--purple);
@@ -894,8 +894,15 @@ button:active { transform: translateY(0); }
    MODE 2: hearing — hiển thị transcript text
    Triggered: nhận transcript từ Groq
 ═══════════════════════════════════════════════════════════════════════════ */
-.oled-face.hearing .oled-eyes { opacity: 0; }
-.oled-face.hearing .oled-text { opacity: 1; }
+.oled-face.hearing .oled-eyes,
+.oled-face.answering .oled-eyes { opacity: 0; }
+.oled-face.hearing .oled-text,
+.oled-face.answering .oled-text { opacity: 1; }
+
+.oled-face.answering .oled-text {
+    color: var(--accent);
+    text-shadow: 0 0 3px var(--accent-glow);
+}
 
 /* Border pulse xanh lá khi đang nghe */
 .oled-face.hearing {
@@ -1157,3 +1164,39 @@ button:active { transform: translateY(0); }
     0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.5); }
     50%      { box-shadow: 0 0 0 8px rgba(255, 71, 87, 0); }
 }
+
+/* Voice controls inside the existing Moon panel. */
+.voice-controls { min-width: 0; padding-top: 12px; }
+.voice-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.voice-buttons .btn-browser-mic { flex: 1 1 120px; margin: 4px 0; }
+.voice-controls select { max-width: 100%; width: 100%; padding: 10px; background: #182233; color: #e2e8f0; border: 1px solid #475569; border-radius: 8px; }
+.voice-controls p { margin: 10px 0; font-size: 13px; overflow-wrap: anywhere; }
+.voice-controls meter { width: 55%; }
+#voice-state { color: #86efac; font-weight: 600; }
+#voice-error { color: #fca5a5; }
+#voice-log { max-height: 260px; overflow: auto; padding-left: 24px; font-size: 12px; }
+#voice-log li { padding: 8px 0; overflow-wrap: anywhere; }
+.voice-controls button:disabled { opacity: .5; cursor: default; }
+
+/* Static, scrollable transcript: never translate the entire OLED text layer. */
+.oled-face.hearing .oled-text,
+.oled-face.answering .oled-text {
+    display: block;
+    padding: 14px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    overflow-y: auto;
+    overflow-x: hidden;
+    pointer-events: auto;
+    animation: none;
+    transform: none;
+    text-shadow: 0 0 3px var(--accent-glow);
+    font-family: system-ui, sans-serif;
+    line-height: 1.5;
+}
+.oled-face.hearing .oled-text::before,
+.oled-face.hearing .oled-text::after,
+.oled-face.answering .oled-text::before,
+.oled-face.answering .oled-text::after { content: none; }
+.oled-face.hearing,
+.oled-face.answering { animation: none; }

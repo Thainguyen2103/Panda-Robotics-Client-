@@ -5,6 +5,7 @@ __pycache__/
 server/venv/
 venv/
 .voice-venv/
+*.ppn
 
 # ═══ Node ═══
 web/node_modules/

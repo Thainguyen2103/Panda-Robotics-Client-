@@ -1,4 +1,4 @@
-# Computer vision cho Panda
+# Computer vision cho Moon
 
 > Bản mở rộng hiện tại (08/09/2026): xem [hướng dẫn tín hiệu mới](vision-signals.md)
 > cho bàn tay 21 mốc, tổ hợp cử chỉ, hướng nhìn/mắt, khoảng cách, đồ vật và điểm biểu cảm liên tục.
@@ -81,7 +81,7 @@ trạng thái, danh tính, biểu cảm, cử chỉ đầu/tay và thời gian x
 phát lệnh motor theo cử chỉ. Cơ chế chào khi thấy người có sẵn của brain vẫn hoạt động.
 
 `panda/camera` là ảnh JPEG base64 **đầu ra** dành cho dashboard; không phải topic
-nhận ảnh từ ESP32. Camera mạng dùng URL qua `PANDA_CAMERA_SOURCE`.
+nhận ảnh từ ESP32. Camera mạng dùng URL qua `MOON_CAMERA_SOURCE`.
 
 ## Chạy và kiểm tra
 
@@ -101,7 +101,7 @@ Từ thư mục gốc `C:\PBL4`, dùng môi trường Python sẵn có của d�
 .\start.bat
 
 # Dùng camera mạng: thay bằng địa chỉ thiết bị của bạn
-$env:PANDA_CAMERA_SOURCE = 'http://<dia-chi-esp32>:81/stream'
+$env:MOON_CAMERA_SOURCE = 'http://<dia-chi-esp32>:81/stream'
 .\server\venv\Scripts\python.exe -m server.vision
 
 # Kiểm thử logic và lỗi

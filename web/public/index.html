@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Panda Robot Dashboard — điều khiển và giám sát robot Panda thời gian thực">
-    <title>Panda Dashboard</title>
+    <meta name="description" content="Moon Robot Dashboard — điều khiển và giám sát robot Moon thời gian thực">
+    <title>Moon Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
             <div class="header-left">
                 <div class="logo">🐼</div>
                 <div>
-                    <h1>Panda <span>Dashboard</span></h1>
+                    <h1>Moon <span>Dashboard</span></h1>
                     <p class="header-subtitle">Robot Intelligence System</p>
                 </div>
             </div>
@@ -174,25 +174,25 @@
                     </div>
                 </div>
 
-                <!-- Voice Transcript box đã được tích hợp trực tiếp lên OLED Face và Panda AI Chat -->
+                <!-- Voice Transcript box đã được tích hợp trực tiếp lên OLED Face và Moon AI Chat -->
 
 
-                <!-- ✨ PANDA AI CHAT PANEL (NEW) -->
+                <!-- ✨ MOON AI CHAT PANEL (NEW) -->
                 <div class="visual-group ai-chat-group">
-                    <h3><span class="panda-icon-h3">🐼</span> Panda AI</h3>
+                    <h3><span class="moon-icon-h3">🐼</span> Moon Voice</h3>
 
                     <div class="ai-chat-panel" id="ai-chat-panel">
 
                         <!-- Trạng thái mặc định: chờ wake-word -->
                         <div class="ai-idle-hint" id="ai-idle-hint">
                             <div class="ai-idle-icon">🎙️</div>
-                            <p>Nói <strong>"Panda..."</strong> để bắt đầu hội thoại</p>
-                            <p class="ai-idle-sub">Sau 3 giây im lặng, Panda sẽ trả lời</p>
+                            <p>Nói <strong>"Moon..."</strong> để kiểm tra giọng nói</p>
+                            <p class="ai-idle-sub">Bật mic web để test STT; khi mic web tắt, theo dõi hội thoại từ Brain.</p>
                         </div>
 
                         <!-- Bubble câu hỏi người dùng -->
                         <div class="ai-bubble user-bubble" id="ai-user-bubble" style="display:none">
-                            <div class="bubble-label"><i data-lucide="user"></i> Bạn hỏi</div>
+                            <div class="bubble-label"><i data-lucide="user"></i> Bạn đã nói</div>
                             <div class="bubble-text" id="ai-user-text"></div>
                         </div>
 
@@ -201,32 +201,39 @@
                             <div class="thinking-dots">
                                 <span></span><span></span><span></span>
                             </div>
-                            <span class="thinking-label" id="ai-thinking-label">Panda đang suy nghĩ...</span>
+                            <span class="thinking-label" id="ai-thinking-label">Moon đang suy nghĩ...</span>
                         </div>
 
-                        <!-- Bubble câu trả lời Panda -->
-                        <div class="ai-bubble panda-bubble" id="ai-panda-bubble" style="display:none">
-                            <div class="bubble-label"><span>🐼</span> Panda trả lời</div>
-                            <div class="bubble-text" id="ai-panda-text"></div>
+                        <!-- Bubble câu trả lời Moon -->
+                        <div class="ai-bubble moon-bubble" id="ai-moon-bubble" style="display:none">
+                            <div class="bubble-label"><span>🐼</span> Moon trả lời</div>
+                            <div class="bubble-text" id="ai-moon-text"></div>
                             <div class="bubble-cursor" id="ai-cursor">▋</div>
                         </div>
 
                     </div>
 
-                    <!-- Browser push-to-talk: dùng mic của trình duyệt (cùng mic Google Translate) -->
-                    <button class="btn-browser-mic" id="mic-btn" onclick="toggleBrowserMic()">
-                        🎤 Nói qua trình duyệt
-                    </button>
-
-                    <!-- Live mic: nghe liên tục với DSP AEC+NS+AGC kiểu Google Dịch -->
-                    <button class="btn-browser-mic" id="mic-live-btn" onclick="toggleLiveMic()">
-                        🎙️ Nghe liên tục qua trình duyệt
-                    </button>
-
-                    <!-- History button -->
-                    <button class="btn-clear-history" id="btn-clear-history" onclick="clearAiHistory()">
-                        <i data-lucide="trash-2"></i> Xóa lịch sử
-                    </button>
+                    <div class="voice-controls" id="dashboard-voice" data-endpoint="/voice/ws">
+                        <div class="voice-buttons">
+                            <button class="btn-browser-mic" id="voice-start">🎙️ Bật microphone</button>
+                            <button class="btn-browser-mic" id="voice-stop" disabled>Dừng mic</button>
+                            <button class="btn-browser-mic" id="voice-test-sound">Thử tiếng tick</button>
+                        </div>
+                        <select id="voice-device" aria-label="Microphone"><option value="">Microphone mặc định</option></select>
+                        <p id="voice-display-source">Nguồn hiển thị: Brain qua MQTT (nếu đang chạy)</p>
+                        <p id="voice-state" role="status">Chưa bật mic</p>
+                        <meter id="voice-level" min="0" max="0.15" value="0" aria-label="Mức microphone"></meter>
+                        <span id="voice-speech"></span>
+                        <p id="voice-noise">Giữ im lặng 1.8 giây khi bật mic để đo tiếng nền.</p>
+                        <p id="voice-wake">Đã bắt wakeword: 0 lần</p>
+                        <p id="voice-engine">Âm thanh được gửi tới Groq để nhận diện; không qua Brain/LLM.</p>
+                        <p id="voice-error" role="alert"></p>
+                        <details><summary>Chẩn đoán Voice và transcript nguyên văn</summary>
+                            <p id="voice-diagnostic"></p>
+                            <button class="btn-clear-history" id="voice-clear">Xóa nhật ký Voice</button>
+                            <ol id="voice-log" reversed></ol>
+                        </details>
+                    </div>
                 </div>
             </section>
 
@@ -266,8 +273,9 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="vision-ui.js?v=20260914d"></script>
-    <script src="app.js?v=20260914d"></script>
+    <script src="vision-ui.js?v=20260914e"></script>
+    <script src="app.js?v=20260914e"></script>
+    <script src="voice-panel.js?v=20260914e"></script>
     <script>
         lucide.createIcons();
     </script>

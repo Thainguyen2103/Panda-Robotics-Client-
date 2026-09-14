@@ -1,9 +1,9 @@
 """
 Wake-word engine kiểu Anki Vector — server/wakeword.py
 =======================================================
-Bắt từ khóa "Panda" BẰNG ÂM HỌC trên thiết bị (Porcupine), KHÔNG đi qua ASR:
+Bắt từ khóa "Moon" BẰNG ÂM HỌC trên thiết bị (Porcupine), KHÔNG đi qua ASR:
   - Không phụ thuộc ngôn ngữ câu nói xung quanh (Việt/Anh/trộn đều được)
-  - Không bị Whisper Việt-hóa "Panda" thành "bạn nàng"/"Anna"
+  - Không bị Whisper Việt-hóa "Moon" thành "bạn nàng"/"Anna"
   - Độ trễ ~10ms, CPU không đáng kể
 
 Phần nhận diện câu hỏi SAU wake-word vẫn gửi cloud (Groq Whisper) — đúng
@@ -12,12 +12,12 @@ kiến trúc của Vector: KWS local + ASR cloud.
 Kích hoạt (một lần):
   1. pip install pvporcupine
   2. Tạo tài khoản miễn phí tại https://console.picovoice.ai/ → copy AccessKey
-  3. Console → Porcupine → "Create Keyword" → gõ "Panda" → tải file .ppn
-     (chọn nền tảng Windows x86_64) → lưu vào server/panda.ppn
+  3. Console → Porcupine → "Create Keyword" → gõ "Moon" → tải file .ppn
+     (chọn nền tảng Windows x86_64) → lưu vào server/moon.ppn
   4. Điền PICOVOICE_ACCESS_KEY trong config/settings.py
   5. Khởi động lại hệ thống.
 
-Khi chưa cấu hình: brain tự fallback về wake-word Whisper dual-pass (vi+en).
+Khi chưa cấu hình: fallback Whisper một lượt; xem docs/voice.md để test độc lập.
 """
 
 import os
@@ -42,8 +42,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import settings
 
 ACCESS_KEY = getattr(settings, "PICOVOICE_ACCESS_KEY", "")
-PPN_PATH = getattr(settings, "PANDA_PPN_PATH", "") or \
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "panda.ppn")
+PPN_PATH = getattr(settings, "MOON_PPN_PATH", "") or \
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "moon.ppn")
 
 _porcupine = None
 _init_tried = False
@@ -76,12 +76,12 @@ def available() -> bool:
         return False
 
 
-def run_loop(on_wake, should_listen=None):
+def run_loop(on_wake, should_listen=None, stop_event=None):
     """
     Vòng lặp bắt wake-word on-device (block — chạy trong thread riêng).
 
     Args:
-        on_wake:        callback không tham số, gọi khi nghe thấy "Panda".
+        on_wake:        callback không tham số, gọi khi nghe thấy "Moon".
         should_listen:  callback trả về False để tạm ngưng (khi AI đang bận).
     """
     if not available():
@@ -92,32 +92,44 @@ def run_loop(on_wake, should_listen=None):
     from server import tts
 
     h = _porcupine
-    q = queue.Queue()
-
-    def _cb(indata, frames, t, status):
-        q.put(bytes(indata))
-
-    print("🔔 [WAKEWORD] Porcupine đang nghe 'Panda' (on-device, mọi ngôn ngữ)...")
+    print("🔔 [WAKEWORD] Porcupine đang nghe 'Moon' (on-device, mọi ngôn ngữ)...")
     last_trigger = 0.0
 
-    with sd.InputStream(samplerate=h.sample_rate, channels=1, dtype="int16",
-                        device=None, blocksize=h.frame_length, callback=_cb):
-        while True:
+    stopping = lambda: stop_event is not None and stop_event.is_set()
+    while not stopping():
+        # Quan trọng: không giữ InputStream mở khi Brain đang thu câu hỏi
+        # hoặc phát TTS. Windows không ổn định khi hai stream cùng tranh mic.
+        if (should_listen and not should_listen()) or tts.is_speaking():
+            time.sleep(0.1)
+            continue
+
+        q = queue.Queue()
+
+        def _cb(indata, frames, t, status):
+            q.put(bytes(indata))
+
+        detected = False
+        with sd.InputStream(samplerate=h.sample_rate, channels=1, dtype="int16",
+                            device=None, blocksize=h.frame_length, callback=_cb):
+            while (not should_listen or should_listen()) \
+                    and not tts.is_speaking() and not stopping():
+                try:
+                    data = q.get(timeout=0.25)
+                except queue.Empty:
+                    continue
+
+                keyword_index = h.process(np.frombuffer(data, dtype=np.int16))
+                if keyword_index >= 0:
+                    now = time.time()
+                    if now - last_trigger > 1.5:   # debounce 1.5s
+                        last_trigger = now
+                        detected = True
+                        print("🔔 [WAKEWORD] Porcupine bắt được 'Moon'!")
+                        break
+
+        # Stream đã đóng trước khi pipeline mở mic để nghe câu hỏi.
+        if detected and not stopping():
             try:
-                data = q.get(timeout=2.0)
-            except queue.Empty:
-                continue
-
-            # Chống tự kích: bỏ qua khi loa Panda đang phát ("...Mình là Panda!")
-            if tts.is_speaking():
-                continue
-            if should_listen and not should_listen():
-                continue
-
-            keyword_index = h.process(np.frombuffer(data, dtype=np.int16))
-            if keyword_index >= 0:
-                now = time.time()
-                if now - last_trigger > 1.5:   # debounce 1.5s
-                    last_trigger = now
-                    print("🔔 [WAKEWORD] Porcupine bắt được 'Panda'!")
-                    on_wake()
+                on_wake()
+            except Exception as e:
+                print(f"❌ [WAKEWORD] Lỗi callback wake: {e}")

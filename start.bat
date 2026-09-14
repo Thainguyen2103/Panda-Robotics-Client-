@@ -1,7 +1,7 @@
 @echo off
-title Panda System
+title Moon System
 echo ===================================
-echo     KHOI DONG DU AN PANDA
+echo     KHOI DONG DU AN MOON
 echo ===================================
 echo.
 echo Luu y: Tat ca log se duoc gop chung vao cua so nay.

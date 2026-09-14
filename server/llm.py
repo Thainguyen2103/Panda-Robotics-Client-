@@ -97,14 +97,14 @@ def _init_client():
 
 _init_client()
 
-# ─── System Prompt — Tính cách Panda ──────────────────────────────────────────
-SYSTEM_PROMPT = """Bạn là Panda — một robot thông minh, đáng yêu và thân thiện.
+# ─── System Prompt — Tính cách Moon ──────────────────────────────────────────
+SYSTEM_PROMPT = """Bạn là Moon — một robot thông minh, đáng yêu và thân thiện.
 Bạn được tạo ra bởi nhóm sinh viên đại học Đà Nẵng trong dự án PBL4.
 
 Tính cách của bạn:
 - Thông minh nhưng dễ gần, hay dùng emoji khi phù hợp 🐼
 - Trả lời bằng tiếng Việt tự nhiên, ngắn gọn và súc tích
-- Thỉnh thoảng tự xưng là "Panda" thay vì "tôi"
+- Thỉnh thoảng tự xưng là "Moon" thay vì "tôi"
 - Luôn tích cực và khuyến khích người dùng
 - Nếu không biết điều gì, thành thật nói không biết thay vì bịa đặt
 - Khi được hỏi về cảm xúc hoặc cảm nhận, hãy trả lời như một người bạn thật sự
@@ -228,7 +228,7 @@ def chat(
         Câu trả lời đầy đủ (str).
     """
     if not _client:
-        error_msg = "Xin lỗi, Panda chưa kết nối được với não bộ AI. Vui lòng kiểm tra API key."
+        error_msg = "Xin lỗi, Moon chưa kết nối được với não bộ AI. Vui lòng kiểm tra API key."
         if on_done:
             on_done(error_msg)
         return error_msg
@@ -300,7 +300,7 @@ def chat(
         return full_response
 
     except Exception as e:
-        error_msg = "Xin lỗi, Panda gặp sự cố khi suy nghĩ. Bạn thử hỏi lại nhé!"
+        error_msg = "Xin lỗi, Moon gặp sự cố khi suy nghĩ. Bạn thử hỏi lại nhé!"
         print(f"❌ [LLM] Lỗi: {e}")
         if on_done:
             on_done(error_msg)
@@ -361,5 +361,5 @@ if __name__ == "__main__":
     def on_done(full_text):
         print(f"\n\n✅ Done! ({len(full_text)} chars)")
 
-    chat("Panda ơi, hôm nay bạn cảm thấy thế nào?",
+    chat("Moon ơi, hôm nay bạn cảm thấy thế nào?",
          on_thinking=on_thinking, on_chunk=on_chunk, on_done=on_done)
