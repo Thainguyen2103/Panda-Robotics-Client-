@@ -437,6 +437,7 @@ socket.on('mqtt_message', (data) => {
     // ── Camera feed ───────────────────────────────────────────────────────────
     } else if (topic === 'panda/camera') {
         lastCameraFrame = Date.now();
+        visionPanel.cameraFrame();
         const camImg         = document.getElementById('cam-image');
         const camPlaceholder = document.getElementById('cam-placeholder');
         camImg.src           = "data:image/jpeg;base64," + payload;

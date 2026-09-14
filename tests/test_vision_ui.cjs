@@ -29,6 +29,8 @@ assert.equal(elements.get('cv-emotion').textContent,'Buồn (45%)\nGiận (30%)\
 now=11750;panel.tick();
 assert.equal(elements.get('cv-health').textContent,'Mất kết nối Vision');
 assert.equal(elements.get('cv-identity').textContent,'Chưa rõ');
+panel.cameraFrame();panel.tick();
+assert.equal(elements.get('cv-health').textContent,'Camera còn hình · AI đang xử lý');
 console.log('Vision UI: smoothing, event hold, uncertainty expiry and disconnection passed');
 send({actions:[{channel:'head',label:'head_shake'},{channel:'arms',label:'hand_raised'},{channel:'left_hand',label:'victory'},{channel:'right_hand',label:'thumbs_up'}],emotion_probs:{happy:.82,sad:.15},expression_intensities:{fear:.6},eyes:{state:'open',gaze:'toward_camera',blink_rate_per_min:12},distance:{cm:61,source:'assumed_fov'}},12000);
 assert.equal(elements.get('cv-head').textContent,'Lắc đầu');

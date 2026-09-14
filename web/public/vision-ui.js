@@ -5,11 +5,13 @@ class VisionPanel {
         this.now = now;
         this.status = null;
         this.received = 0;
+        this.cameraReceived = 0;
         this.fields = new Map();
         this.events = new Map();
         this.objects = new Map();
         this.hands = new Map();
     }
+    cameraFrame() { this.cameraReceived = this.now(); }
     receive(status) {
         this.status = status;
         this.received = this.now();
@@ -57,13 +59,14 @@ class VisionPanel {
         if (!this.status) return;
         const s = this.status;
         const stale = this.now() - this.received > 4000;
+        const cameraFresh = this.cameraReceived > 0 && this.now()-this.cameraReceived <= 3000;
         const offline = stale || ['camera_unavailable', 'inference_stale'].includes(s.status);
         if (stale) {
             this.fields.clear();
             this.events.clear();
             this.objects.clear();
             this.hands.clear();
-            this.text('cv-health', 'Mất kết nối Vision');
+            this.text('cv-health',cameraFresh ? 'Camera còn hình · AI đang xử lý' : 'Mất kết nối Vision');
             for (const id of ['cv-identity','cv-emotion','cv-action','cv-joints','cv-cues','cv-head','cv-arms','cv-left-hand','cv-right-hand','cv-gaze','cv-eyes','cv-blinks','cv-distance','cv-objects']) this.text(id,'Chưa rõ');
             this.meters({});
             return;
