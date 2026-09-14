@@ -8,6 +8,7 @@ class VisionPanel {
         this.fields = new Map();
         this.events = new Map();
         this.objects = new Map();
+        this.hands = new Map();
     }
     receive(status) {
         this.status = status;
@@ -16,6 +17,10 @@ class VisionPanel {
         const actions = status.actions || [{channel:'head',label:status.head_action},{channel:'arms',label:status.arm_action}];
         for (const item of actions) {
             if (item.label && item.label !== 'unknown') this.events.set(item.channel,{text:VisionPanel.labels[item.label] || item.label,time:this.received});
+        }
+        for (const hand of status.hands || []) {
+            if (!['left','right'].includes(hand.side)) continue;
+            this.hands.set(hand.side,{...hand,time:this.received});
         }
         const detected = new Map();
         for (const object of status.objects || []) {
@@ -57,6 +62,7 @@ class VisionPanel {
             this.fields.clear();
             this.events.clear();
             this.objects.clear();
+            this.hands.clear();
             this.text('cv-health', 'Mất kết nối Vision');
             for (const id of ['cv-identity','cv-emotion','cv-action','cv-joints','cv-cues','cv-head','cv-arms','cv-left-hand','cv-right-hand','cv-gaze','cv-eyes','cv-blinks','cv-distance','cv-objects']) this.text(id,'Chưa rõ');
             this.meters({});
@@ -87,7 +93,18 @@ class VisionPanel {
         this.text('cv-action',active.length ? active.map(event=>event.text).join(' · ') : 'Chưa rõ');
         for (const [channel,id] of [['head','cv-head'],['arms','cv-arms'],['left_hand','cv-left-hand'],['right_hand','cv-right-hand']]) {
             const event = this.events.get(channel);
-            this.text(id,event && this.now()-event.time<1800 ? event.text : 'Chưa rõ');
+            let text = event && this.now()-event.time<1800 ? event.text : 'Chưa rõ';
+            if (channel.endsWith('_hand') && text === 'Chưa rõ') {
+                const hand = this.hands.get(channel.split('_')[0]);
+                if (hand && this.now()-hand.time < 1500) {
+                    const candidate = hand.gesture_candidate && hand.gesture_candidate !== 'unknown'
+                        ? VisionPanel.labels[hand.gesture_candidate] : null;
+                    const confidence = Number.isFinite(hand.confidence) ? ` · ${Math.round(hand.confidence*100)}%` : '';
+                    const fingers = Number.isFinite(hand.extended_fingers) ? ` · ${hand.extended_fingers} ngón duỗi` : '';
+                    text = candidate ? `Đang xác nhận: ${candidate}${confidence}` : `Đã thấy bàn tay${fingers}${confidence}`;
+                }
+            }
+            this.text(id,text);
         }
         const count = offline ? 0 : Object.values(s.upper_body_joints || {}).filter(j=>j.visible).length;
         this.stable('cv-joints',`${count}/6 khớp`,count === 0,750);

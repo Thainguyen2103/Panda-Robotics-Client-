@@ -56,4 +56,8 @@ now=20750;panel.tick();
 assert.notEqual(elements.get('cv-objects').textContent,'Chưa thấy','a brief detection remains visible for three seconds');
 now=21250;panel.tick();
 assert.equal(elements.get('cv-objects').textContent,'Chưa thấy');
+send({hands:[{side:'left',gesture:'unknown',gesture_candidate:'open_palm',extended_fingers:4,confidence:.91,associated:false}]},21500);
+assert.equal(elements.get('cv-left-hand').textContent,'Đang xác nhận: Xòe bàn tay · 91%');
+send({hands:[{side:'right',gesture:'unknown',gesture_candidate:'unknown',extended_fingers:2,confidence:.77,associated:false}]},21750);
+assert.equal(elements.get('cv-right-hand').textContent,'Đã thấy bàn tay · 2 ngón duỗi · 77%');
 console.log('Vision UI: expanded gesture and object labels passed');
