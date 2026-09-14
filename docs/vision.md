@@ -5,8 +5,9 @@
 
 ## Phạm vi hiện tại
 
-Một người đứng/ngồi đối diện camera; khung hình thấy mặt, hai vai và cổ tay khi
-vẫy chào. Không cần nhìn thấy chân. Chọn khuôn mặt đang theo dõi bằng độ chồng
+Một người đứng/ngồi đối diện camera; không cần nhìn thấy chân hoặc đủ cả hai vai.
+Một cánh tay vẫn có thể nhận diện nếu thấy vai và cổ tay tương ứng; cử chỉ ngón
+tay có thể ghép với vùng người suy ra từ khuôn mặt khi pose thân bị cắt. Chọn khuôn mặt đang theo dõi bằng độ chồng
 lấp, ưu tiên mặt lớn nhất khi bắt đầu; ghép phần thân chứa tâm mặt đó.
 Đây là theo dõi hình học đơn giản, chưa phải định danh nhiều người khi họ đi
 chéo nhau hoặc che khuất nhau.
@@ -19,9 +20,14 @@ chéo nhau hoặc che khuất nhau.
 | Vẫy tay | YOLOv8n-pose, cổ tay ở trên vai và có chuyển động đi–về, ưu tiên đo tương đối với khuỷu tay | Cần cổ tay trong hình; cử động ngón tay riêng chưa hỗ trợ |
 | Giơ tay | Cổ tay cao hơn vai qua nhiều lần đo | Một hoặc hai tay |
 | Gật/lắc đầu | Góc pitch/yaw từ ma trận mặt MediaPipe, lọc rung và kiểm tra xoay đi–về | Ngưỡng thử nghiệm 8°/10°, cần hiệu chỉnh bằng video demo thật |
+| Tư thế đầu | Giữ ổn định góc roll/yaw/pitch để nhận nghiêng, quay, nhìn lên/xuống | Cần giữ khoảng 0,25 giây; trái/phải tính theo người trong ảnh |
+| Tư thế cánh tay | Giơ, duỗi ngang, khoanh tay, chống hông từ vai/khuỷu/cổ tay còn nhìn thấy | Cử chỉ hai tay vẫn cần thấy đủ hai bên |
+| Cử chỉ ngón | MediaPipe 21 mốc: V, like, lòng bàn tay, chỉ, nắm, OK, chụm ngón, 3/4 ngón, rock, shaka | Bàn tay che khuất hoặc quá nhỏ có thể trả `unknown` |
 
-Nhãn hành động: `waving`, `hand_raised`, `both_hands_up`, `head_nod`, `head_shake`,
-`unknown`. Cử chỉ đầu được giữ 0,7 giây ở backend; dashboard giữ sự kiện tối đa
+Nhãn hành động gồm `waving`, `hand_raised`, `both_hands_up`, `arm_out`,
+`arms_out`, `arms_crossed`, `hand_on_hip`, `hands_on_hips`, `head_nod`,
+`head_shake`, `head_tilt_left/right`, `head_turn_left/right`, `head_up/down`
+và các cử chỉ ngón tay kể trên. Cử chỉ đầu được giữ 0,7 giây ở backend; dashboard giữ sự kiện tối đa
 1,8 giây để đọc. Một lần quay một hướng không đủ để kích hoạt. MediaPipe tạo
 mốc mặt chi tiết và ma trận biến đổi; gật/lắc dựa trên góc đầu, không phụ thuộc
 chỉ vào tỷ lệ mũi–miệng như bản trước. Nếu thiếu mô hình mới, hệ thống báo lỗi
@@ -159,9 +165,9 @@ giữa các mẫu rồi mới thay file. Khởi động lại vision để nạp
 ## Kịch bản kiểm tra demo
 
 1. Để mặt và vai trong hình, đứng yên 10 giây: không xuất hiện vẫy/gật/lắc.
-2. Giơ tay giữ yên: `hand_raised`, không phải `waving`.
+2. Giơ tay giữ yên: `hand_raised`, không phải `waving`; thử lại khi chỉ để một vai và tay tương ứng trong hình.
 3. Vẫy ngang rõ 2–3 nhịp, cổ tay trên vai; lặp 10 lần mỗi tay.
-4. Nhìn thẳng rồi gật xuống–lên, lắc trái–phải; lặp riêng 10 lần mỗi cử chỉ.
+4. Nhìn thẳng rồi gật xuống–lên, lắc trái–phải; sau đó giữ nghiêng trái/phải, quay trái/phải và nhìn lên/xuống ít nhất 0,5 giây.
 5. Nói chuyện, cười, quay mặt một hướng, dịch người: đếm nhận nhầm.
 6. Đưa cổ tay khỏi hình, che mặt, rời camera: kết quả phải về `unknown`.
 7. Rút/cắm camera: dashboard báo mất camera, không giữ danh tính cũ.

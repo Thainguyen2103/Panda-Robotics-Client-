@@ -41,13 +41,16 @@ MediaPipe Hand Landmarker trả tối đa 2 bàn tay, mỗi tay 21 mốc x/y/z, 
 handedness. Điểm handedness không phải độ tin cậy của từng khớp. Skeleton
 ngón tay được vẽ trên camera, song song skeleton cánh tay.
 
-Quy tắc ban đầu: `victory` (hai ngón V), `thumbs_up` (like), `open_palm`,
-`pointing`, `fist`. Cần hai lần nhận cùng nhãn trên cùng tay. Đây chưa phải
+Các quy tắc: `victory` (hai ngón V), `thumbs_up` (like), `open_palm`,
+`pointing`, `fist`, `ok_sign`, `pinch`, `three_fingers`, `four_fingers`,
+`rock_sign`, `shaka`. Cần hai lần nhận cùng nhãn trên cùng tay. Đây chưa phải
 mô hình học hành động tổng quát; một số hướng bàn tay hoặc ngón bị che sẽ
 trả `unknown`. Giơ V là cử chỉ V, không có nghĩa chắc chắn là đang chào.
 
 `hands[]`: `side`, `associated`, `confidence`, `gesture`, `landmarks`, `timestamp`.
-Ghép bàn tay với người đang theo dõi bằng cổ tay pose hoặc vùng thân. Khi
+Ghép bàn tay với người đang theo dõi bằng cổ tay pose hoặc vùng thân. Nếu pose
+thân bị cắt nhưng còn mặt, hệ thống dùng vùng mở rộng quanh mặt làm gợi ý ghép.
+Vùng này không tạo khớp cánh tay giả. Khi
 không ghép được, vẫn xuất mốc bàn tay nhưng không đưa vào hành động của người.
 Phân biệt nhiều người/che khuất/đổi tay nhanh còn có thể ghép nhầm.
 
@@ -107,10 +110,16 @@ hoặc người. Số ví dụ không phải kết quả đo camera của bạn.
 
 ## Đồ vật
 
-YOLOv8n dùng `server/yolov8n.pt`, xuất `objects[]` gồm nhãn, điểm, box chuẩn hóa,
-timestamp và `near_hands`. Ly/chai/sách/điện thoại được dịch trên dashboard.
+YOLOv8n dùng `server/yolov8n.pt`, hỗ trợ 80 lớp COCO và xuất `objects[]` gồm nhãn, điểm, box chuẩn hóa,
+timestamp và `near_hands`. Các lớp vật thể được dịch sang tiếng Việt trên dashboard.
 “Gần tay” chỉ dựa vào lân cận hình học 2D, không khẳng định đang cầm/nắm.
 Không thấy đồ vật không có nghĩa đồ vật không tồn tại.
+
+Mặc định nhánh vật thể dùng ảnh 480 px và ngưỡng 0,30 để tăng khả năng thấy vật
+nhỏ so với cấu hình 320 px/0,45 trước đây. Có thể chỉnh
+`VISION_OBJECTS_SIZE` và `VISION_OBJECTS_CONFIDENCE` trong settings. Kích thước
+lớn hơn làm tăng thời gian CPU; ngưỡng thấp hơn có thể tăng nhận nhầm. Dashboard
+đã có tên tiếng Việt cho đủ 80 lớp, trừ `person` vì người được xử lý ở kênh riêng.
 
 ## Tần suất và dữ liệu cũ
 
