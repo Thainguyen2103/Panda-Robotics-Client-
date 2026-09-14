@@ -7,6 +7,7 @@ class VisionPanel {
         this.received = 0;
         this.fields = new Map();
         this.events = new Map();
+        this.objects = new Map();
     }
     receive(status) {
         this.status = status;
@@ -15,6 +16,18 @@ class VisionPanel {
         const actions = status.actions || [{channel:'head',label:status.head_action},{channel:'arms',label:status.arm_action}];
         for (const item of actions) {
             if (item.label && item.label !== 'unknown') this.events.set(item.channel,{text:VisionPanel.labels[item.label] || item.label,time:this.received});
+        }
+        const detected = new Map();
+        for (const object of status.objects || []) {
+            if (!object?.label) continue;
+            const group = detected.get(object.label) || {count:0,confidence:0,near:false};
+            group.count += 1;
+            group.confidence = Math.max(group.confidence,Number(object.confidence) || 0);
+            group.near ||= Boolean(object.near_hands?.length);
+            detected.set(object.label,group);
+        }
+        for (const [label,object] of detected) {
+            this.objects.set(label,{...object,time:this.received});
         }
     }
     text(id, value) {
@@ -43,6 +56,7 @@ class VisionPanel {
         if (stale) {
             this.fields.clear();
             this.events.clear();
+            this.objects.clear();
             this.text('cv-health', 'Mất kết nối Vision');
             for (const id of ['cv-identity','cv-emotion','cv-action','cv-joints','cv-cues','cv-head','cv-arms','cv-left-hand','cv-right-hand','cv-gaze','cv-eyes','cv-blinks','cv-distance','cv-objects']) this.text(id,'Chưa rõ');
             this.meters({});
@@ -87,9 +101,15 @@ class VisionPanel {
         this.text('cv-blinks',eyes.blink_rate_per_min == null ? 'Đang lấy mẫu' : `~${Math.round(eyes.blink_rate_per_min)}/phút (ước lượng)`);
         const distance = offline ? {} : s.distance || {};
         this.text('cv-distance',distance.cm == null ? 'Chưa rõ' : `~${Math.round(distance.cm/5)*5} cm${distance.source==='assumed_fov'?' *':''}`);
-        const objects = offline ? [] : s.objects || [];
-        const names = [...new Set(objects.map(o=>(VisionPanel.objects[o.label] || o.label)+(o.near_hands?.length?' (gần tay)':'')))];
-        this.stable('cv-objects',names.join(', ') || 'Chưa thấy',!names.length,500);
+        for (const [label,object] of this.objects) {
+            if (offline || this.now()-object.time > 3000) this.objects.delete(label);
+        }
+        const names = [...this.objects].map(([label,object]) => {
+            const count = object.count > 1 ? ` ×${object.count}` : '';
+            const confidence = object.confidence > 0 ? ` (${Math.round(object.confidence*100)}%)` : '';
+            return `${VisionPanel.objects[label] || label}${count}${confidence}${object.near?' · gần tay':''}`;
+        });
+        this.text('cv-objects',names.join(', ') || 'Chưa thấy');
         this.meters(offline ? {} : s.emotion_probs || {},offline ? {} : s.expression_intensities || {});
     }
     emotionRanking(probs) {
@@ -126,7 +146,8 @@ VisionPanel.labels = {unknown:'Chưa rõ',neutral:'Trung tính',happy:'Vui',sad:
     hand_on_hip:'Chống một tay vào hông',hands_on_hips:'Chống hai tay vào hông',
     victory:'Hai ngón V / hello',thumbs_up:'Ngón cái / like',open_palm:'Xòe bàn tay',pointing:'Chỉ một ngón',fist:'Nắm tay',
     ok_sign:'Dấu OK',pinch:'Chụm ngón tay',three_fingers:'Ba ngón tay',four_fingers:'Bốn ngón tay',
-    rock_sign:'Dấu rock',shaka:'Dấu shaka'};
+    rock_sign:'Dấu rock',shaka:'Dấu shaka',thumbs_down:'Không thích / ngón cái xuống',
+    i_love_you:'Dấu I love you'};
 VisionPanel.objects = {
     bicycle:'Xe đạp',car:'Ô tô',motorcycle:'Xe máy',airplane:'Máy bay',bus:'Xe buýt',train:'Tàu hỏa',truck:'Xe tải',boat:'Thuyền',
     'traffic light':'Đèn giao thông','fire hydrant':'Trụ cứu hỏa','stop sign':'Biển dừng','parking meter':'Đồng hồ đỗ xe',bench:'Ghế băng',
