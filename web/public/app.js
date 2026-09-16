@@ -6,10 +6,27 @@ let webVoiceHandedOff = false;  // Brain owns OLED/LLM/TTS while web mic is paus
 let webVoiceHandoffTimer;
 let robotTtsActive = false;
 let robotTtsResumeTimer;
+let robotTtsEndedAt = 0;
 let transcriptTimer;
 function cancelTranscriptTimer() {
     clearTimeout(transcriptTimer);
     transcriptTimer = undefined;
+}
+
+function resumeWebVoiceWhenSafe() {
+    clearTimeout(robotTtsResumeTimer);
+    if (robotTtsActive) return;
+    const elapsed = robotTtsEndedAt ? performance.now() - robotTtsEndedAt : 1200;
+    const delay = Math.max(0, 1200 - elapsed);
+    robotTtsResumeTimer = setTimeout(() => {
+        if (voiceOnlyDashboard && !webVoiceHandedOff && !robotTtsActive) {
+            window.dispatchEvent(new CustomEvent('moon-voice-control', {
+                detail: {command: 'resume', reason: 'tts'}
+            }));
+            const sourceLabel = document.getElementById('voice-display-source');
+            if (sourceLabel) sourceLabel.textContent = 'Nguồn hiển thị: mic web — đang chờ Moon';
+        }
+    }, delay);
 }
 
 const visionPanel = new VisionPanel(document);
@@ -258,15 +275,8 @@ socket.on('mqtt_message', (data) => {
             }
         } else {
             // Đợi tiếng loa/echo trong phòng tắt hẳn rồi mới nghe wakeword lại.
-            robotTtsResumeTimer = setTimeout(() => {
-                if (voiceOnlyDashboard && !webVoiceHandedOff && !robotTtsActive) {
-                    window.dispatchEvent(new CustomEvent('moon-voice-control', {
-                        detail: {command: 'resume', reason: 'tts'}
-                    }));
-                    const sourceLabel = document.getElementById('voice-display-source');
-                    if (sourceLabel) sourceLabel.textContent = 'Nguồn hiển thị: mic web — đang chờ Moon';
-                }
-            }, 1200);
+            robotTtsEndedAt = performance.now();
+            resumeWebVoiceWhenSafe();
         }
 
     } else if (topic === 'panda/status') {
@@ -362,9 +372,7 @@ socket.on('mqtt_message', (data) => {
             if (webVoiceHandedOff) {
                 clearTimeout(webVoiceHandoffTimer);
                 webVoiceHandedOff = false;
-                window.dispatchEvent(new CustomEvent('moon-voice-control',{detail:{command:'resume'}}));
-                const sourceLabel = document.getElementById('voice-display-source');
-                if (sourceLabel) sourceLabel.textContent = 'Nguồn hiển thị: mic web — đang chờ Moon';
+                resumeWebVoiceWhenSafe();
             }
         }
         logToTerminal(`AI State: ${payload}`, 'ai-state');

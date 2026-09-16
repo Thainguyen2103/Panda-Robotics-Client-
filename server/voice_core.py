@@ -78,7 +78,40 @@ def confirmed_wake_tail(primary, verification):
             and possible_moon_miss(primary)
             and possible_moon_miss(verification)):
         return ''
+    primary_token, primary_called = _english_wake_token(primary)
+    verify_token, verify_called = _english_wake_token(verification)
+    # Whisper often writes the proper name Moon as Mom/Mum/Moan/Move. Only
+    # accept a small allowlist of wider English spellings when the user used a
+    # calling prefix (Hey/Hi) and both independent passes remain Moon-like.
+    if (not (primary or '').strip() and verify_token and verify_called
+            and verify_token in _MOON_EN_ALIASES):
+        return ''
+    if (primary_token and verify_token and (primary_called or verify_called)
+            and primary_token in _MOON_EN_ALIASES
+            and verify_token in _MOON_EN_ALIASES):
+        return ''
     return None
+
+
+def _english_wake_token(text):
+    normalized = unicodedata.normalize('NFC', text or '').casefold()
+    if any(word in {'môn', 'món', 'muốn'} for word in re.findall(r'\w+', normalized)):
+        return None, False
+    ascii_text = ''.join(c for c in unicodedata.normalize('NFD', normalized)
+                         if unicodedata.category(c) != 'Mn')
+    words = re.findall(r'[a-z]+', ascii_text)
+    called = bool(words and words[0] in {'hey', 'hi', 'hay'})
+    if called:
+        words = words[1:]
+    if words and words[-1] == 'oi':
+        words = words[:-1]
+    return (words[0], called) if len(words) == 1 else (None, called)
+
+
+_MOON_EN_ALIASES = {
+    'moon', 'mun', 'muun', 'moun', 'moom', 'moone',
+    'mom', 'mum', 'moan', 'morn', 'move', 'man', 'noon',
+}
 
 
 class Segmenter:

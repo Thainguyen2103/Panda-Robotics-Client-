@@ -58,7 +58,11 @@ class VoiceCoreTests(unittest.TestCase):
         self.assertEqual(confirmed_wake_tail('Mun', 'Hey Mun'), '')
         self.assertEqual(confirmed_wake_tail('', 'Mùn ơi'), '')
         self.assertEqual(confirmed_wake_tail('Mun', 'Hey Moon'), '')
+        self.assertEqual(confirmed_wake_tail('Hey Mom', 'Hey Mum'), '')
+        self.assertEqual(confirmed_wake_tail('', 'Hey Moan'), '')
         self.assertIsNone(confirmed_wake_tail('Mun', 'Mom'))
+        self.assertIsNone(confirmed_wake_tail('Mom', 'Mum'))
+        self.assertIsNone(confirmed_wake_tail('môn', 'Hey Mom'))
         self.assertIsNone(confirmed_wake_tail('xin chào', 'Hey Mun'))
 
     def test_silence_and_click_do_not_make_clip(self):

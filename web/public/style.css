@@ -1194,6 +1194,12 @@ button:active { transform: translateY(0); }
     font-family: system-ui, sans-serif;
     line-height: 1.5;
 }
+.oled-face.answering .oled-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
 .oled-face.hearing .oled-text::before,
 .oled-face.hearing .oled-text::after,
 .oled-face.answering .oled-text::before,

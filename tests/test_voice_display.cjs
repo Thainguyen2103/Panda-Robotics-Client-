@@ -87,6 +87,12 @@ const {chromium} = require('playwright');
         assert.equal(await page.locator('#ai-thinking-bar').isVisible(), false);
         assert.match(await page.locator('#oled-face').getAttribute('class'), /answering/);
         assert.equal(await page.locator('#oled-text').textContent(), '"Câu trả lời từ Brain"');
+        assert.deepEqual(await page.locator('#oled-text').evaluate(el => ({
+            display: getComputedStyle(el).display,
+            align: getComputedStyle(el).alignItems,
+            justify: getComputedStyle(el).justifyContent,
+            textAlign: getComputedStyle(el).textAlign
+        })), {display: 'flex', align: 'center', justify: 'center', textAlign: 'center'});
         await page.evaluate(() => socket.listeners('mqtt_message')[0]({topic: 'panda/ai/state', payload: 'standby'}));
         assert.match(await page.locator('#oled-face').getAttribute('class'), /answering/);
         await page.waitForTimeout(4100);
