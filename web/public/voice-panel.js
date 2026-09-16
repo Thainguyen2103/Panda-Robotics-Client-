@@ -3,6 +3,27 @@ const $ = id => document.getElementById(id === 'question' ? 'ai-user-text' : `vo
 let stream, context, capture, source, highpass, ws, starting = false, generation = 0, wakes = 0;
 let reconnectTimer, reconnectAttempts = 0;
 let pausedReason = '';
+let micLockHeld = false, releaseMicLock;
+
+async function acquireMicLock() {
+    if (!navigator.locks || micLockHeld) return true;
+    let settle;
+    const acquired = new Promise(resolve => { settle = resolve; });
+    navigator.locks.request('moon-voice-microphone', {mode:'exclusive', ifAvailable:true}, lock => {
+        if (!lock) { settle(false); return; }
+        micLockHeld = true;
+        settle(true);
+        return new Promise(resolve => { releaseMicLock = resolve; });
+    }).catch(() => settle(true)); // Trình duyệt lỗi Web Locks: vẫn dùng getUserMedia làm fallback.
+    return acquired;
+}
+
+function unlockMicrophone() {
+    micLockHeld = false;
+    const release = releaseMicLock;
+    releaseMicLock = undefined;
+    if (release) release();
+}
 function wakeTick() {
     if (!context || context.state !== 'running') return;
     const tone = context.createOscillator(), volume = context.createGain();
@@ -24,6 +45,7 @@ function addLog(text) {
 async function stop(forgetAutoStart = false) {
     if (forgetAutoStart) localStorage.setItem('moonVoiceAutoStart','0');
     clearTimeout(reconnectTimer);
+    unlockMicrophone();
     generation++;
     starting = false;
     if (capture) { capture.port.onmessage = null; capture.disconnect(); capture = null; }
@@ -79,6 +101,12 @@ function event(msg) {
 async function start(auto = false) {
     if (starting || stream) return true;
     starting = true;
+    if (!await acquireMicLock()) {
+        starting = false;
+        $('state').textContent = 'Microphone đang được dùng ở một tab Moon khác';
+        $('error').textContent = 'Hãy đóng tab Moon cũ hoặc dừng mic ở tab đó.';
+        return true;
+    }
     window.dispatchEvent(new CustomEvent('moon-voice', {detail: {event: 'starting'}}));
     const token = ++generation;
     $('start').disabled = true; $('stop').disabled = false; $('device').disabled = true;
