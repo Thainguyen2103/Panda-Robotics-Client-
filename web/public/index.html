@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20260916c">
+    <link rel="stylesheet" href="style.css?v=20260916d">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -239,14 +239,14 @@
                 <div class="visual-group live-talk-group">
                     <div class="live-talk-heading">
                         <div>
-                            <p class="live-talk-kicker">GEMINI NATIVE AUDIO</p>
+                            <p class="live-talk-kicker">GEMINI LIVE + FISH VOICE</p>
                             <h3><i data-lucide="audio-lines"></i> Live Talk</h3>
                         </div>
                         <span class="live-talk-badge" id="live-badge" data-state="idle">Chưa chạy</span>
                     </div>
                     <p class="live-talk-description">
-                        Nói chuyện hai chiều liên tục, không qua pipeline STT → LLM → TTS riêng.
-                        Moon có thể bị ngắt lời tự nhiên; OLED chỉ hiển thị biểu cảm phù hợp.
+                        Gemini nghe và hiểu âm thanh trực tiếp, không dùng dịch vụ STT riêng.
+                        Fish Audio giữ đúng giọng Moon; phản hồi chậm hơn một chút và có dùng quota Fish. OLED chỉ hiển thị biểu cảm.
                     </p>
                     <div class="live-talk-orb" id="live-orb" data-state="idle" aria-hidden="true">
                         <span></span><span></span><span></span>
@@ -255,9 +255,15 @@
                     <p class="live-talk-state" id="live-state" role="status">Sẵn sàng kết nối</p>
                     <meter id="live-level" min="0" max="0.2" value="0" aria-label="Mức âm lượng Live Talk"></meter>
                     <div class="live-talk-meta">
-                        <span id="live-model">gemini-3.8-live</span>
+                        <span id="live-model">gemini-3.8-live · Fish Voice</span>
                         <span id="live-duration">00:00</span>
                     </div>
+                    <label class="live-talk-select-label" for="live-mode">Giọng trả lời</label>
+                    <select id="live-mode" aria-label="Giọng trả lời Live Talk">
+                        <option value="fish" selected>Fish Voice — cùng giọng Moon (dùng quota Fish)</option>
+                        <option value="native">Gemini Native — nhanh hơn (Kore)</option>
+                    </select>
+                    <label class="live-talk-select-label" for="live-device">Microphone</label>
                     <select id="live-device" aria-label="Microphone Live Talk">
                         <option value="">Microphone mặc định</option>
                     </select>
@@ -268,7 +274,7 @@
                     <p class="live-talk-error" id="live-error" role="alert"></p>
                     <details class="live-talk-setup">
                         <summary>Cách thêm API key</summary>
-                        <p>Thêm <code>"GEMINI_API_KEY": "..."</code> vào <code>config/secrets.py</code>, rồi chạy lại <code>start.bat</code>. Key chỉ được đọc ở backend.</p>
+                          <p>Thêm <code>"GEMINI_API_KEY": "..."</code> và <code>"FISH_AUDIO_API_KEY": "..."</code> vào <code>config/secrets.py</code>, rồi chạy lại <code>start.bat</code>. Key chỉ được đọc ở backend.</p>
                     </details>
                 </div>
             </section>
@@ -310,9 +316,9 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="vision-ui.js?v=20260914e"></script>
-    <script src="app.js?v=20260916c"></script>
-    <script src="voice-panel.js?v=20260916c"></script>
-    <script src="live-talk.js?v=20260916c"></script>
+    <script src="app.js?v=20260916d"></script>
+    <script src="voice-panel.js?v=20260916d"></script>
+    <script src="live-talk.js?v=20260916d"></script>
     <script>
         lucide.createIcons();
     </script>

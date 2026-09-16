@@ -3,7 +3,8 @@ const $ = id => document.getElementById(`live-${id}`);
 let stream, context, source, highpass, capture, ws;
 let starting = false, active = false, ready = false, generation = 0;
 let releaseMicLock, micLockHeld = false, startedAt = 0, clockTimer;
-let playHead = 0, turnComplete = false;
+let playHead = 0, turnComplete = false, outputMode = 'fish';
+let playbackGeneration = 0, decodingCount = 0;
 const playing = new Set();
 
 function dispatch(event, extra = {}) {
@@ -41,6 +42,8 @@ function unlockMicrophone() {
 }
 
 function clearPlayback() {
+    playbackGeneration++;
+    decodingCount = 0;
     for (const node of playing) {
         node.onended = null;
         try { node.stop(); } catch (_) {}
@@ -52,19 +55,13 @@ function clearPlayback() {
 }
 
 function notifyPlaybackComplete() {
-    if (!turnComplete || playing.size > 0 || !ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!turnComplete || playing.size > 0 || decodingCount > 0 || !ws || ws.readyState !== WebSocket.OPEN) return;
     turnComplete = false;
     ws.send(JSON.stringify({command: 'playback_complete'}));
 }
 
-function playPcm24k(arrayBuffer) {
-    if (!context || arrayBuffer.byteLength < 2) return;
-    const view = new DataView(arrayBuffer);
-    const samples = Math.floor(arrayBuffer.byteLength / 2);
-    const buffer = context.createBuffer(1, samples, 24000);
-    const channel = buffer.getChannelData(0);
-    for (let i = 0; i < samples; i++) channel[i] = view.getInt16(i * 2, true) / 32768;
-
+function playAudioBuffer(buffer) {
+    if (!context) return;
     const node = context.createBufferSource();
     node.buffer = buffer;
     node.connect(context.destination);
@@ -79,11 +76,43 @@ function playPcm24k(arrayBuffer) {
     node.start(startAt);
 }
 
+function playPcm24k(arrayBuffer) {
+    if (!context || arrayBuffer.byteLength < 2) return;
+    const view = new DataView(arrayBuffer);
+    const samples = Math.floor(arrayBuffer.byteLength / 2);
+    const buffer = context.createBuffer(1, samples, 24000);
+    const channel = buffer.getChannelData(0);
+    for (let i = 0; i < samples; i++) channel[i] = view.getInt16(i * 2, true) / 32768;
+
+    playAudioBuffer(buffer);
+}
+
+async function playEncodedAudio(arrayBuffer) {
+    if (!context || arrayBuffer.byteLength === 0) return;
+    const token = playbackGeneration;
+    decodingCount++;
+    try {
+        const buffer = await context.decodeAudioData(arrayBuffer.slice(0));
+        if (token === playbackGeneration && context) playAudioBuffer(buffer);
+    } catch (_) {
+        if (token === playbackGeneration) {
+            $('error').textContent = 'Trình duyệt không giải mã được âm thanh Fish Audio.';
+            turnComplete = false;
+        }
+    } finally {
+        if (token === playbackGeneration) {
+            decodingCount = Math.max(0, decodingCount - 1);
+            notifyPlaybackComplete();
+        }
+    }
+}
+
 function handleServer(message) {
     if (message.event === 'connecting' || message.event === 'connected') {
         setState('connecting', 'Đang mở phiên Gemini Live…');
     } else if (message.event === 'ready') {
         ready = true;
+        outputMode = message.outputMode || 'native';
         $('model').textContent = `${message.model} · ${message.voice}`;
         setState('listening', 'Moon đang nghe — cứ nói tự nhiên');
         dispatch('ready');
@@ -93,6 +122,9 @@ function handleServer(message) {
         dispatch(message.event);
     } else if (message.event === 'thinking') {
         setState('thinking', 'Moon đang suy nghĩ…');
+        dispatch('thinking');
+    } else if (message.event === 'fish_synthesizing') {
+        setState('thinking', 'Đang tạo giọng Fish Audio…');
         dispatch('thinking');
     } else if (message.event === 'speaking') {
         setState('speaking', 'Moon đang trả lời — bạn có thể ngắt lời');
@@ -104,6 +136,10 @@ function handleServer(message) {
     } else if (message.event === 'turn_complete') {
         turnComplete = true;
         notifyPlaybackComplete();
+    } else if (message.event === 'turn_error') {
+        $('error').textContent = message.text || 'Không tạo được câu trả lời bằng Fish Audio.';
+        setState('error', 'Lỗi tạo giọng — phiên vẫn đang nghe');
+        dispatch('error', {text: message.text});
     } else if (message.event === 'expression') {
         dispatch('expression', {expression: message.expression});
     } else if (message.event === 'reconnecting') {
@@ -116,7 +152,8 @@ function handleServer(message) {
 }
 
 async function connectSocket(token) {
-    const endpoint = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/live/ws`;
+    const mode = $('mode').value === 'native' ? 'native' : 'fish';
+    const endpoint = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/live/ws?mode=${encodeURIComponent(mode)}`;
     const socket = new WebSocket(endpoint);
     socket.binaryType = 'arraybuffer';
     ws = socket;
@@ -136,6 +173,7 @@ async function connectSocket(token) {
     socket.onmessage = event => {
         if (token !== generation) return;
         if (typeof event.data === 'string') handleServer(JSON.parse(event.data));
+        else if (outputMode === 'fish') void playEncodedAudio(event.data);
         else playPcm24k(event.data);
     };
     socket.onclose = event => {
@@ -200,6 +238,7 @@ async function start() {
     $('error').textContent = '';
     $('start').disabled = true;
     $('stop').disabled = false;
+    $('mode').disabled = true;
     $('device').disabled = true;
     setState('connecting', 'Đang chuẩn bị Live Talk…');
     dispatch('starting');
@@ -251,6 +290,7 @@ async function stop(userRequested = true, preserveError = false) {
     unlockMicrophone();
     $('start').disabled = false;
     $('stop').disabled = true;
+    $('mode').disabled = false;
     $('device').disabled = false;
     $('level').value = 0;
     $('duration').textContent = '00:00';
@@ -262,5 +302,12 @@ async function stop(userRequested = true, preserveError = false) {
 
 $('start').onclick = start;
 $('stop').onclick = () => stop(true);
+$('mode').onchange = () => {
+    const fish = $('mode').value === 'fish';
+    $('model').textContent = fish ? 'gemini-3.8-live · Fish Voice' : 'gemini-3.8-live · Kore';
+    $('state').textContent = fish
+        ? 'Fish Voice chậm hơn một chút nhưng giữ đúng giọng Moon'
+        : 'Gemini Native phản hồi nhanh hơn';
+};
 window.addEventListener('pagehide', () => stop(false));
 })();
