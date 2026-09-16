@@ -10,13 +10,17 @@ const {chromium} = require('playwright');
         await page.waitForFunction(() => typeof setOledAiMode === 'function');
         const say = msg => page.evaluate(detail => window.dispatchEvent(new CustomEvent('moon-voice', {detail})), msg);
         await say({event: 'starting'});
+        await say({event: 'processing', phase: 'wake'});
+        await say({event: 'verifying_wake'});
+        assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/,
+            'noise/wake verification must not show listening OLED');
         await say({event: 'wake'});
         assert.match(await page.locator('#oled-face').getAttribute('class'), /questioning/);
         await say({event: 'processing'});
         await say({event: 'meter', rms: .03, speech: true});
         assert.match(await page.locator('#oled-face').getAttribute('class'), /questioning/);
         assert.equal(await page.locator('#ai-thinking-bar').isVisible(), true);
-        assert.equal(await page.locator('#ai-thinking-label').textContent(), 'Đang nhận diện giọng nói…');
+        assert.equal(await page.locator('#ai-thinking-label').textContent(), 'Đang nhận diện câu hỏi…');
         await say({event: 'armed'});
         assert.match(await page.locator('#oled-face').getAttribute('class'), /questioning/);
         await say({event: 'state', state: 'listening'});
@@ -94,8 +98,6 @@ const {chromium} = require('playwright');
             textAlign: getComputedStyle(el).textAlign
         })), {display: 'flex', align: 'center', justify: 'center', textAlign: 'center'});
         await page.evaluate(() => socket.listeners('mqtt_message')[0]({topic: 'panda/ai/state', payload: 'standby'}));
-        assert.match(await page.locator('#oled-face').getAttribute('class'), /answering/);
-        await page.waitForTimeout(4100);
         assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/);
         assert.deepEqual(errors, []);
         console.log('Voice display: Brain handoff, literal long text, MQTT progression and stop reset passed');

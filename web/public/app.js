@@ -361,14 +361,9 @@ socket.on('mqtt_message', (data) => {
         }
         else if (payload === 'standby') {
             hideThinking(); aiCursor.style.display = 'none';
-            // Giữ câu trả lời đủ lâu để người dùng kịp nhìn, nhưng cho mic
-            // quay lại chờ wakeword ngay lập tức.
-            if (oledFace.classList.contains('answering')) {
-                cancelTranscriptTimer();
-                transcriptTimer = setTimeout(() => setOledAiMode('neutral'), 4000);
-            } else {
-                setOledAiMode('neutral');
-            }
+            // Playback đã kết thúc: trả OLED về mặt mặc định ngay, đồng bộ
+            // với loa thay vì giữ câu trả lời thêm nhiều giây.
+            setOledAiMode('neutral');
             if (webVoiceHandedOff) {
                 clearTimeout(webVoiceHandoffTimer);
                 webVoiceHandedOff = false;
@@ -436,7 +431,6 @@ socket.on('mqtt_message', (data) => {
                 // Done — show full text, ẩn cursor
                 aiMoonText.textContent = msg.text;
                 finalizeMoonResponse();
-                setOledAiMode('answering', msg.text);
                 logToTerminal(`AI: ${msg.text.substring(0, 60)}...`, 'ai-response');
             }
         } catch(e) {}
@@ -535,16 +529,15 @@ window.addEventListener('moon-voice', ({detail: msg}) => {
         const questionPhase = msg.phase === 'question' || webVoiceAwake;
         showThinking(questionPhase ? 'Đang nhận diện câu hỏi…' : 'Đang kiểm tra từ khóa Moon…');
         setVoiceState('transcribing');
-        // Show immediate visual feedback while network wake verification runs.
-        setOledAiMode('questioning');
+        // Tiếng động lớn chỉ được phép làm dashboard kiểm tra STT. OLED giữ
+        // mặt mặc định cho đến khi event `wake` xác nhận đúng tên Moon.
+        if (questionPhase) setOledAiMode('questioning');
     }
     if (msg.event === 'verifying_wake') {
         aiIdleHint.style.display = 'none';
         showThinking('Đang xác minh tên Moon…');
         setVoiceState('transcribing');
-        // Chưa phải wake đã xác nhận: chỉ hiện trạng thái xử lý. Dấu ? chỉ
-        // xuất hiện sau event `wake` thật sự để không gây hiểu nhầm.
-        setOledAiMode('ai-thinking');
+        // Chưa phải wake đã xác nhận: OLED vẫn giữ mặt mặc định.
     }
     if (msg.event === 'question') {
         webVoiceAwake = false;

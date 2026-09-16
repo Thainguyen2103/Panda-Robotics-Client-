@@ -478,31 +478,35 @@ def _handle_wake_word(trigger_text: str):
         response_chunks  = []
         llm_done_event   = threading.Event()
         full_response    = [""]  # list để có thể ghi từ closure
+        speech_started   = [False]
 
         # ── TTS streaming theo câu: câu nào xong trước đọc trước (Vector-like) ──
         def _on_speech_start():
-            """Audio đầu tiên bắt đầu vang lên → tick + chuyển state speaking."""
+            """Audio đầu tiên bắt đầu vang lên → đồng bộ OLED và speaking."""
             with callback_lock:
                 if session_cancelled.is_set():
                     return
                 print(f"⏱ [BRAIN] wake→tiếng đầu tiên: {time.time()-_t_wake:.1f}s")
                 tts.play_tick()
                 _set_voice_ai_state("speaking")
+                speech_started[0] = True
+                # Chỉ hiện câu trả lời trên OLED khi audio thực sự bắt đầu,
+                # không hiện sớm trong lúc Fish Audio còn đang tổng hợp.
+                oled_answer = full_response[0].strip() or first_spoken_sentence[0]
+                if oled_answer:
+                    _publish_thinking("answer", oled_answer)
 
         player = SentencePlayer(on_play_start=_on_speech_start)
         sentence_buffer = [""]
-        answer_preview_shown = [False]
+        first_spoken_sentence = [""]
 
         def _push_sentence(raw: str):
             """Làm sạch markdown + emoji rồi đẩy 1 câu vào hàng đợi TTS."""
             s = re.sub(r"[*_#`>]+", "", raw)
             s = _EMOJI_RE.sub("", s).strip()
             if s:
-                # Câu đầu tiên xuất hiện trên OLED trước khi TTS tổng hợp
-                # xong audio, đảm bảo thứ tự thinking → answer → speaking.
-                if not answer_preview_shown[0]:
-                    answer_preview_shown[0] = True
-                    _publish_thinking("answer", s)
+                if not first_spoken_sentence[0]:
+                    first_spoken_sentence[0] = s
                 player.push(s)
 
         def on_thinking(stage: str):
@@ -546,6 +550,10 @@ def _handle_wake_word(trigger_text: str):
                     "text": text,
                 }))
                 _publish_thinking("done")
+                if speech_started[0]:
+                    # Audio câu đầu đã chạy trước khi LLM hoàn tất: cập nhật
+                    # OLED từ preview sang toàn bộ câu trả lời ngay trong lúc nói.
+                    _publish_thinking("answer", text)
                 _push_sentence(sentence_buffer[0])   # phần cuối không có dấu kết thúc
                 sentence_buffer[0] = ""
                 player.finish()
@@ -584,13 +592,6 @@ def _handle_wake_word(trigger_text: str):
             # nhờ đó finally mới chạy và OLED trở về neutral
             print("⚠️  [BRAIN] TTS không kết thúc đúng hạn — ngắt phát.")
             player.stop()
-
-        # ── BƯỚC 5: Biểu cảm kết thúc — Moon "có hồn" theo ngữ cảnh hội thoại ──
-        emo = _classify_emotion(question, answer)
-        if emo and emo != "neutral":
-            print(f"💫 [BRAIN] Biểu cảm kết thúc: {emo}")
-            mqtt_bridge.publish(settings.TOPIC_FACE, emo)
-            time.sleep(1.8)   # giữ cảm xúc 1.8s rồi finally trả về neutral
 
         print("✅ [BRAIN] Hoàn thành pipeline Voice → LLM → TTS.")
 
