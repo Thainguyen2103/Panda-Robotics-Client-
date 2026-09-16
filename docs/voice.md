@@ -5,6 +5,41 @@ WebSocket cùng origin `/voice/ws` → Python Voice → STT; không gửi audio 
 MQTT hoặc Brain/LLM. Giữ microphone mở liên tục cả khi gọi STT.
 Các phần điều khiển, camera, OLED và Monitor của dashboard vẫn giữ nguyên.
 
+## Live Talk: Gemini Native Audio
+
+Mục **Live Talk** là chế độ riêng nằm dưới Moon Voice. Chế độ này gửi PCM mono
+16 kHz qua WebSocket cùng origin `/live/ws`; Node giữ API key và mở phiên Gemini
+Live. Gemini nhận audio và trả audio PCM 24 kHz trực tiếp, không chạy pipeline
+STT → LLM → TTS của Brain. Dashboard không hiện transcript; OLED chỉ nhận một
+trong 11 biểu cảm qua function call `set_expression`.
+
+Thêm key vào file không được Git theo dõi `config/secrets.py`:
+
+```python
+SECRETS = {
+    # các key hiện có...
+    "GEMINI_API_KEY": "key-cua-ban",
+}
+```
+
+Sau đó chạy lại `start.bat`, mở dashboard và bấm **Bắt đầu Live Talk**. Có thể
+đặt biến môi trường `GEMINI_API_KEY` thay cho file. Mặc định dùng model
+`gemini-3.8-live` và voice `Kore`; có thể đổi bằng `GEMINI_LIVE_MODEL` và
+`GEMINI_LIVE_VOICE` trước khi chạy Node.
+
+Live Talk và Moon Voice dùng chung Web Lock `moon-voice-microphone`, vì vậy chỉ
+một chế độ hoặc một tab giữ mic. Khi bật Live Talk, mic wake-word cũ tự dừng.
+AEC, khử nhiễu và AGC của trình duyệt được bật để giảm việc Moon tự nghe loa.
+Khi người dùng nói chen, client xóa ngay hàng đợi audio cũ. Khi phát xong, OLED
+trở lại `neutral`. API key không được đưa vào HTML/JavaScript trình duyệt, log
+hoặc MQTT.
+
+Kiểm thử cầu nối không gọi API và không dùng quota:
+
+```powershell
+node tests/test_gemini_live_bridge.cjs
+```
+
 ## Chạy trên Windows
 
 Dùng Python **3.12 hoặc 3.13** để có wheel WebRTC VAD sẵn, không cần C++ Build Tools.
@@ -85,6 +120,7 @@ node tests/test_vision_ui.cjs
 # Khi có Playwright và Edge, chạy server rồi test mic giả (không gửi audio cloud):
 node tests/test_voice_browser.cjs
 node tests/test_voice_bridge.cjs
+node tests/test_gemini_live_bridge.cjs
 ```
 
 Test xác minh segmentation, tiếng click/im lặng, wake token, STT chậm/lỗi,

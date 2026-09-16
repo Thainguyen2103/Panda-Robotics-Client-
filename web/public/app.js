@@ -8,6 +8,7 @@ let robotTtsActive = false;
 let robotTtsResumeTimer;
 let robotTtsEndedAt = 0;
 let transcriptTimer;
+let liveTalkActive = false;
 function cancelTranscriptTimer() {
     clearTimeout(transcriptTimer);
     transcriptTimer = undefined;
@@ -256,6 +257,9 @@ function finalizeMoonResponse() {
 // ─── MQTT message handler ─────────────────────────────────────────────────────
 socket.on('mqtt_message', (data) => {
     const { topic, payload } = data;
+    // Live Talk có phiên audio/LLM riêng. Trạng thái AI từ Brain cũ không được
+    // ghi đè giao diện trong lúc phiên Gemini Live đang hoạt động.
+    if (liveTalkActive && topic.startsWith('panda/ai/')) return;
     // Before a question is accepted, retained AI messages must not overwrite
     // local wake/STT progress. After handoff, live Brain messages own the UI.
     if (voiceOnlyDashboard && !webVoiceHandedOff && (topic.startsWith('panda/ai/') || topic.startsWith('panda/log/voice'))) return;
@@ -469,7 +473,7 @@ function logToTerminal(text, type) {
 // Mỗi 5–14s, nếu đang neutral, Moon tự diễn một micro-behavior rồi về lại mắt thường.
 (function scheduleIdleBehavior() {
     setTimeout(() => {
-        if (oledFace.classList.contains('neutral')) {
+        if (!liveTalkActive && oledFace.classList.contains('neutral')) {
             const b = IDLE_BEHAVIORS[Math.floor(Math.random() * IDLE_BEHAVIORS.length)];
             oledFace.classList.add(b);
             setTimeout(() => oledFace.classList.remove(b), 900 + Math.random() * 900);
@@ -477,6 +481,34 @@ function logToTerminal(text, type) {
         scheduleIdleBehavior();
     }, 5000 + Math.random() * 9000);
 })();
+
+// Gemini Live chỉ điều khiển trạng thái và biểu cảm OLED; không hiển thị
+// transcript/câu trả lời lên OLED như pipeline Voice cũ.
+window.addEventListener('moon-live', ({detail: msg}) => {
+    if (msg.event === 'starting') {
+        liveTalkActive = true;
+        voiceOnlyDashboard = false;
+        hideThinking();
+        setVoiceState('listening');
+        setOledAiMode('neutral');
+        logToTerminal('LIVE: đang kết nối Gemini Native Audio', 'ai-state');
+    } else if (['ready', 'listening', 'user_speaking', 'interrupted'].includes(msg.event)) {
+        liveTalkActive = true;
+        setVoiceState('listening');
+    } else if (msg.event === 'thinking') {
+        setVoiceState('thinking');
+    } else if (msg.event === 'speaking') {
+        setVoiceState('speaking');
+    } else if (msg.event === 'expression') {
+        drawFace(ALL_EMOTIONS.includes(msg.expression) ? msg.expression : 'neutral');
+        logToTerminal(`LIVE OLED: ${msg.expression}`, 'status');
+    } else if (['stopped', 'error'].includes(msg.event)) {
+        liveTalkActive = false;
+        setVoiceState('standby');
+        setOledAiMode('neutral');
+        logToTerminal(msg.event === 'error' ? `LIVE lỗi: ${msg.text || 'Mất kết nối'}` : 'LIVE: đã kết thúc', 'sys');
+    }
+});
 
 // Voice test shares dashboard state, OLED preview and Activity Log.
 window.addEventListener('moon-voice', ({detail: msg}) => {

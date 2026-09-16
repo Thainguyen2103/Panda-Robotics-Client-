@@ -204,6 +204,7 @@ window.addEventListener('moon-voice-control',({detail}) => {
         else $('state').textContent = 'Đang chờ Moon';
     }
 });
+window.addEventListener('moon-live-request-mic', () => stop(true));
 window.addEventListener('pagehide', () => stop());
 
 // Browsers require one manual permission grant. On later dashboard loads,

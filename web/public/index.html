@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20260916a">
+    <link rel="stylesheet" href="style.css?v=20260916c">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -235,6 +235,42 @@
                         </details>
                     </div>
                 </div>
+
+                <div class="visual-group live-talk-group">
+                    <div class="live-talk-heading">
+                        <div>
+                            <p class="live-talk-kicker">GEMINI NATIVE AUDIO</p>
+                            <h3><i data-lucide="audio-lines"></i> Live Talk</h3>
+                        </div>
+                        <span class="live-talk-badge" id="live-badge" data-state="idle">Chưa chạy</span>
+                    </div>
+                    <p class="live-talk-description">
+                        Nói chuyện hai chiều liên tục, không qua pipeline STT → LLM → TTS riêng.
+                        Moon có thể bị ngắt lời tự nhiên; OLED chỉ hiển thị biểu cảm phù hợp.
+                    </p>
+                    <div class="live-talk-orb" id="live-orb" data-state="idle" aria-hidden="true">
+                        <span></span><span></span><span></span>
+                        <div class="live-talk-core"><i data-lucide="mic"></i></div>
+                    </div>
+                    <p class="live-talk-state" id="live-state" role="status">Sẵn sàng kết nối</p>
+                    <meter id="live-level" min="0" max="0.2" value="0" aria-label="Mức âm lượng Live Talk"></meter>
+                    <div class="live-talk-meta">
+                        <span id="live-model">gemini-3.8-live</span>
+                        <span id="live-duration">00:00</span>
+                    </div>
+                    <select id="live-device" aria-label="Microphone Live Talk">
+                        <option value="">Microphone mặc định</option>
+                    </select>
+                    <div class="live-talk-actions">
+                        <button class="btn-live-talk" id="live-start"><i data-lucide="radio"></i> Bắt đầu Live Talk</button>
+                        <button class="btn-live-talk btn-live-stop" id="live-stop" disabled><i data-lucide="square"></i> Kết thúc</button>
+                    </div>
+                    <p class="live-talk-error" id="live-error" role="alert"></p>
+                    <details class="live-talk-setup">
+                        <summary>Cách thêm API key</summary>
+                        <p>Thêm <code>"GEMINI_API_KEY": "..."</code> vào <code>config/secrets.py</code>, rồi chạy lại <code>start.bat</code>. Key chỉ được đọc ở backend.</p>
+                    </details>
+                </div>
             </section>
 
             <!-- ═══ RIGHT: Monitor ═══════════════════════════════════════════ -->
@@ -274,8 +310,9 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="vision-ui.js?v=20260914e"></script>
-    <script src="app.js?v=20260916b"></script>
-    <script src="voice-panel.js?v=20260915d"></script>
+    <script src="app.js?v=20260916c"></script>
+    <script src="voice-panel.js?v=20260916c"></script>
+    <script src="live-talk.js?v=20260916c"></script>
     <script>
         lucide.createIcons();
     </script>

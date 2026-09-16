@@ -10,6 +10,8 @@ màn OLED theo phong cách robot Vector (Anki).
 - **Voice trên dashboard**: microphone liên tục, WebRTC VAD, wakeword Moon bằng
   Porcupine hoặc Whisper dự phòng, hiển thị STT nguyên văn để kiểm tra.
   Chạy `start-voice.bat`; xem [hướng dẫn Voice](docs/voice.md).
+- **Live Talk audio↔audio**: hội thoại Gemini Live liên tục, hỗ trợ ngắt lời;
+  API key chỉ nằm ở backend và OLED chỉ hiển thị biểu cảm do function call chọn.
 - **Não cloud**: Groq Whisper (STT) → Groq LLM (trả lời) → Fish Audio (TTS streaming
   từng câu) — độ trễ wake→tiếng đầu tiên ~2-3s.
 - **Phân loại 24 chủ đề** (hybrid: keyword 0ms + LLM enum fallback, benchmark 15/15)

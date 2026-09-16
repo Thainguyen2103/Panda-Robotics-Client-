@@ -1178,6 +1178,159 @@ button:active { transform: translateY(0); }
 #voice-log li { padding: 8px 0; overflow-wrap: anywhere; }
 .voice-controls button:disabled { opacity: .5; cursor: default; }
 
+/* ─── Gemini Native Audio / Live Talk ───────────────────────────────────── */
+.live-talk-group {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(162, 155, 254, .38);
+    background:
+        radial-gradient(circle at 50% 20%, rgba(0, 210, 255, .10), transparent 42%),
+        linear-gradient(145deg, rgba(13, 20, 32, .96), rgba(17, 23, 32, .98));
+}
+.live-talk-group::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(110deg, transparent 25%, rgba(162, 155, 254, .045) 45%, transparent 65%);
+}
+.live-talk-heading,
+.live-talk-meta,
+.live-talk-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.live-talk-heading h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 2px 0 0;
+}
+.live-talk-heading h3 svg { width: 17px; color: var(--accent); }
+.live-talk-kicker {
+    margin: 0;
+    color: var(--purple);
+    font: 600 10px/1.2 'JetBrains Mono', monospace;
+    letter-spacing: 1.3px;
+}
+.live-talk-badge {
+    flex: 0 0 auto;
+    padding: 5px 10px;
+    border: 1px solid var(--border-light);
+    border-radius: 999px;
+    color: var(--text-muted);
+    background: rgba(8, 12, 18, .72);
+    font-size: 11px;
+    font-weight: 600;
+}
+.live-talk-badge[data-state="listening"] { color: var(--green); border-color: rgba(46, 213, 115, .5); }
+.live-talk-badge[data-state="thinking"] { color: var(--purple); border-color: rgba(162, 155, 254, .5); }
+.live-talk-badge[data-state="speaking"] { color: var(--accent); border-color: rgba(0, 210, 255, .55); }
+.live-talk-badge[data-state="error"] { color: #fca5a5; border-color: rgba(255, 71, 87, .55); }
+.live-talk-description {
+    position: relative;
+    max-width: 670px;
+    margin: 12px 0 16px;
+    color: #9bacc0;
+    font-size: 13px;
+}
+.live-talk-orb {
+    position: relative;
+    width: 116px;
+    height: 116px;
+    margin: 16px auto 12px;
+    display: grid;
+    place-items: center;
+}
+.live-talk-orb > span {
+    position: absolute;
+    inset: 9px;
+    border: 1px solid rgba(0, 210, 255, .24);
+    border-radius: 50%;
+    opacity: .45;
+}
+.live-talk-orb > span:nth-child(2) { inset: 0; border-color: rgba(162, 155, 254, .18); }
+.live-talk-orb > span:nth-child(3) { inset: 20px; border-style: dashed; }
+.live-talk-core {
+    position: relative;
+    z-index: 1;
+    width: 58px;
+    height: 58px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: var(--accent);
+    background: rgba(0, 210, 255, .09);
+    border: 1px solid rgba(0, 210, 255, .48);
+    box-shadow: inset 0 0 20px rgba(0, 210, 255, .08), 0 0 20px rgba(0, 210, 255, .08);
+}
+.live-talk-core svg { width: 24px; height: 24px; }
+.live-talk-orb[data-state="connecting"] > span,
+.live-talk-orb[data-state="thinking"] > span { animation: live-orbit 2.2s linear infinite; }
+.live-talk-orb[data-state="listening"] .live-talk-core {
+    color: var(--green);
+    border-color: rgba(46, 213, 115, .65);
+    box-shadow: 0 0 25px rgba(46, 213, 115, .18);
+    animation: live-pulse 1.5s ease-in-out infinite;
+}
+.live-talk-orb[data-state="speaking"] .live-talk-core {
+    animation: live-speaking .62s ease-in-out infinite alternate;
+    box-shadow: 0 0 30px rgba(0, 210, 255, .28);
+}
+@keyframes live-orbit { to { transform: rotate(360deg); } }
+@keyframes live-pulse { 50% { transform: scale(1.08); box-shadow: 0 0 34px rgba(46, 213, 115, .28); } }
+@keyframes live-speaking { to { transform: scale(1.13); } }
+.live-talk-state {
+    margin: 0 0 10px;
+    text-align: center;
+    color: #d8e6f3;
+    font-size: 13px;
+    font-weight: 600;
+}
+.live-talk-group meter { width: 100%; height: 8px; display: block; }
+.live-talk-meta {
+    margin: 5px 0 12px;
+    color: var(--text-muted);
+    font: 500 11px/1.4 'JetBrains Mono', monospace;
+}
+.live-talk-group select {
+    width: 100%;
+    padding: 10px;
+    color: #e2e8f0;
+    background: #182233;
+    border: 1px solid #475569;
+    border-radius: 8px;
+}
+.live-talk-actions { margin-top: 8px; }
+.btn-live-talk {
+    flex: 1 1 50%;
+    min-height: 43px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #071017;
+    background: linear-gradient(135deg, var(--accent), #7ee7ff);
+    border: 0;
+    border-radius: 9px;
+    font-family: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+.btn-live-talk svg { width: 16px; }
+.btn-live-stop { color: #d9e6f2; background: #182233; border: 1px solid #475569; }
+.btn-live-talk:disabled { opacity: .42; cursor: default; }
+.live-talk-error { min-height: 18px; margin: 10px 0 0; color: #fca5a5; font-size: 12px; }
+.live-talk-setup { position: relative; color: var(--text-muted); font-size: 12px; }
+.live-talk-setup summary { cursor: pointer; color: #9bacc0; }
+.live-talk-setup code { color: #b9f2ff; overflow-wrap: anywhere; }
+@media (max-width: 560px) {
+    .live-talk-actions { flex-direction: column; }
+    .btn-live-talk { width: 100%; }
+}
+
 /* Static, scrollable transcript: never translate the entire OLED text layer. */
 .oled-face.hearing .oled-text,
 .oled-face.answering .oled-text {

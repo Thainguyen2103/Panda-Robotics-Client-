@@ -71,6 +71,17 @@ function attachGeminiLive(server, mqttClient, options = {}) {
         let closed = false;
         let sentSpeaking = false;
 
+        const cleanup = () => {
+            if (closed) return;
+            closed = true;
+            ready = false;
+            try { session?.sendRealtimeInput({audioStreamEnd: true}); } catch (_) {}
+            try { session?.close(); } catch (_) {}
+            if (session) publishFace('neutral');
+        };
+        downstream.once('close', cleanup);
+        downstream.once('error', cleanup);
+
         const sendJson = value => {
             if (downstream.readyState === WebSocket.OPEN) downstream.send(JSON.stringify(value));
         };
@@ -119,6 +130,10 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                     sendJson({event: 'speaking'});
                 }
                 if (downstream.readyState === WebSocket.OPEN) {
+                    if (downstream.bufferedAmount > 512 * 1024) {
+                        downstream.close(1013, 'Audio client is too slow');
+                        return;
+                    }
                     downstream.send(Buffer.from(part.inlineData.data, 'base64'), {binary: true});
                 }
             }
@@ -192,6 +207,10 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                     },
                 },
             });
+            if (closed || downstream.readyState !== WebSocket.OPEN) {
+                try { session.close(); } catch (_) {}
+                return;
+            }
         } catch (error) {
             fail(error?.message || 'Không kết nối được Gemini Live.');
             return;
@@ -222,16 +241,6 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             }
         });
 
-        const cleanup = () => {
-            if (closed) return;
-            closed = true;
-            ready = false;
-            try { session?.sendRealtimeInput({audioStreamEnd: true}); } catch (_) {}
-            try { session?.close(); } catch (_) {}
-            publishFace('neutral');
-        };
-        downstream.on('close', cleanup);
-        downstream.on('error', cleanup);
     });
 
     return wss;

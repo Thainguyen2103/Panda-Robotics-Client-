@@ -1,0 +1,107 @@
+const assert = require('node:assert/strict');
+const http = require('node:http');
+const {WebSocket} = require('../web/node_modules/ws');
+const {
+    attachGeminiLive,
+    normalizeExpression,
+    readGeminiKey,
+} = require('../web/gemini-live-bridge');
+
+function waitFor(check, timeoutMs = 2000) {
+    const start = Date.now();
+    return new Promise((resolve, reject) => {
+        const poll = () => {
+            const value = check();
+            if (value) return resolve(value);
+            if (Date.now() - start >= timeoutMs) return reject(new Error('Timed out waiting for bridge event'));
+            setTimeout(poll, 10);
+        };
+        poll();
+    });
+}
+
+(async () => {
+    assert.equal(normalizeExpression('HAPPY'), 'happy');
+    assert.equal(normalizeExpression('drive_forward'), 'neutral');
+    assert.equal(readGeminiKey({env: {GEMINI_API_KEY: '  test-key  '}}), 'test-key');
+
+    const server = http.createServer();
+    const published = [];
+    const mqtt = {
+        connected: true,
+        publish(topic, payload) { published.push({topic, payload}); },
+    };
+    const inputs = [];
+    const toolResponses = [];
+    let callbacks;
+    let closed = false;
+    const fakeSession = {
+        sendRealtimeInput(input) { inputs.push(input); },
+        sendToolResponse(response) { toolResponses.push(response); },
+        close() { closed = true; },
+    };
+    const wss = attachGeminiLive(server, mqtt, {
+        env: {GEMINI_API_KEY: 'unit-test-key'},
+        createClient: () => ({
+            live: {
+                async connect(params) {
+                    callbacks = params.callbacks;
+                    queueMicrotask(() => callbacks.onopen());
+                    return fakeSession;
+                },
+            },
+        }),
+    });
+
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const port = server.address().port;
+    const client = new WebSocket(`ws://127.0.0.1:${port}/live/ws`, {
+        origin: `http://127.0.0.1:${port}`,
+    });
+    const jsonMessages = [];
+    const audioMessages = [];
+    client.on('message', (data, binary) => {
+        if (binary) audioMessages.push(Buffer.from(data));
+        else jsonMessages.push(JSON.parse(data.toString()));
+    });
+
+    await waitFor(() => callbacks);
+    callbacks.onmessage({setupComplete: {sessionId: 'test'}});
+    await waitFor(() => jsonMessages.some(message => message.event === 'ready'));
+
+    client.send(Buffer.alloc(960), {binary: true});
+    await waitFor(() => inputs.some(input => input.audio));
+    assert.equal(inputs.find(input => input.audio).audio.mimeType, 'audio/pcm;rate=16000');
+
+    callbacks.onmessage({
+        toolCall: {functionCalls: [{id: 'call-1', name: 'set_expression', args: {expression: 'happy'}}]},
+    });
+    await waitFor(() => toolResponses.length === 1);
+    assert.deepEqual(published.at(-1), {topic: 'panda/cmd/face', payload: 'happy'});
+    assert.equal(toolResponses[0].functionResponses[0].id, 'call-1');
+
+    const pcm = Buffer.from([0, 0, 1, 0]);
+    callbacks.onmessage({
+        serverContent: {modelTurn: {parts: [{inlineData: {mimeType: 'audio/pcm;rate=24000', data: pcm.toString('base64')}}]}},
+    });
+    await waitFor(() => audioMessages.length === 1);
+    assert.deepEqual(audioMessages[0], pcm);
+
+    callbacks.onmessage({serverContent: {turnComplete: true}});
+    await waitFor(() => jsonMessages.some(message => message.event === 'turn_complete'));
+    client.send(JSON.stringify({command: 'playback_complete'}));
+    await waitFor(() => published.some(item => item.payload === 'neutral'));
+
+    await new Promise(resolve => {
+        client.once('close', resolve);
+        client.close();
+    });
+    await waitFor(() => closed);
+    assert.equal(closed, true);
+    await new Promise(resolve => wss.close(resolve));
+    await new Promise(resolve => server.close(resolve));
+    console.log('Gemini Live bridge tests passed');
+})().catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+});
