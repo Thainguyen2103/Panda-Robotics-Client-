@@ -125,24 +125,47 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
             await worker
         return session, socket.messages
 
-    async def test_question_spoken_while_wake_stt_is_pending_is_preserved(self):
+    async def test_audio_queued_while_wake_stt_is_pending_is_discarded(self):
         session, messages = await self.run_clips(['Moon ơi', 'Tôi muốn học tiếng Anh.'])
-        self.assertEqual([m['text'] for m in messages if m['event'] == 'question'],
-                         ['Tôi muốn học tiếng Anh.'])
+        self.assertFalse(any(m['event'] == 'question' for m in messages))
         self.assertEqual(sum(m['event'] == 'wake' for m in messages), 1)
-        self.assertFalse(session.listening)
+        self.assertTrue(session.listening)
+        self.assertTrue(session.waiting_for_wake_quiet)
         phases=[m.get('phase') for m in messages if m['event']=='processing']
-        self.assertEqual(phases,['wake','question'])
+        self.assertEqual(phases,['wake'])
 
     async def test_clip_captured_after_wake_is_the_question(self):
-        session, messages = await self.run_clips(
-            ['Moon ơi', 'Tôi muốn học tiếng Anh.'],
-            captured_states=[False, True],
-        )
+        socket = Socket()
+        session = Session(socket, None)
+        texts = iter(['Moon ơi', 'Tôi muốn học tiếng Anh.'])
+
+        async def transcribe(clip):
+            return next(texts)
+
+        session.transcribe = transcribe
+        worker = asyncio.create_task(session.worker())
+
+        # Chỉ clip wakeword tồn tại trong lúc Whisper đang xác minh.
+        session.clips.put_nowait((b'wake', False, session.audio_epoch))
+        await asyncio.wait_for(session.clips.join(), 1)
+        self.assertTrue(session.waiting_for_wake_quiet)
+
+        # Sau khoảng im lặng, UI báo đã sẵn sàng rồi người dùng mới hỏi.
+        for _ in range(4):
+            await session.feed(bytes(960))
+        self.assertFalse(session.waiting_for_wake_quiet)
+        session.clips.put_nowait((b'question', True, session.audio_epoch))
+        await asyncio.wait_for(session.clips.join(), 1)
+
+        worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker
+        messages = socket.messages
         self.assertEqual(
             [m['text'] for m in messages if m['event'] == 'question'],
             ['Tôi muốn học tiếng Anh.'],
         )
+        self.assertEqual(sum(m['event'] == 'armed' for m in messages), 1)
         self.assertFalse(session.listening)
 
     async def test_same_utterance(self):

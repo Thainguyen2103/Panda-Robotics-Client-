@@ -81,6 +81,24 @@ class Session:
         self.segmenter.reset()
         await self.emit('resumed')
 
+    def discard_pending_clips(self):
+        """Drop audio captured before a newly confirmed wake can be armed."""
+        while True:
+            try:
+                self.clips.get_nowait()
+                self.clips.task_done()
+            except asyncio.QueueEmpty:
+                break
+
+    def gate_question_after_wake(self):
+        # Cloud wake verification takes time. Audio queued during that wait may
+        # be TV/music/background and must never become the new question.
+        self.discard_pending_clips()
+        self.segmenter.reset()
+        self.waiting_for_wake_quiet = True
+        self.wake_quiet_frames = 0
+        self.deadline = time.monotonic() + settings.VOICE_WAIT_SEC
+
     async def feed(self, pcm):
         if len(pcm) != FRAME_BYTES:
             raise ValueError('Audio frame must be 30ms PCM16 mono / 16kHz')
@@ -179,9 +197,10 @@ class Session:
                 if self.paused or audio_epoch != self.audio_epoch:
                     publish_state = False
                     continue
-                # A question may already be queued while the preceding Moon clip
-                # is still being transcribed over the network.
-                question_context = self.listening
+                # State is captured with the clip. Never reinterpret an older
+                # standby/background clip as a question merely because a prior
+                # network request has since recognized Moon.
+                question_context = captured_while_listening
                 await self.emit('processing',phase='question' if question_context else 'wake')
                 text = await self.transcribe(clip)
                 if self.paused or audio_epoch != self.audio_epoch:
@@ -234,6 +253,8 @@ class Session:
                     if tail:
                         await self.emit('question', text=tail)
                         self.listening = False
+                    else:
+                        self.gate_question_after_wake()
                 else:
                     self.standby_rejects = 0
             except Exception as exc:
