@@ -189,9 +189,13 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             }
 
             if (outputMode === 'fish') {
-                const textParts = content?.modelTurn?.parts?.filter(part =>
-                    typeof part.text === 'string' && !part.thought) || [];
-                for (const part of textParts) pendingText += part.text;
+                if (typeof content?.outputTranscription?.text === 'string') {
+                    pendingText += content.outputTranscription.text;
+                } else {
+                    const textParts = content?.modelTurn?.parts?.filter(part =>
+                        typeof part.text === 'string' && !part.thought) || [];
+                    for (const part of textParts) pendingText += part.text;
+                }
             }
 
             const audioParts = outputMode === 'native'
@@ -257,10 +261,9 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             session = await ai.live.connect({
                 model,
                 config: {
-                    responseModalities: [outputMode === 'fish' ? Modality.TEXT : Modality.AUDIO],
-                    ...(outputMode === 'native' ? {
-                        speechConfig: {voiceConfig: {prebuiltVoiceConfig: {voiceName: voice}}},
-                    } : {}),
+                    responseModalities: [Modality.AUDIO],
+                    speechConfig: {voiceConfig: {prebuiltVoiceConfig: {voiceName: voice}}},
+                    ...(outputMode === 'fish' ? {outputAudioTranscription: {}} : {}),
                     systemInstruction: {
                         parts: [{text: [
                             'Bạn là Moon, robot đồng hành thân thiện. Luôn trò chuyện tự nhiên bằng tiếng Việt.',

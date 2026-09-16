@@ -65,13 +65,12 @@ function waitFor(check, timeoutMs = 2000) {
     await waitFor(() => callbacks);
     callbacks.onmessage({setupComplete: {sessionId: 'fish-test'}});
     await waitFor(() => jsonMessages.some(message => message.event === 'ready'));
-    assert.equal(connectParams.config.responseModalities[0], 'TEXT');
-    assert.equal(Object.hasOwn(connectParams.config, 'speechConfig'), false);
+    assert.equal(connectParams.config.responseModalities[0], 'AUDIO');
+    assert.deepEqual(connectParams.config.outputAudioTranscription, {});
     assert.equal(jsonMessages.find(message => message.event === 'ready').outputMode, 'fish');
 
-    callbacks.onmessage({
-        serverContent: {modelTurn: {parts: [{text: 'Xin chào '}, {text: 'bạn.'}]}},
-    });
+    callbacks.onmessage({serverContent: {outputTranscription: {text: 'Xin chào '}}});
+    callbacks.onmessage({serverContent: {outputTranscription: {text: 'bạn.'}}});
     callbacks.onmessage({serverContent: {turnComplete: true}});
     await waitFor(() => audioMessages.length === 1);
     assert.equal(synthRequest.text, 'Xin chào bạn.');
