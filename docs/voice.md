@@ -22,6 +22,9 @@ Mở [Dashboard](http://localhost:3000) trong Chrome/Edge. Lần đầu cần b�
 **Bật microphone** để cấp quyền, giữ im lặng 1.8 giây để đo nền rồi mới gọi Moon.
 Các lần tải trang sau mic tự bật khi quyền vẫn được cấp; bấm **Dừng mic** để tắt
 tự động. Có thể đổi thiết bị sau khi dừng.
+Chỉ một tab Moon được giữ microphone. Nếu `start.bat` mở tab mới trong khi tab
+cũ vẫn nghe, tab mới sẽ báo đang dùng mic ở tab khác thay vì tranh mic và làm
+ngắt phiên wakeword.
 Nút **Thử tiếng tick** kiểm tra loa; mỗi wake thật phát tiếng tick 80ms. Không chạy `start.bat` cho
 bài test này vì lệnh đó khởi động toàn bộ Brain.
 
