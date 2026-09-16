@@ -12,6 +12,11 @@ except Exception:
 def _key(name: str) -> str:
     return _SEC.get(name, "") or os.environ.get(name, "")
 
+
+# Gemini Live native audio (dashboard Live Talk). Node cũng đọc cùng key này
+# trực tiếp từ config/secrets.py; key không bao giờ được gửi xuống trình duyệt.
+GEMINI_API_KEY = _key("GEMINI_API_KEY")
+
 # MQTT Broker Configuration
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883

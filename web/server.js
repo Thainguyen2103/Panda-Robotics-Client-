@@ -8,12 +8,14 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 const {attachVoice, startVoiceService} = require('./voice-bridge');
-attachVoice(server);
-startVoiceService();
+const {attachGeminiLive} = require('./gemini-live-bridge');
 
 // Define MQTT settings
 const MQTT_BROKER = 'mqtt://localhost:1883';
 const mqttClient = mqtt.connect(MQTT_BROKER);
+attachVoice(server);
+attachGeminiLive(server, mqttClient);
+startVoiceService();
 
 // Serve static files
 // index.html: KHÔNG cache — để mọi lần tải đều lấy bản mới (chống lỗi file cũ)
