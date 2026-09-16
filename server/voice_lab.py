@@ -210,7 +210,7 @@ class Session:
                 # returns blank. Verify only those narrow cases with an English
                 # pass; common Vietnamese words muốn/môn/món never enter here.
                 if (not self.engine and not captured_while_listening
-                        and not question_context and wake_tail(text) is None
+                        and not question_context
                         and should_verify_wake(text,len(clip)/32,
                             settings.VOICE_WAKE_VERIFY_MAX_SEC,
                             settings.VOICE_WAKE_VERIFY_MAX_WORDS)):
@@ -219,6 +219,11 @@ class Session:
                     confirmed_tail = confirmed_wake_tail(text, verified)
                     if confirmed_tail is not None:
                         text = 'Moon' + (f', {confirmed_tail}' if confirmed_tail else '')
+                    else:
+                        # Even a literal Moon from one pass is not enough: loud
+                        # noise occasionally produces a confident single-pass
+                        # hallucination. Keep OLED in standby and ignore it.
+                        text = ''
                 if self.paused or audio_epoch != self.audio_epoch:
                     publish_state = False
                     continue

@@ -115,6 +115,9 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
                 raise result
             return result
         session.transcribe = transcribe
+        # Các ca dùng helper này mô phỏng wake hợp lệ; test false-wake bên dưới
+        # tự cấu hình kết quả xác minh khác để kiểm tra hai lượt bất đồng.
+        session.verify_wake = lambda clip: asyncio.sleep(0, result='Hey Moon')
         worker = asyncio.create_task(session.worker())
         states = captured_states or [False] * len(texts)
         for captured_while_listening in states:
@@ -143,6 +146,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
             return next(texts)
 
         session.transcribe = transcribe
+        session.verify_wake = lambda clip: asyncio.sleep(0, result='Hey Moon')
         worker = asyncio.create_task(session.worker())
 
         # Chỉ clip wakeword tồn tại trong lúc Whisper đang xác minh.
@@ -187,7 +191,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(m['event'] == 'verifying_wake' for m in socket.messages))
         self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
 
-    async def test_blank_primary_can_be_recovered_by_english_wake_pass(self):
+    async def test_blank_primary_cannot_become_false_wake_from_english_pass(self):
         socket = Socket()
         session = Session(socket, None)
         session.transcribe = lambda clip: asyncio.sleep(0, result='')
@@ -198,8 +202,22 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         worker.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await worker
-        self.assertTrue(session.listening)
-        self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
+        self.assertFalse(session.listening)
+        self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 0)
+
+    async def test_literal_moon_requires_second_pass_confirmation(self):
+        socket = Socket()
+        session = Session(socket, None)
+        session.transcribe = lambda clip: asyncio.sleep(0, result='Moon')
+        session.verify_wake = lambda clip: asyncio.sleep(0, result='tiếng hét')
+        worker = asyncio.create_task(session.worker())
+        session.clips.put_nowait((b'audio', False, session.audio_epoch))
+        await asyncio.wait_for(session.clips.join(), 2)
+        worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker
+        self.assertFalse(session.listening)
+        self.assertFalse(any(m['event'] == 'wake' for m in socket.messages))
 
     async def test_repeated_blank_standby_noise_recalibrates_without_log_spam(self):
         socket = Socket()

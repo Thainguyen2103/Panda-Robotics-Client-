@@ -56,14 +56,18 @@ class VoiceCoreTests(unittest.TestCase):
 
     def test_two_stt_passes_can_confirm_a_moon_spelling_variant(self):
         self.assertEqual(confirmed_wake_tail('Mun', 'Hey Mun'), '')
-        self.assertEqual(confirmed_wake_tail('', 'Mùn ơi'), '')
         self.assertEqual(confirmed_wake_tail('Mun', 'Hey Moon'), '')
         self.assertEqual(confirmed_wake_tail('Hey Mom', 'Hey Mum'), '')
-        self.assertEqual(confirmed_wake_tail('', 'Hey Moan'), '')
+        self.assertEqual(confirmed_wake_tail('Hey Moon', 'Hey Moan'), '')
         self.assertIsNone(confirmed_wake_tail('Mun', 'Mom'))
         self.assertIsNone(confirmed_wake_tail('Mom', 'Mum'))
         self.assertIsNone(confirmed_wake_tail('môn', 'Hey Mom'))
         self.assertIsNone(confirmed_wake_tail('xin chào', 'Hey Mun'))
+
+    def test_one_pass_or_blank_noise_cannot_confirm_wake(self):
+        self.assertIsNone(confirmed_wake_tail('', 'Hey Moon'))
+        self.assertIsNone(confirmed_wake_tail('A', 'Moon'))
+        self.assertIsNone(confirmed_wake_tail('xin chào', 'Moon'))
 
     def test_silence_and_click_do_not_make_clip(self):
         s = Segmenter(EnergyVad())

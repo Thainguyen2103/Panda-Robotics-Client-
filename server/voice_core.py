@@ -67,30 +67,39 @@ def should_verify_wake(text, duration_ms, max_sec=3.0, max_words=3):
 def confirmed_wake_tail(primary, verification):
     """Confirm Moon using the independent Vietnamese and English STT passes.
 
-    Exact ``Moon`` always wins. A targeted English pass returning a Moon-like
-    short result (for example ``Mun`` / ``Hey Mun``) also confirms a primary
-    result that was blank or another narrowly allowed Moon miss.
+    A targeted English pass must agree with Moon-like evidence in the primary
+    pass. Blank or unrelated audio never wakes from one pass guessing Moon.
     """
-    exact = wake_tail(verification)
-    if exact is not None:
-        return exact
-    if ((verification or '').strip()
-            and possible_moon_miss(primary)
-            and possible_moon_miss(verification)):
-        return ''
+    # A loud non-verbal sound can make one Whisper pass hallucinate "Moon".
+    # Require Moon-like evidence from BOTH language passes; a blank/unrelated
+    # primary transcript can no longer be rescued by one English guess.
+    primary_text = (primary or '').strip()
+    verification_text = (verification or '').strip()
+    if not primary_text or not verification_text:
+        return None
+
+    primary_exact = wake_tail(primary)
+    verification_exact = wake_tail(verification)
     primary_token, primary_called = _english_wake_token(primary)
     verify_token, verify_called = _english_wake_token(verification)
-    # Whisper often writes the proper name Moon as Mom/Mum/Moan/Move. Only
-    # accept a small allowlist of wider English spellings when the user used a
-    # calling prefix (Hey/Hi) and both independent passes remain Moon-like.
-    if (not (primary or '').strip() and verify_token and verify_called
-            and verify_token in _MOON_EN_ALIASES):
-        return ''
-    if (primary_token and verify_token and (primary_called or verify_called)
-            and primary_token in _MOON_EN_ALIASES
-            and verify_token in _MOON_EN_ALIASES):
-        return ''
-    return None
+
+    primary_narrow = (primary_exact is not None
+                      or (possible_moon_miss(primary) and bool(primary_text))
+                      or primary_token in _MOON_NARROW_ALIASES)
+    verify_narrow = (verification_exact is not None
+                     or (possible_moon_miss(verification) and bool(verification_text))
+                     or verify_token in _MOON_NARROW_ALIASES)
+    primary_wide = primary_token in _MOON_EN_ALIASES
+    verify_wide = verify_token in _MOON_EN_ALIASES
+
+    if not ((primary_narrow and verify_narrow)
+            or (primary_wide and verify_wide and (primary_called or verify_called))):
+        return None
+    if primary_exact is not None:
+        return primary_exact
+    if verification_exact is not None:
+        return verification_exact
+    return ''
 
 
 def _english_wake_token(text):
@@ -108,8 +117,11 @@ def _english_wake_token(text):
     return (words[0], called) if len(words) == 1 else (None, called)
 
 
-_MOON_EN_ALIASES = {
+_MOON_NARROW_ALIASES = {
     'moon', 'mun', 'muun', 'moun', 'moom', 'moone',
+}
+
+_MOON_EN_ALIASES = _MOON_NARROW_ALIASES | {
     'mom', 'mum', 'moan', 'morn', 'move', 'man', 'noon',
 }
 
