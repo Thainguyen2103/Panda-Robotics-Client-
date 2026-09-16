@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const {WebSocket, WebSocketServer} = require('ws');
 const {GoogleGenAI, Modality, Type} = require('@google/genai');
+const {readFishConfig, synthesizeFish} = require('./fish-tts');
 
 const DEFAULT_MODEL = 'gemini-3.8-live';
 const DEFAULT_VOICE = 'Kore';
@@ -83,16 +84,25 @@ function attachGeminiLive(server, mqttClient, options = {}) {
         wss.handleUpgrade(req, socket, head, downstream => wss.emit('connection', downstream, req));
     });
 
-    wss.on('connection', async downstream => {
+    wss.on('connection', async (downstream, req) => {
+        const query = new URL(req.url, 'http://localhost').searchParams;
+        const outputMode = query.get('mode') === 'native' ? 'native' : 'fish';
+        const fishConfig = readFishConfig(options);
+        const synthesize = options.synthesizeFish || synthesizeFish;
         let session;
         let ready = false;
         let closed = false;
         let sentSpeaking = false;
+        let pendingText = '';
+        let responseGeneration = 0;
+        let fishAbort;
 
         const cleanup = () => {
             if (closed) return;
             closed = true;
             ready = false;
+            responseGeneration++;
+            fishAbort?.abort();
             try { session?.sendRealtimeInput({audioStreamEnd: true}); } catch (_) {}
             try { session?.close(); } catch (_) {}
             if (session) publishFace('neutral');
@@ -111,6 +121,35 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             publishFace('neutral');
             sendJson({event: 'expression', expression: 'neutral'});
         };
+        const interruptFish = () => {
+            if (outputMode !== 'fish') return;
+            responseGeneration++;
+            fishAbort?.abort();
+            fishAbort = undefined;
+            pendingText = '';
+        };
+        const speakFish = async text => {
+            const generation = ++responseGeneration;
+            fishAbort?.abort();
+            fishAbort = new AbortController();
+            sendJson({event: 'fish_synthesizing'});
+            try {
+                const audio = await synthesize(text, fishConfig, {signal: fishAbort.signal});
+                if (closed || generation !== responseGeneration || downstream.readyState !== WebSocket.OPEN) return;
+                sentSpeaking = true;
+                sendJson({event: 'speaking', format: 'mp3'});
+                downstream.send(audio, {binary: true});
+                sentSpeaking = false;
+                sendJson({event: 'turn_complete'});
+            } catch (error) {
+                if (error?.name === 'AbortError' || generation !== responseGeneration || closed) return;
+                resetFace();
+                sendJson({event: 'turn_error', text: error?.message || 'Không tạo được giọng Fish Audio.'});
+                sendJson({event: 'listening'});
+            } finally {
+                if (generation === responseGeneration) fishAbort = undefined;
+            }
+        };
         const handleToolCalls = calls => {
             if (!session || !Array.isArray(calls) || calls.length === 0) return;
             const functionResponses = calls.map(call => {
@@ -127,21 +166,38 @@ function attachGeminiLive(server, mqttClient, options = {}) {
         const handleMessage = message => {
             if (message.setupComplete) {
                 ready = true;
-                sendJson({event: 'ready', model, voice});
+                sendJson({
+                    event: 'ready',
+                    model,
+                    voice: outputMode === 'fish' ? 'Fish Voice' : voice,
+                    outputMode,
+                });
             }
 
             const activity = message.voiceActivity?.voiceActivityType;
-            if (activity === 'ACTIVITY_START') sendJson({event: 'user_speaking'});
+            if (activity === 'ACTIVITY_START') {
+                interruptFish();
+                sendJson({event: 'user_speaking'});
+            }
             if (activity === 'ACTIVITY_END') sendJson({event: 'thinking'});
 
             const content = message.serverContent;
             if (content?.interrupted) {
+                interruptFish();
                 sentSpeaking = false;
                 sendJson({event: 'interrupted'});
             }
 
-            const audioParts = content?.modelTurn?.parts?.filter(part =>
-                part.inlineData?.data && String(part.inlineData.mimeType || '').startsWith('audio/')) || [];
+            if (outputMode === 'fish') {
+                const textParts = content?.modelTurn?.parts?.filter(part =>
+                    typeof part.text === 'string' && !part.thought) || [];
+                for (const part of textParts) pendingText += part.text;
+            }
+
+            const audioParts = outputMode === 'native'
+                ? (content?.modelTurn?.parts?.filter(part =>
+                    part.inlineData?.data && String(part.inlineData.mimeType || '').startsWith('audio/')) || [])
+                : [];
             for (const part of audioParts) {
                 if (!sentSpeaking) {
                     sentSpeaking = true;
@@ -155,7 +211,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                     downstream.send(Buffer.from(part.inlineData.data, 'base64'), {binary: true});
                 }
             }
-            if (audioParts.length === 0 && message.data) {
+            if (outputMode === 'native' && audioParts.length === 0 && message.data) {
                 if (!sentSpeaking) {
                     sentSpeaking = true;
                     sendJson({event: 'speaking'});
@@ -167,7 +223,17 @@ function attachGeminiLive(server, mqttClient, options = {}) {
 
             if (content?.turnComplete) {
                 sentSpeaking = false;
-                sendJson({event: 'turn_complete'});
+                if (outputMode === 'fish') {
+                    const text = pendingText.trim();
+                    pendingText = '';
+                    if (text) void speakFish(text);
+                    else {
+                        sendJson({event: 'turn_error', text: 'Gemini chưa tạo được câu trả lời.'});
+                        sendJson({event: 'listening'});
+                    }
+                } else {
+                    sendJson({event: 'turn_complete'});
+                }
             } else if (content?.waitingForInput) {
                 sendJson({event: 'listening'});
             }
@@ -180,21 +246,30 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             fail('Chưa có GEMINI_API_KEY. Hãy thêm key vào config/secrets.py rồi chạy lại start.bat.', 'missing_key');
             return;
         }
+        if (outputMode === 'fish' && (!fishConfig.apiKey || !fishConfig.voiceId)) {
+            fail('Chế độ Fish Voice cần FISH_AUDIO_API_KEY và FISH_VOICE_ID trong cấu hình.', 'missing_fish_config');
+            return;
+        }
 
-        sendJson({event: 'connecting', model, voice});
+        sendJson({event: 'connecting', model, voice: outputMode === 'fish' ? 'Fish Voice' : voice, outputMode});
         try {
             const ai = createClient(apiKey);
             session = await ai.live.connect({
                 model,
                 config: {
-                    responseModalities: [Modality.AUDIO],
-                    speechConfig: {voiceConfig: {prebuiltVoiceConfig: {voiceName: voice}}},
+                    responseModalities: [outputMode === 'fish' ? Modality.TEXT : Modality.AUDIO],
+                    ...(outputMode === 'native' ? {
+                        speechConfig: {voiceConfig: {prebuiltVoiceConfig: {voiceName: voice}}},
+                    } : {}),
                     systemInstruction: {
                         parts: [{text: [
                             'Bạn là Moon, robot đồng hành thân thiện. Luôn trò chuyện tự nhiên bằng tiếng Việt.',
                             'Trả lời trực tiếp, ngắn gọn, thường từ một đến ba câu; có thể ngắt lời như hội thoại thật.',
                             'Dựa trên nội dung và giọng điệu người dùng, hãy gọi set_expression để OLED thể hiện cảm xúc phù hợp.',
                             'Không đọc transcript, không mô tả công cụ và không nói rằng bạn đang gọi công cụ.',
+                            ...(outputMode === 'fish' ? [
+                                'Câu trả lời sẽ được đọc bằng Fish Audio: chỉ viết lời nói tự nhiên, không Markdown, không emoji và không ký hiệu trang trí.',
+                            ] : []),
                         ].join(' ')}],
                     },
                     tools: [{functionDeclarations: [{

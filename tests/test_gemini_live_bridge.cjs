@@ -63,7 +63,7 @@ function waitFor(check, timeoutMs = 2000) {
 
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const port = server.address().port;
-    const client = new WebSocket(`ws://127.0.0.1:${port}/live/ws`, {
+    const client = new WebSocket(`ws://127.0.0.1:${port}/live/ws?mode=native`, {
         origin: `http://127.0.0.1:${port}`,
     });
     const jsonMessages = [];
@@ -77,6 +77,7 @@ function waitFor(check, timeoutMs = 2000) {
     callbacks.onmessage({setupComplete: {sessionId: 'test'}});
     await waitFor(() => jsonMessages.some(message => message.event === 'ready'));
     assert.equal(Object.hasOwn(connectParams.config, 'enableAffectiveDialog'), false);
+    assert.equal(connectParams.config.responseModalities[0], 'AUDIO');
 
     client.send(Buffer.alloc(960), {binary: true});
     await waitFor(() => inputs.some(input => input.audio));
