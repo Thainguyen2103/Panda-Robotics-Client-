@@ -40,6 +40,7 @@ function waitFor(check, timeoutMs = 2000) {
     const inputs = [];
     const toolResponses = [];
     let callbacks;
+    let connectParams;
     let closed = false;
     const fakeSession = {
         sendRealtimeInput(input) { inputs.push(input); },
@@ -51,6 +52,7 @@ function waitFor(check, timeoutMs = 2000) {
         createClient: () => ({
             live: {
                 async connect(params) {
+                    connectParams = params;
                     callbacks = params.callbacks;
                     queueMicrotask(() => callbacks.onopen());
                     return fakeSession;
@@ -74,6 +76,7 @@ function waitFor(check, timeoutMs = 2000) {
     await waitFor(() => callbacks);
     callbacks.onmessage({setupComplete: {sessionId: 'test'}});
     await waitFor(() => jsonMessages.some(message => message.event === 'ready'));
+    assert.equal(Object.hasOwn(connectParams.config, 'enableAffectiveDialog'), false);
 
     client.send(Buffer.alloc(960), {binary: true});
     await waitFor(() => inputs.some(input => input.audio));

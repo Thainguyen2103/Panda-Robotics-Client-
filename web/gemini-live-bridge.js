@@ -188,13 +188,12 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 model,
                 config: {
                     responseModalities: [Modality.AUDIO],
-                    enableAffectiveDialog: true,
                     speechConfig: {voiceConfig: {prebuiltVoiceConfig: {voiceName: voice}}},
                     systemInstruction: {
                         parts: [{text: [
                             'Bạn là Moon, robot đồng hành thân thiện. Luôn trò chuyện tự nhiên bằng tiếng Việt.',
                             'Trả lời trực tiếp, ngắn gọn, thường từ một đến ba câu; có thể ngắt lời như hội thoại thật.',
-                            'Khi cảm xúc phù hợp thay đổi, hãy gọi set_expression để OLED thể hiện cảm xúc.',
+                            'Dựa trên nội dung và giọng điệu người dùng, hãy gọi set_expression để OLED thể hiện cảm xúc phù hợp.',
                             'Không đọc transcript, không mô tả công cụ và không nói rằng bạn đang gọi công cụ.',
                         ].join(' ')}],
                     },

@@ -39,6 +39,10 @@ Một số driver/Chrome noise suppression tạo frame im lặng toàn bit `0`; 
 frame digital-silence đó bằng dither ±1 LSB không nghe thấy để VAD vẫn nhận được
 nhịp im lặng; mọi frame có tín hiệu được chuyển nguyên vẹn.
 
+Không bật `enableAffectiveDialog` trong setup: endpoint có thể chấp nhận bắt tay
+nhưng đóng mã `1007` ngay khi audio đầu tiên tới trên một số project/quota. Moon
+vẫn chọn biểu cảm OLED bằng system prompt và function call `set_expression`.
+
 Kiểm thử cầu nối không gọi API và không dùng quota:
 
 ```powershell
