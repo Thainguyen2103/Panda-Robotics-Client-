@@ -5,13 +5,21 @@ WebSocket cùng origin `/voice/ws` → Python Voice → STT; không gửi audio 
 MQTT hoặc Brain/LLM. Giữ microphone mở liên tục cả khi gọi STT.
 Các phần điều khiển, camera, OLED và Monitor của dashboard vẫn giữ nguyên.
 
-## Live Talk: Gemini Native Audio
+## Live Talk: Gemini Live + Fish Voice
 
 Mục **Live Talk** là chế độ riêng nằm dưới Moon Voice. Chế độ này gửi PCM mono
 16 kHz qua WebSocket cùng origin `/live/ws`; Node giữ API key và mở phiên Gemini
-Live. Gemini nhận audio và trả audio PCM 24 kHz trực tiếp, không chạy pipeline
-STT → LLM → TTS của Brain. Dashboard không hiện transcript; OLED chỉ nhận một
-trong 11 biểu cảm qua function call `set_expression`.
+Live. Gemini hiểu audio trực tiếp, không chạy Groq/Whisper STT và không dùng
+pipeline Voice của Brain. Chế độ mặc định lấy transcript nội bộ của chính câu
+trả lời Gemini rồi tạo MP3 bằng Fish Audio để giữ cùng giọng Moon; transcript
+này không hiển thị trên dashboard. Vì phải chờ đủ câu rồi mới gọi Fish, phản hồi
+chậm hơn Gemini Native và sử dụng quota Fish. OLED chỉ nhận một trong 11 biểu cảm
+qua function call `set_expression`.
+
+Menu **Giọng trả lời** có hai lựa chọn:
+
+- **Fish Voice** (mặc định): cùng `FISH_VOICE_ID` và `FISH_TTS_MODEL` với TTS hiện có.
+- **Gemini Native**: phát PCM trực tiếp bằng giọng `Kore`, nhanh hơn và không gọi Fish.
 
 Thêm key vào file không được Git theo dõi `config/secrets.py`:
 
@@ -19,13 +27,16 @@ Thêm key vào file không được Git theo dõi `config/secrets.py`:
 SECRETS = {
     # các key hiện có...
     "GEMINI_API_KEY": "key-cua-ban",
+    "FISH_AUDIO_API_KEY": "key-fish-cua-ban",
 }
 ```
 
 Sau đó chạy lại `start.bat`, mở dashboard và bấm **Bắt đầu Live Talk**. Có thể
-đặt biến môi trường `GEMINI_API_KEY` thay cho file. Mặc định dùng model
-`gemini-3.8-live` và voice `Kore`; có thể đổi bằng `GEMINI_LIVE_MODEL` và
-`GEMINI_LIVE_VOICE` trước khi chạy Node.
+đặt biến môi trường `GEMINI_API_KEY`/`FISH_AUDIO_API_KEY` thay cho file. Fish Voice
+đọc `FISH_VOICE_ID` và `FISH_TTS_MODEL` trong `config/settings.py`; có thể đặt
+`FISH_VOICE_ID` và `FISH_LIVE_TTS_MODEL` bằng biến môi trường. Mặc định Gemini
+dùng model `gemini-3.8-live` và voice nội bộ `Kore`; có thể đổi bằng
+`GEMINI_LIVE_MODEL` và `GEMINI_LIVE_VOICE` trước khi chạy Node.
 
 Live Talk và Moon Voice dùng chung Web Lock `moon-voice-microphone`, vì vậy chỉ
 một chế độ hoặc một tab giữ mic. Khi bật Live Talk, mic wake-word cũ tự dừng.
@@ -47,6 +58,8 @@ Kiểm thử cầu nối không gọi API và không dùng quota:
 
 ```powershell
 node tests/test_gemini_live_bridge.cjs
+node tests/test_gemini_live_fish.cjs
+node tests/test_fish_tts.cjs
 ```
 
 ## Chạy trên Windows
