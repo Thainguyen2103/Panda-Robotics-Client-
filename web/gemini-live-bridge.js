@@ -31,6 +31,24 @@ function normalizeExpression(value) {
     return EXPRESSIONS.has(expression) ? expression : 'neutral';
 }
 
+function preparePcmFrame(data) {
+    const frame = Buffer.from(data);
+    let hasSignal = false;
+    for (let i = 0; i < frame.length; i++) {
+        if (frame[i] !== 0) { hasSignal = true; break; }
+    }
+    if (hasSignal) return frame;
+
+    // Browser noise suppression can gate a quiet microphone to exact digital
+    // zero. Gemini Live closes the whole session with code 1007 for an all-zero
+    // audio request. Alternating one least-significant bit is inaudible
+    // (~-90 dBFS), still represents silence to VAD and keeps the PCM valid.
+    for (let i = 0; i < frame.length; i += 2) {
+        frame.writeInt16LE((i / 2) % 2 ? 1 : -1, i);
+    }
+    return frame;
+}
+
 function sameOrigin(req) {
     const origin = req.headers.origin;
     if (!origin) return true;
@@ -200,8 +218,17 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                     onopen: () => sendJson({event: 'connected'}),
                     onmessage: handleMessage,
                     onerror: event => fail(event?.message || 'Gemini Live gặp lỗi kết nối.'),
-                    onclose: () => {
+                    onclose: event => {
                         if (!closed && downstream.readyState === WebSocket.OPEN) {
+                            const closeCode = Number(event?.code) || 0;
+                            const closeReason = String(event?.reason || '').trim().slice(0, 240);
+                            sendJson({
+                                event: 'error',
+                                code: `gemini_close_${closeCode}`,
+                                text: closeReason
+                                    ? `Gemini đóng phiên (${closeCode}): ${closeReason}`
+                                    : `Gemini đóng phiên ngoài dự kiến (mã ${closeCode}).`,
+                            });
                             downstream.close(1012, 'Gemini session closed');
                         }
                     },
@@ -224,7 +251,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                     return;
                 }
                 session.sendRealtimeInput({
-                    audio: {data: Buffer.from(data).toString('base64'), mimeType: 'audio/pcm;rate=16000'},
+                    audio: {data: preparePcmFrame(data).toString('base64'), mimeType: 'audio/pcm;rate=16000'},
                 });
                 return;
             }
@@ -246,4 +273,11 @@ function attachGeminiLive(server, mqttClient, options = {}) {
     return wss;
 }
 
-module.exports = {attachGeminiLive, readGeminiKey, normalizeExpression, DEFAULT_MODEL, DEFAULT_VOICE};
+module.exports = {
+    attachGeminiLive,
+    readGeminiKey,
+    normalizeExpression,
+    preparePcmFrame,
+    DEFAULT_MODEL,
+    DEFAULT_VOICE,
+};

@@ -140,7 +140,7 @@ async function connectSocket(token) {
     };
     socket.onclose = event => {
         if (token !== generation || (!active && !starting)) return;
-        $('error').textContent = event.reason || 'Phiên Live Talk đã ngắt.';
+        $('error').textContent ||= event.reason || 'Phiên Live Talk đã ngắt.';
         stop(false, true);
     };
 }

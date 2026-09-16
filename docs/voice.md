@@ -34,6 +34,11 @@ Khi người dùng nói chen, client xóa ngay hàng đợi audio cũ. Khi phát
 trở lại `neutral`. API key không được đưa vào HTML/JavaScript trình duyệt, log
 hoặc MQTT.
 
+Một số driver/Chrome noise suppression tạo frame im lặng toàn bit `0`; Gemini
+đóng phiên với mã `1007` nếu nhận request audio kiểu này. Bridge chỉ thay đúng
+frame digital-silence đó bằng dither ±1 LSB không nghe thấy để VAD vẫn nhận được
+nhịp im lặng; mọi frame có tín hiệu được chuyển nguyên vẹn.
+
 Kiểm thử cầu nối không gọi API và không dùng quota:
 
 ```powershell

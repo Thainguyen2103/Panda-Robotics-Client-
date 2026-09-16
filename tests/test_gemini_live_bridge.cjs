@@ -4,6 +4,7 @@ const {WebSocket} = require('../web/node_modules/ws');
 const {
     attachGeminiLive,
     normalizeExpression,
+    preparePcmFrame,
     readGeminiKey,
 } = require('../web/gemini-live-bridge');
 
@@ -24,6 +25,11 @@ function waitFor(check, timeoutMs = 2000) {
     assert.equal(normalizeExpression('HAPPY'), 'happy');
     assert.equal(normalizeExpression('drive_forward'), 'neutral');
     assert.equal(readGeminiKey({env: {GEMINI_API_KEY: '  test-key  '}}), 'test-key');
+    const digitalSilence = preparePcmFrame(Buffer.alloc(960));
+    assert.equal(digitalSilence.some(byte => byte !== 0), true);
+    assert.equal(Math.max(...new Int16Array(digitalSilence.buffer, digitalSilence.byteOffset, 480)), 1);
+    const realPcm = Buffer.from([1, 0, 2, 0]);
+    assert.deepEqual(preparePcmFrame(realPcm), realPcm);
 
     const server = http.createServer();
     const published = [];
@@ -72,6 +78,7 @@ function waitFor(check, timeoutMs = 2000) {
     client.send(Buffer.alloc(960), {binary: true});
     await waitFor(() => inputs.some(input => input.audio));
     assert.equal(inputs.find(input => input.audio).audio.mimeType, 'audio/pcm;rate=16000');
+    assert.equal(Buffer.from(inputs.find(input => input.audio).audio.data, 'base64').some(byte => byte !== 0), true);
 
     callbacks.onmessage({
         toolCall: {functionCalls: [{id: 'call-1', name: 'set_expression', args: {expression: 'happy'}}]},
