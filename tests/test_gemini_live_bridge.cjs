@@ -83,6 +83,10 @@ function waitFor(check, timeoutMs = 2000) {
     assert.equal(Object.hasOwn(connectParams.config, 'enableAffectiveDialog'), false);
     assert.equal(connectParams.config.responseModalities[0], 'AUDIO');
     assert.deepEqual(connectParams.config.inputAudioTranscription, {});
+    assert.match(
+        connectParams.config.systemInstruction.parts[0].text,
+        /tiếng Anh hỏi thì đáp tiếng Anh/,
+    );
     assert.equal(
         connectParams.config.realtimeInputConfig.automaticActivityDetection.silenceDurationMs,
         700,

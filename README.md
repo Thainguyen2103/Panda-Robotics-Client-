@@ -57,6 +57,8 @@ Chạy `start.bat`, mở http://localhost:3000 và chọn **Bật trực tiếp*
 không cần gọi Moon lại. `start-voice.bat` chỉ phù hợp để kiểm tra transport/STT
 khi không cần Brain trả lời. Wake âm học tức thời cần model Moon `.ppn` và
 Picovoice key; nếu chưa có, dashboard dùng Whisper dự phòng.
+Moon trả lời theo ngôn ngữ của lượt hỏi mới nhất; câu trộn ngôn ngữ hoặc chưa đủ
+rõ sẽ nhận phản hồi song ngữ Việt–Anh ngắn gọn.
 
 ## 🚀 Chạy thử (không cần phần cứng)
 

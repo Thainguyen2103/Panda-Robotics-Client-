@@ -169,7 +169,11 @@ _MOON_NARROW_ALIASES = {
 }
 
 _MOON_EN_ALIASES = _MOON_NARROW_ALIASES | {
-    'mom', 'mum', 'moan', 'morn', 'move', 'man', 'noon',
+    # Whisper forced to Vietnamese often writes the English sound Moon as
+    # "múa" or "mưa"; accent folding turns both into "mua". This wide alias is
+    # accepted only when one pass includes a call prefix and both STT passes
+    # independently hear a Moon-like word.
+    'mom', 'mum', 'moan', 'morn', 'move', 'man', 'noon', 'mua',
 }
 
 

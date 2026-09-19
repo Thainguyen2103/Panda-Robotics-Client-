@@ -198,6 +198,20 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(m['event'] == 'verifying_wake' for m in socket.messages))
         self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
 
+    async def test_explicit_hey_moon_miss_promotes_live_session(self):
+        socket = Socket()
+        session = Session(socket, None)
+        session.transcribe = lambda clip: asyncio.sleep(0, result='Hey múa')
+        session.verify_wake = lambda clip: asyncio.sleep(0, result='Hey Moon')
+        worker = asyncio.create_task(session.worker())
+        session.clips.put_nowait((b'audio', False, session.audio_epoch))
+        await asyncio.wait_for(session.clips.join(), 2)
+        worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker
+        self.assertTrue(session.listening)
+        self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
+
     async def test_blank_primary_cannot_become_false_wake_from_english_pass(self):
         socket = Socket()
         session = Session(socket, None)

@@ -319,11 +319,13 @@ def _correct_and_classify(text: str):
     """HYBRID tiết kiệm trễ: 1 call compound-mini vừa sửa lỗi chính tả vừa
     phân loại chủ đề → (topic_id | None, câu đã sửa)."""
     r = llm.quick(
-        "Bạn là bộ sửa lỗi + phân loại cho trợ lý giọng nói tiếng Việt.\n"
+        "Bạn là bộ sửa lỗi + phân loại cho trợ lý giọng nói Việt/Anh.\n"
         "Hãy suy luận thầm theo ngữ cảnh rồi chọn 1 chủ đề phù hợp nhất và sửa lỗi "
         "chính tả câu chép từ giọng nói. Chỉ sửa từ nghe nhầm/gần âm và dấu câu; "
         "không thêm ý, không trả lời câu hỏi, giữ nguyên tên riêng, chữ viết tắt, "
-        "con số, đơn vị và mã sản phẩm. Nếu không chắc thì giữ nguyên từ gốc.\n"
+        "con số, đơn vị và mã sản phẩm. Tuyệt đối giữ nguyên ngôn ngữ người dùng, "
+        "không dịch tiếng Anh sang tiếng Việt hoặc ngược lại. Nếu không chắc thì "
+        "giữ nguyên từ gốc.\n"
         f"Danh sách chủ đề: {_TOPIC_ENUM}\n"
         "Ví dụ:\n"
         "- 'Hơ tiếp hôm nay như thế nào?' → weather|Thời tiết hôm nay như thế nào?\n"

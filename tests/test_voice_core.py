@@ -79,6 +79,12 @@ class VoiceCoreTests(unittest.TestCase):
         self.assertIsNone(confirmed_wake_tail('môn', 'Hey Mom'))
         self.assertIsNone(confirmed_wake_tail('xin chào', 'Hey Mun'))
 
+    def test_vietnamese_stt_miss_after_explicit_hey_uses_english_confirmation(self):
+        for primary in ['Hey múa', 'Hey mưa', 'Hey mua']:
+            self.assertEqual(confirmed_wake_tail(primary, 'Hey Moon'), '', primary)
+        # A Vietnamese word without an explicit call prefix remains protected.
+        self.assertIsNone(confirmed_wake_tail('trời mưa', 'Hey Moon'))
+
     def test_one_pass_or_blank_noise_cannot_confirm_wake(self):
         self.assertIsNone(confirmed_wake_tail('', 'Hey Moon'))
         self.assertIsNone(confirmed_wake_tail('A', 'Moon'))

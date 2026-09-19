@@ -384,7 +384,8 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                     ...(outputMode === 'fish' ? {outputAudioTranscription: {}} : {}),
                     systemInstruction: {
                         parts: [{text: [
-                            'Bạn là Moon, robot đồng hành thân thiện. Luôn trò chuyện tự nhiên bằng tiếng Việt.',
+                            'Bạn là Moon, robot đồng hành thân thiện.',
+                            'Mỗi lượt, hãy tự nhận biết ngôn ngữ trong câu nói mới nhất và trả lời đúng ngôn ngữ đó: tiếng Việt hỏi thì đáp tiếng Việt, tiếng Anh hỏi thì đáp tiếng Anh. Nếu người dùng trộn hai ngôn ngữ hoặc âm thanh không đủ rõ để chắc chắn, trả lời song ngữ thật ngắn: tiếng Việt trước rồi tiếng Anh tương đương. Không bị ngôn ngữ các lượt cũ chi phối.',
                             'Trả lời trực tiếp, ngắn gọn, thường từ một đến ba câu; có thể ngắt lời như hội thoại thật.',
                             'Dựa trên nội dung và giọng điệu người dùng, hãy gọi set_expression để OLED thể hiện cảm xúc phù hợp.',
                             'Không đọc transcript, không mô tả công cụ và không nói rằng bạn đang gọi công cụ.',
