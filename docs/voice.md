@@ -21,6 +21,10 @@ Menu **Giọng trả lời** có hai lựa chọn:
 - **Fish Voice** (mặc định): cùng `FISH_VOICE_ID` và `FISH_TTS_MODEL` với TTS hiện có.
 - **Gemini Native**: phát PCM trực tiếp bằng giọng `Kore`, nhanh hơn và không gọi Fish.
 
+Ở Fish Voice, bridge vẫn giữ audio Gemini của từng câu trong bộ nhớ. Nếu Fish
+timeout/lỗi hoặc trình duyệt không giải mã được MP3, câu đó tự chuyển sang giọng
+Gemini thay vì im lặng; câu kế tiếp vẫn thử Fish như bình thường.
+
 Thêm key vào file không được Git theo dõi `config/secrets.py`:
 
 ```python
