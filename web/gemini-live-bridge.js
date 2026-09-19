@@ -104,6 +104,8 @@ function attachGeminiLive(server, mqttClient, options = {}) {
         let responseGeneration = 0;
         let fishAbort;
         let fishFinalizeTimer;
+        let toolContinuationTimer;
+        let awaitingToolContinuation = false;
         let failed = false;
         let lastPlaybackFallback = [];
         let lastPlaybackText = '';
@@ -115,6 +117,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             ready = false;
             responseGeneration++;
             clearTimeout(fishFinalizeTimer);
+            clearTimeout(toolContinuationTimer);
             fishAbort?.abort();
             try { ignoreRejection(session?.sendRealtimeInput({audioStreamEnd: true})); } catch (_) {}
             try { ignoreRejection(session?.close()); } catch (_) {}
@@ -156,7 +159,10 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             if (outputMode !== 'fish') return;
             responseGeneration++;
             clearTimeout(fishFinalizeTimer);
+            clearTimeout(toolContinuationTimer);
             fishFinalizeTimer = undefined;
+            toolContinuationTimer = undefined;
+            awaitingToolContinuation = false;
             fishAbort?.abort();
             fishAbort = undefined;
             pendingText = '';
@@ -237,6 +243,8 @@ function attachGeminiLive(server, mqttClient, options = {}) {
         };
         const handleToolCalls = calls => {
             if (!session || !Array.isArray(calls) || calls.length === 0) return;
+            awaitingToolContinuation = true;
+            clearTimeout(toolContinuationTimer);
             const functionResponses = calls.map(call => {
                 if (call.name !== 'set_expression') {
                     return {id: call.id, name: call.name, response: {error: 'Unknown function'}};
@@ -247,6 +255,15 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 return {id: call.id, name: call.name, response: {output: `OLED is now ${expression}`}};
             });
             callSession('sendToolResponse', {functionResponses});
+            toolContinuationTimer = setTimeout(() => {
+                if (!awaitingToolContinuation || closed) return;
+                awaitingToolContinuation = false;
+                sendJson({
+                    event: 'turn_error',
+                    text: 'Gemini đã đổi biểu cảm nhưng chưa gửi câu trả lời. Bạn hãy nói lại câu vừa rồi.',
+                });
+                sendJson({event: 'listening'});
+            }, 8000);
         };
         const handleMessage = message => {
             if (message.setupComplete) {
@@ -267,6 +284,9 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             if (activity === 'ACTIVITY_END') sendJson({event: 'thinking'});
 
             const content = message.serverContent;
+            const hasToolCalls = Array.isArray(message.toolCall?.functionCalls)
+                && message.toolCall.functionCalls.length > 0;
+            if (hasToolCalls) handleToolCalls(message.toolCall.functionCalls);
             if (typeof content?.inputTranscription?.text === 'string') {
                 sendJson({event: 'input_transcript', text: content.inputTranscription.text});
             }
@@ -290,6 +310,14 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 part.inlineData?.data && String(part.inlineData.mimeType || '').startsWith('audio/')) || [];
             const audioChunks = audioParts.map(part => Buffer.from(part.inlineData.data, 'base64'));
             if (audioChunks.length === 0 && message.data) audioChunks.push(Buffer.from(message.data, 'base64'));
+            const hasResponseContent = audioChunks.length > 0
+                || typeof content?.outputTranscription?.text === 'string'
+                || (content?.modelTurn?.parts || []).some(part => typeof part.text === 'string' && !part.thought);
+            if (hasResponseContent && awaitingToolContinuation) {
+                awaitingToolContinuation = false;
+                clearTimeout(toolContinuationTimer);
+                toolContinuationTimer = undefined;
+            }
             if (outputMode === 'fish') {
                 for (const chunk of audioChunks) {
                     if (pendingNativeBytes + chunk.length > MAX_FALLBACK_AUDIO_BYTES) break;
@@ -307,6 +335,10 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             if (content?.turnComplete) {
                 sentSpeaking = false;
                 if (outputMode === 'fish') {
+                    // A tool-only turn (OLED expression) is not the spoken answer.
+                    // Wait for the continuation produced after sendToolResponse().
+                    if ((hasToolCalls || awaitingToolContinuation)
+                            && !pendingText.trim() && pendingNativeAudio.length === 0) return;
                     clearTimeout(fishFinalizeTimer);
                     // Output transcription can arrive a fraction after turnComplete.
                     fishFinalizeTimer = setTimeout(finalizeFishTurn, 250);
@@ -316,7 +348,6 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             } else if (content?.waitingForInput) {
                 sendJson({event: 'listening'});
             }
-            if (message.toolCall?.functionCalls) handleToolCalls(message.toolCall.functionCalls);
             if (message.goAway) sendJson({event: 'reconnecting', text: 'Phiên Gemini sắp được làm mới.'});
         };
 
@@ -348,6 +379,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                             'Không đọc transcript, không mô tả công cụ và không nói rằng bạn đang gọi công cụ.',
                             ...(outputMode === 'fish' ? [
                                 'Câu trả lời sẽ được đọc bằng Fish Audio: chỉ viết lời nói tự nhiên, không Markdown, không emoji và không ký hiệu trang trí.',
+                                'Để phát âm tiếng Việt rõ: dùng câu ngắn, dấu câu rõ; viết đầy đủ số, đơn vị và chữ viết tắt bằng tiếng Việt; ưu tiên từ tiếng Việt dễ đọc nếu có nghĩa tương đương.',
                             ] : []),
                         ].join(' ')}],
                     },

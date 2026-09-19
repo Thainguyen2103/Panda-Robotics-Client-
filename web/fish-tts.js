@@ -3,6 +3,63 @@ const path = require('path');
 
 const FISH_TTS_URL = 'https://api.fish.audio/v1/tts';
 const DEFAULT_FISH_MODEL = 's2.1-pro-free';
+const VI_DIGITS = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+
+function numberToVietnamese(value) {
+    let number = Number(value);
+    if (!Number.isSafeInteger(number) || number < 0 || number > 999999999999) return String(value);
+    if (number === 0) return VI_DIGITS[0];
+    const underThousand = input => {
+        let current = input;
+        const words = [];
+        if (current >= 100) {
+            words.push(`${VI_DIGITS[Math.floor(current / 100)]} trăm`);
+            current %= 100;
+            if (current > 0 && current < 10) words.push('lẻ');
+        }
+        if (current >= 10) {
+            const tens = Math.floor(current / 10);
+            const unit = current % 10;
+            words.push(tens === 1 ? 'mười' : `${VI_DIGITS[tens]} mươi`);
+            if (unit === 1 && tens >= 2) words.push('mốt');
+            else if (unit === 5) words.push('lăm');
+            else if (unit) words.push(VI_DIGITS[unit]);
+        } else if (current > 0) words.push(VI_DIGITS[current]);
+        return words.join(' ');
+    };
+    const scales = ['', ' nghìn', ' triệu', ' tỷ'];
+    const groups = [];
+    for (let scale = 0; number > 0; scale++) {
+        const group = number % 1000;
+        if (group) groups.unshift(`${underThousand(group)}${scales[scale] || ''}`);
+        number = Math.floor(number / 1000);
+    }
+    return groups.join(' ');
+}
+
+function normalizeVietnameseTtsText(value) {
+    let text = String(value || '').normalize('NFC').replace(/\s+/g, ' ').trim();
+    if (!/[ăâđêôơưẠ-ỹ]/u.test(text)) return text;
+    text = text.replace(/\b(\d{1,2}):(\d{2})\b/g, (raw, hourText, minuteText) => {
+        const hour = Number(hourText), minute = Number(minuteText);
+        if (hour > 23 || minute > 59) return raw;
+        return minute
+            ? `${numberToVietnamese(hour)} giờ ${numberToVietnamese(minute)} phút`
+            : `${numberToVietnamese(hour)} giờ`;
+    });
+    text = text.replace(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g, (_, day, month, year) =>
+        `${numberToVietnamese(Number(day))} tháng ${numberToVietnamese(Number(month))} năm ${numberToVietnamese(Number(year))}`);
+    text = text.replace(/(\d+(?:[.,]\d+)?)\s*%/g, '$1 phần trăm');
+    text = text.replace(/(\d+(?:[.,]\d+)?)\s*°\s*C\b/gi, '$1 độ xê');
+    const units = new Map([
+        ['km', 'ki lô mét'], ['kg', 'ki lô gam'], ['cm', 'xen ti mét'],
+        ['mm', 'mi li mét'], ['gb', 'ghi ga bai'], ['mb', 'mê ga bai'],
+    ]);
+    text = text.replace(/\b(\d+(?:[.,]\d+)?)\s*(km|kg|cm|mm|gb|mb)\b/gi,
+        (_, number, unit) => `${number} ${units.get(unit.toLowerCase())}`);
+    text = text.replace(/\d+/g, match => numberToVietnamese(Number(match)));
+    return text.replace(/\s+([,.!?;:])/g, '$1').replace(/([,.!?;:])(?=\S)/g, '$1 ');
+}
 
 function readAssignment(source, name) {
     const pattern = new RegExp(`^\\s*${name}\\s*=\\s*["']([^"']+)["']`, 'm');
@@ -36,7 +93,7 @@ function readFishConfig(options = {}) {
 }
 
 async function synthesizeFish(text, config, options = {}) {
-    const cleanText = String(text || '').trim().slice(0, 4000);
+    const cleanText = normalizeVietnameseTtsText(text).slice(0, 4000);
     if (!cleanText) throw new Error('Moon chưa tạo được nội dung để đọc.');
     if (!config?.apiKey) throw new Error('Chưa có FISH_AUDIO_API_KEY.');
     if (!config?.voiceId) throw new Error('Chưa có FISH_VOICE_ID.');
@@ -57,6 +114,7 @@ async function synthesizeFish(text, config, options = {}) {
             format: 'mp3',
             latency: 'balanced',
             normalize: true,
+            prosody: {speed: 0.94},
         }),
         signal: options.signal,
     });
@@ -133,6 +191,7 @@ module.exports = {
     readFishConfig,
     synthesizeFish,
     synthesizeFishWithRetry,
+    normalizeVietnameseTtsText,
     FISH_TTS_URL,
     DEFAULT_FISH_MODEL,
 };

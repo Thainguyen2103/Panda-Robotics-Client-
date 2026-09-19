@@ -1,5 +1,11 @@
 const assert = require('node:assert/strict');
-const {readFishConfig, synthesizeFish, synthesizeFishWithRetry, FISH_TTS_URL} = require('../web/fish-tts');
+const {
+    readFishConfig,
+    synthesizeFish,
+    synthesizeFishWithRetry,
+    normalizeVietnameseTtsText,
+    FISH_TTS_URL,
+} = require('../web/fish-tts');
 
 (async () => {
     const config = readFishConfig({
@@ -34,6 +40,7 @@ const {readFishConfig, synthesizeFish, synthesizeFishWithRetry, FISH_TTS_URL} = 
         format: 'mp3',
         latency: 'balanced',
         normalize: true,
+        prosody: {speed: 0.94},
     });
     assert.deepEqual(audio, expected);
 
@@ -62,6 +69,16 @@ const {readFishConfig, synthesizeFish, synthesizeFishWithRetry, FISH_TTS_URL} = 
         },
     }), /422/);
     assert.equal(attempts, 1);
+
+    assert.equal(
+        normalizeVietnameseTtsText('Bây giờ là 03:07, nhiệt độ 28°C và pin 75%.'),
+        'Bây giờ là ba giờ bảy phút, nhiệt độ hai mươi tám độ xê và pin bảy mươi lăm phần trăm.',
+    );
+    assert.equal(
+        normalizeVietnameseTtsText('Robot đi 12 km và dùng 4 GB.'),
+        'Robot đi mười hai ki lô mét và dùng bốn ghi ga bai.',
+    );
+    assert.equal(normalizeVietnameseTtsText('Hello at 03:07.'), 'Hello at 03:07.');
     console.log('Fish TTS tests passed');
 })().catch(error => {
     console.error(error);

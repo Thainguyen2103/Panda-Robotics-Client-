@@ -70,6 +70,15 @@ function waitFor(check, timeoutMs = 2000) {
     assert.deepEqual(connectParams.config.outputAudioTranscription, {});
     assert.equal(jsonMessages.find(message => message.event === 'ready').outputMode, 'fish');
 
+    // Gemini often emits a tool-only turn for OLED before the spoken answer.
+    // That turn must not be mistaken for an empty response.
+    callbacks.onmessage({toolCall: {
+        functionCalls: [{id: 'face-1', name: 'set_expression', args: {expression: 'happy'}}],
+    }});
+    callbacks.onmessage({serverContent: {turnComplete: true}});
+    await new Promise(resolve => setTimeout(resolve, 350));
+    assert.equal(jsonMessages.some(message => message.event === 'turn_error'), false);
+
     const decodeFallbackPcm = Buffer.from([3, 0, 4, 0]);
     callbacks.onmessage({serverContent: {
         modelTurn: {parts: [{inlineData: {mimeType: 'audio/pcm;rate=24000', data: decodeFallbackPcm.toString('base64')}}]},
