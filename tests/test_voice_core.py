@@ -72,6 +72,8 @@ class VoiceCoreTests(unittest.TestCase):
         self.assertEqual(confirmed_wake_tail('Mun', 'Hey Moon'), '')
         self.assertEqual(confirmed_wake_tail('Hey Mom', 'Hey Mum'), '')
         self.assertEqual(confirmed_wake_tail('Hey Moon', 'Hey Moan'), '')
+        self.assertEqual(confirmed_wake_tail('Hê mon', 'Hey Moon'), '')
+        self.assertEqual(confirmed_wake_tail('Hey muon', 'Hey Moon'), '')
         self.assertIsNone(confirmed_wake_tail('Mun', 'Mom'))
         self.assertIsNone(confirmed_wake_tail('Mom', 'Mum'))
         self.assertIsNone(confirmed_wake_tail('môn', 'Hey Mom'))

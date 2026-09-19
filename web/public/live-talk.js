@@ -7,7 +7,10 @@ let playHead = 0, turnComplete = false, outputMode = 'fish', incomingFormat = 'm
 let playbackGeneration = 0, decodingCount = 0;
 let pipeline = 'gemini', turnTranscript = '', responseStartedAt = 0;
 let brainWaiting = false, brainTimer, brainResumeTimer;
-let activation = 'manual', phase = 'idle', promotingWake = false;
+let geminiResponseTimer;
+let activation = 'manual', phase = 'idle', promotingWake = false, wakeCalibrating = false;
+let localSpeech = false, localSilenceFrames = 0, localNoise = .0015;
+const localSpeechVotes = [];
 const playing = new Set();
 
 function dispatch(event, extra = {}) {
@@ -55,6 +58,52 @@ function wakeTick() {
     tone.onended = () => { tone.disconnect(); volume.disconnect(); };
     tone.start(now);
     tone.stop(now + .09);
+}
+
+function resetGeminiTurnDetector() {
+    localSpeech = false;
+    localSilenceFrames = 0;
+    localSpeechVotes.length = 0;
+}
+
+function armGeminiResponseTimeout() {
+    clearTimeout(geminiResponseTimer);
+    const token = generation;
+    geminiResponseTimer = setTimeout(() => {
+        if (token !== generation || !active || pipeline !== 'gemini') return;
+        $('error').textContent = 'Gemini đã nhận câu nhưng chưa phản hồi. Bạn hãy nói lại câu vừa rồi.';
+        responseStartedAt = 0;
+        resetGeminiTurnDetector();
+        setState('listening', 'Moon vẫn đang nghe — hãy thử nói lại');
+        dispatch('listening');
+    }, 15000);
+}
+
+function detectGeminiTurnEnd(rms) {
+    if (pipeline !== 'gemini' || phase !== 'live' || !ready
+            || !ws || ws.readyState !== WebSocket.OPEN) return;
+    const threshold = Math.max(.0035, localNoise * 2.5);
+    const speech = rms >= threshold;
+    if (!localSpeech && !speech) localNoise = localNoise * .985 + rms * .015;
+    localSpeechVotes.push(speech);
+    if (localSpeechVotes.length > 5) localSpeechVotes.shift();
+    if (!localSpeech && localSpeechVotes.filter(Boolean).length >= 3) {
+        localSpeech = true;
+        localSilenceFrames = 0;
+        return;
+    }
+    if (!localSpeech) return;
+    const stillSpeaking = rms >= Math.max(.0025, threshold * .65);
+    localSilenceFrames = stillSpeaking ? 0 : localSilenceFrames + 1;
+    if (localSilenceFrames < 30) return; // 900 ms: chốt câu nếu VAD Gemini bỏ lỡ.
+
+    resetGeminiTurnDetector();
+    responseStartedAt = performance.now();
+    ws.send(JSON.stringify({command: 'audio_stream_end'}));
+    armGeminiResponseTimeout();
+    setState('thinking', 'Đã nghe xong — đang chờ Gemini trả lời…');
+    showLatency('đang chờ phản hồi');
+    dispatch('thinking');
 }
 
 async function acquireMicLock() {
@@ -181,6 +230,7 @@ function handleServer(message) {
         setState('connecting', 'Đang mở phiên Gemini Live…');
     } else if (message.event === 'ready') {
         ready = true;
+        resetGeminiTurnDetector();
         if (pipeline === 'brain') {
             outputMode = 'brain';
             $('model').textContent = 'Brain · Groq STT · LLM · Fish';
@@ -196,6 +246,7 @@ function handleServer(message) {
         dispatch('ready');
     } else if (message.event === 'user_speaking' || message.event === 'listening') {
         if (message.event === 'user_speaking') {
+            clearTimeout(geminiResponseTimer);
             clearPlayback();
             $('error').textContent = '';
             turnTranscript = '';
@@ -204,12 +255,16 @@ function handleServer(message) {
             showLatency('đang đo');
         }
         setState('listening', message.event === 'user_speaking' ? 'Bạn đang nói…' : 'Moon đang nghe — cứ nói tự nhiên');
+        if (message.event === 'listening') resetGeminiTurnDetector();
         dispatch(message.event);
     } else if (message.event === 'thinking') {
+        resetGeminiTurnDetector();
         if (!responseStartedAt) responseStartedAt = performance.now();
+        armGeminiResponseTimeout();
         setState('thinking', 'Moon đang suy nghĩ…');
         dispatch('thinking');
     } else if (message.event === 'fish_synthesizing') {
+        clearTimeout(geminiResponseTimer);
         setState('thinking', 'Đang tạo giọng Fish Audio…');
         dispatch('thinking');
     } else if (message.event === 'fish_retrying') {
@@ -217,6 +272,8 @@ function handleServer(message) {
     } else if (message.event === 'browser_tts_fallback') {
         speakBrowserFallback(message.text, message.reason);
     } else if (message.event === 'speaking') {
+        clearTimeout(geminiResponseTimer);
+        resetGeminiTurnDetector();
         incomingFormat = message.format || (outputMode === 'fish' ? 'mp3' : 'pcm');
         if (responseStartedAt) showLatency(`${Math.round(performance.now() - responseStartedAt)} ms tới âm thanh`);
         setState('speaking', 'Moon đang trả lời — bạn có thể ngắt lời');
@@ -224,6 +281,9 @@ function handleServer(message) {
     } else if (message.event === 'input_transcript') {
         turnTranscript += message.text || '';
         showHeard(turnTranscript);
+    } else if (message.event === 'input_committed') {
+        if (!responseStartedAt) responseStartedAt = performance.now();
+        setState('thinking', 'Gemini đã nhận câu — đang tạo phản hồi…');
     } else if (pipeline === 'brain' && message.event === 'calibrated') {
         setState('listening', 'Brain đang nghe — nói trực tiếp, không cần gọi Moon');
     } else if (pipeline === 'brain' && message.event === 'meter') {
@@ -265,6 +325,7 @@ function handleServer(message) {
         turnComplete = true;
         notifyPlaybackComplete();
     } else if (message.event === 'turn_error') {
+        clearTimeout(geminiResponseTimer);
         $('error').textContent = message.text || 'Không tạo được câu trả lời bằng Fish Audio.';
         setState('error', 'Lỗi tạo giọng — phiên vẫn đang nghe');
         dispatch('error', {text: message.text});
@@ -273,6 +334,7 @@ function handleServer(message) {
     } else if (message.event === 'reconnecting') {
         setState('connecting', message.text || 'Đang làm mới phiên…');
     } else if (message.event === 'error') {
+        clearTimeout(geminiResponseTimer);
         $('error').textContent = message.text;
         setState('error', 'Không thể bắt đầu Live Talk');
         dispatch('error', {text: message.text});
@@ -283,18 +345,31 @@ function handleWakeServer(message, token) {
     if (token !== generation || phase !== 'wake') return;
     if (message.event === 'ready') {
         ready = true;
-        setState('waiting', message.calibrating
+        wakeCalibrating = Boolean(message.calibrating);
+        setState(wakeCalibrating ? 'connecting' : 'waiting', wakeCalibrating
             ? 'Đang đo tiếng nền — hãy giữ im lặng' : 'Đang chờ bạn nói “Hey Moon”');
         $('model').textContent = `Wakeword · ${message.engine || 'Whisper'}`;
     } else if (message.event === 'calibrated' || message.event === 'resumed') {
-        setState('waiting', 'Đang chờ bạn nói “Hey Moon”');
+        wakeCalibrating = false;
+        setState('waiting', 'Sẵn sàng — hãy nói “Hey Moon”');
+    } else if (message.event === 'recalibrating') {
+        wakeCalibrating = true;
+        setState('connecting', 'Tiếng nền thay đổi — hãy giữ im lặng để đo lại');
     } else if (message.event === 'meter') {
         if (typeof message.rms === 'number') $('level').value = message.rms;
     } else if (message.event === 'processing') {
         setState('waiting', 'Đang kiểm tra từ khóa…');
     } else if (message.event === 'verifying_wake') {
+        if (message.text) showHeard(`Đang xác minh: ${message.text}`);
         setState('waiting', 'Đang xác minh “Hey Moon”…');
-    } else if (message.event === 'ignored' || message.event === 'state') {
+    } else if (message.event === 'transcript') {
+        showHeard(message.text || 'Đã nhận wakeword');
+        showLatency(`wake STT ${message.latency_ms || 0} ms`);
+    } else if (message.event === 'ignored') {
+        showHeard(message.text ? `Chưa khớp wakeword: ${message.text}` : 'Chưa nghe rõ wakeword');
+        showLatency(`wake STT ${message.latency_ms || 0} ms`);
+        if (!promotingWake) setState('waiting', 'Chưa nhận đúng — hãy nói lại “Hey Moon”');
+    } else if (message.event === 'state') {
         if (!promotingWake) setState('waiting', 'Đang chờ bạn nói “Hey Moon”');
     } else if (message.event === 'wake') {
         void promoteWakeToLive(token);
@@ -335,6 +410,7 @@ async function connectWakeSocket(token) {
 async function promoteWakeToLive(token) {
     if (promotingWake || token !== generation || phase !== 'wake') return;
     promotingWake = true;
+    wakeCalibrating = false;
     ready = false;
     wakeTick();
     setState('connecting', 'Đã nghe “Hey Moon” — đang mở hội thoại trực tiếp…');
@@ -444,10 +520,12 @@ async function openMicrophone(token) {
         const pcm = new Int16Array(event.data);
         let energy = 0;
         for (let i = 0; i < pcm.length; i++) energy += (pcm[i] / 32768) ** 2;
-        $('level').value = Math.sqrt(energy / Math.max(1, pcm.length));
+        const rms = Math.sqrt(energy / Math.max(1, pcm.length));
+        $('level').value = rms;
         if (!ready || !ws || ws.readyState !== WebSocket.OPEN) return;
         if (ws.bufferedAmount > 65536) return;
         ws.send(event.data);
+        detectGeminiTurnEnd(rms);
     };
     source.connect(highpass);
     highpass.connect(capture);
@@ -470,6 +548,9 @@ async function start() {
     activation = $('activation').value === 'wakeword' ? 'wakeword' : 'manual';
     phase = activation === 'wakeword' ? 'wake' : 'live';
     promotingWake = false;
+    wakeCalibrating = false;
+    localNoise = .0015;
+    resetGeminiTurnDetector();
     turnTranscript = '';
     brainWaiting = false;
     showHeard('Đang chuẩn bị…');
@@ -491,8 +572,10 @@ async function start() {
             $('duration').textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
         }, 1000);
         if (phase === 'wake') {
-            setState('waiting', 'Đang chờ bạn nói “Hey Moon”');
-            dispatch('waiting_wake');
+            setState(wakeCalibrating ? 'connecting' : 'waiting', wakeCalibrating
+                ? 'Đang đo tiếng nền — hãy giữ im lặng'
+                : 'Sẵn sàng — hãy nói “Hey Moon”');
+            dispatch('waiting_wake', {calibrating: wakeCalibrating});
         } else {
             setState('listening', pipeline === 'brain'
                 ? 'Brain đang nghe — nói trực tiếp, không cần gọi Moon'
@@ -513,9 +596,12 @@ async function stop(userRequested = true, preserveError = false) {
     active = false;
     ready = false;
     promotingWake = false;
+    wakeCalibrating = false;
+    resetGeminiTurnDetector();
     clearInterval(clockTimer);
     clearTimeout(brainTimer);
     clearTimeout(brainResumeTimer);
+    clearTimeout(geminiResponseTimer);
     brainWaiting = false;
     clearPlayback();
     if (capture) { capture.port.onmessage = null; capture.disconnect(); capture = null; }

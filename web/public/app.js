@@ -466,7 +466,9 @@ window.addEventListener('moon-live', ({detail: msg}) => {
         liveTalkActive = true;
         setVoiceState('standby');
         setOledAiMode('neutral');
-        logToTerminal('LIVE: đang chờ “Hey Moon”', 'ai-state');
+        logToTerminal(msg.calibrating
+            ? 'LIVE: đang đo tiếng nền trước khi chờ wakeword'
+            : 'LIVE: đang chờ “Hey Moon”', 'ai-state');
     } else if (msg.event === 'wake') {
         liveTalkActive = true;
         setVoiceState('listening');

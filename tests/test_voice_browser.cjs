@@ -11,19 +11,25 @@ const {chromium} = require('playwright');
         const page = await context.newPage();
         const errors = [], controls = [];
         let wakeConnections = 0, liveConnections = 0, wakeFrames = 0, liveFrames = 0;
+        let wakeScheduled = false;
         page.on('pageerror', error => errors.push(error.message));
 
         await page.routeWebSocket('**/voice/ws', socket => {
             wakeConnections++;
-            socket.send(JSON.stringify({event: 'ready', engine: 'TEST wake mock'}));
+            socket.send(JSON.stringify({
+                event: 'ready', engine: 'TEST wake mock', calibrating: true,
+            }));
             socket.onMessage(data => {
                 if (typeof data === 'string') {
                     controls.push(JSON.parse(data).command);
                     return;
                 }
                 assert.equal(data.length, 960);
-                if (++wakeFrames === 4) {
-                    socket.send(JSON.stringify({event: 'wake', engine: 'mock'}));
+                wakeFrames++;
+                if (!wakeScheduled) {
+                    wakeScheduled = true;
+                    setTimeout(() => socket.send(JSON.stringify({event: 'calibrated'})), 180);
+                    setTimeout(() => socket.send(JSON.stringify({event: 'wake', engine: 'mock'})), 380);
                 }
             });
         });
@@ -50,12 +56,14 @@ const {chromium} = require('playwright');
 
         await page.locator('#live-activation').selectOption('wakeword');
         await page.locator('#live-start').click();
+        await page.waitForFunction(() => document.getElementById('live-state').textContent.includes('đo tiếng nền'));
+        await page.waitForFunction(() => document.getElementById('live-state').textContent.includes('Sẵn sàng'));
         await page.waitForFunction(() => document.getElementById('live-state').textContent.includes('Đã thức'));
         await page.waitForFunction(() => window.toneCount >= 2);
         await page.waitForTimeout(150);
         assert.equal(wakeConnections, 1);
         assert.equal(liveConnections, 1);
-        assert(wakeFrames >= 4);
+        assert(wakeFrames > 0);
         assert(liveFrames > 0);
         assert.equal(await page.evaluate(() => window.toneCount), 2);
         await page.locator('#live-stop').click();

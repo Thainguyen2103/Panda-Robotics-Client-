@@ -156,7 +156,7 @@ def _english_wake_token(text):
     ascii_text = ''.join(c for c in unicodedata.normalize('NFD', normalized)
                          if unicodedata.category(c) != 'Mn')
     words = re.findall(r'[a-z]+', ascii_text)
-    called = bool(words and words[0] in {'hey', 'hi', 'hay'})
+    called = bool(words and words[0] in {'hey', 'hi', 'hay', 'he'})
     if called:
         words = words[1:]
     if words and words[-1] == 'oi':
@@ -165,7 +165,7 @@ def _english_wake_token(text):
 
 
 _MOON_NARROW_ALIASES = {
-    'moon', 'mun', 'muun', 'moun', 'moom', 'moone',
+    'moon', 'mun', 'muun', 'moun', 'moom', 'moone', 'mon', 'muon', 'mune',
 }
 
 _MOON_EN_ALIASES = _MOON_NARROW_ALIASES | {

@@ -38,7 +38,7 @@ class Session:
         self.continuous = continuous
         self.segmenter = Segmenter(webrtcvad.Vad(settings.VOICE_VAD_MODE),
                                    settings.VOICE_MIN_RMS, settings.VOICE_MAX_SEC,
-                                   calibration_frames=60)
+                                   calibration_frames=60 if continuous else 30)
         self.clips = asyncio.Queue(maxsize=3)
         self.acoustic_buffer = bytearray()
         self.listening = False

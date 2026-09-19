@@ -83,6 +83,10 @@ function waitFor(check, timeoutMs = 2000) {
     assert.equal(Object.hasOwn(connectParams.config, 'enableAffectiveDialog'), false);
     assert.equal(connectParams.config.responseModalities[0], 'AUDIO');
     assert.deepEqual(connectParams.config.inputAudioTranscription, {});
+    assert.equal(
+        connectParams.config.realtimeInputConfig.automaticActivityDetection.silenceDurationMs,
+        700,
+    );
 
     callbacks.onmessage({serverContent: {inputTranscription: {text: 'Xin chào Moon'}}});
     await waitFor(() => jsonMessages.some(message => message.event === 'input_transcript'));
@@ -92,6 +96,9 @@ function waitFor(check, timeoutMs = 2000) {
     await waitFor(() => inputs.some(input => input.audio));
     assert.equal(inputs.find(input => input.audio).audio.mimeType, 'audio/pcm;rate=16000');
     assert.equal(Buffer.from(inputs.find(input => input.audio).audio.data, 'base64').some(byte => byte !== 0), true);
+    client.send(JSON.stringify({command: 'audio_stream_end'}));
+    await waitFor(() => inputs.some(input => input.audioStreamEnd));
+    await waitFor(() => jsonMessages.some(message => message.event === 'input_committed'));
 
     callbacks.onmessage({
         toolCall: {functionCalls: [{id: 'call-1', name: 'set_expression', args: {expression: 'happy'}}]},

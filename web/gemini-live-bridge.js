@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const {WebSocket, WebSocketServer} = require('ws');
-const {GoogleGenAI, Modality, Type} = require('@google/genai');
+const {
+    GoogleGenAI, Modality, Type, StartSensitivity, EndSensitivity,
+} = require('@google/genai');
 const {readFishConfig, synthesizeFish, synthesizeFishWithRetry} = require('./fish-tts');
 
 const DEFAULT_MODEL = 'gemini-3.8-live';
@@ -370,6 +372,15 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                     responseModalities: [Modality.AUDIO],
                     speechConfig: {voiceConfig: {prebuiltVoiceConfig: {voiceName: voice}}},
                     inputAudioTranscription: {},
+                    realtimeInputConfig: {
+                        automaticActivityDetection: {
+                            disabled: false,
+                            startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
+                            endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_HIGH,
+                            prefixPaddingMs: 300,
+                            silenceDurationMs: 700,
+                        },
+                    },
                     ...(outputMode === 'fish' ? {outputAudioTranscription: {}} : {}),
                     systemInstruction: {
                         parts: [{text: [
@@ -464,6 +475,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                     );
                 } else if (command === 'audio_stream_end') {
                     callSession('sendRealtimeInput', {audioStreamEnd: true});
+                    sendJson({event: 'input_committed'});
                 }
             } catch (_) {
                 downstream.close(1003, 'Invalid control message');

@@ -35,8 +35,17 @@ Menu **Cách kích hoạt** có hai lựa chọn dùng chung một phiên Live V
   chuyển chính microphone đó sang hội thoại liên tục. Sau lần kích hoạt này không
   cần gọi Moon lại; bấm **Kết thúc** để đóng phiên.
 
+Sau khi bấm chế độ chờ, giữ im lặng trong lúc giao diện báo **Đang đo tiếng
+nền**. Chỉ gọi “Hey Moon” khi dòng trạng thái đổi thành **Sẵn sàng**; giai đoạn
+hiệu chuẩn wakeword kéo dài khoảng 0,9 giây.
+
 Wakeword chỉ là cổng kích hoạt, không còn tự thu một câu rồi gửi qua pipeline cũ.
 Chế độ chờ giữ audio ngoài Gemini/Brain cho tới khi wakeword được xác nhận.
+
+Gemini dùng VAD tự động với ngưỡng nhạy cho hội thoại. Dashboard còn có một lớp
+dự phòng: khi đã nghe tiếng nói và gặp khoảng 0,9 giây im lặng, nó gửi tín hiệu
+kết thúc luồng audio hiện tại để Gemini chốt câu và bắt đầu trả lời; microphone
+vẫn tiếp tục dùng cho câu kế tiếp.
 
 ### So sánh Gemini Live và Brain Pipeline
 

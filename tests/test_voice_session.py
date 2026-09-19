@@ -16,6 +16,13 @@ class Socket:
 
 
 class SessionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_wake_gate_calibrates_faster_than_continuous_pipeline(self):
+        self.assertEqual(Session(Socket(), None).segmenter.calibration_frames, 30)
+        self.assertEqual(
+            Session(Socket(), None, continuous=True).segmenter.calibration_frames,
+            60,
+        )
+
     async def test_acoustic_wake_before_stt_and_frame_reblocking(self):
         class Engine:
             frame_length = 512
