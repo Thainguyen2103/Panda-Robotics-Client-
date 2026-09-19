@@ -259,6 +259,22 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         _, messages = await self.run_clips(['Tôi muốn ăn món ngon.'])
         self.assertFalse(any(m['event'] in ('wake', 'question') for m in messages))
 
+    async def test_continuous_mode_routes_every_clear_utterance_as_question(self):
+        socket = Socket()
+        session = Session(socket, None, continuous=True)
+        session.transcribe = lambda clip: asyncio.sleep(0, result='Thời tiết hôm nay thế nào?')
+        worker = asyncio.create_task(session.worker())
+        session.clips.put_nowait((b'audio', False, session.audio_epoch))
+        await asyncio.wait_for(session.clips.join(), 1)
+        worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker
+        self.assertEqual(
+            [m['text'] for m in socket.messages if m['event'] == 'question'],
+            ['Thời tiết hôm nay thế nào?'],
+        )
+        self.assertFalse(any(m['event'] in ('wake', 'verifying_wake') for m in socket.messages))
+
     async def test_api_failure_recovers_without_exposing_exception(self):
         _, messages = await self.run_clips([RuntimeError('secret-value'), 'Moon, Xin chào'])
         self.assertNotIn('secret-value', str(messages))

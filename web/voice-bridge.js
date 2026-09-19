@@ -8,7 +8,8 @@ const {spawn} = require('node:child_process');
 function attachVoice(server) {
     const wss = new WebSocketServer({noServer: true, maxPayload: 4096});
     server.on('upgrade', (req, socket, head) => {
-        if (req.url !== '/voice/ws') return; // Socket.IO handles its own path.
+        const requestUrl = new URL(req.url, 'http://localhost');
+        if (requestUrl.pathname !== '/voice/ws') return; // Socket.IO handles its own path.
         if (req.headers.origin !== `http://${req.headers.host}`) {
             socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return;
         }
@@ -27,7 +28,8 @@ function attachVoice(server) {
             };
             const connectUpstream = () => {
                 if (downstream.readyState !== WebSocket.OPEN) return;
-                const candidate = new WebSocket('ws://127.0.0.1:8765/ws', {
+                const mode = requestUrl.searchParams.get('mode') === 'continuous' ? '?mode=continuous' : '';
+                const candidate = new WebSocket(`ws://127.0.0.1:8765/ws${mode}`, {
                     origin: 'http://127.0.0.1:8765', handshakeTimeout: 1500,
                     maxPayload: 1024 * 1024
                 });

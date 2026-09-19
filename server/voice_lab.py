@@ -33,8 +33,9 @@ def acoustic_engine():
 
 
 class Session:
-    def __init__(self, ws, client, engine=None):
+    def __init__(self, ws, client, engine=None, continuous=False):
         self.ws, self.client, self.engine = ws, client, engine
+        self.continuous = continuous
         self.segmenter = Segmenter(webrtcvad.Vad(settings.VOICE_VAD_MODE),
                                    settings.VOICE_MIN_RMS, settings.VOICE_MAX_SEC,
                                    calibration_frames=60)
@@ -138,7 +139,7 @@ class Session:
                 await self.emit('meter', rms=round(rms, 4), speech=speech,
                                 threshold=round(self.segmenter.threshold, 4))
             return
-        silence = (settings.VOICE_QUESTION_SILENCE_SEC if self.listening
+        silence = (settings.VOICE_QUESTION_SILENCE_SEC if (self.listening or self.continuous)
                    else settings.VOICE_WAKE_SILENCE_SEC)
         clip, rms, speech = self.segmenter.feed(pcm, silence)
         if calibrating and not self.segmenter.calibration_frames:
@@ -200,7 +201,7 @@ class Session:
                 # State is captured with the clip. Never reinterpret an older
                 # standby/background clip as a question merely because a prior
                 # network request has since recognized Moon.
-                question_context = captured_while_listening
+                question_context = captured_while_listening or self.continuous
                 await self.emit('processing',phase='question' if question_context else 'wake')
                 text = await self.transcribe(clip)
                 if self.paused or audio_epoch != self.audio_epoch:
@@ -230,13 +231,13 @@ class Session:
                 self.sequence += 1
                 # Unrelated standby ASR is diagnostic, not a user's question.
                 tail = wake_tail(text) if not self.engine else None
-                question_clip = captured_while_listening or question_context
+                question_clip = self.continuous or captured_while_listening or question_context
                 accepted = ((question_clip and self.listening)
                             or (tail is not None and not self.listening))
                 await self.emit('transcript' if accepted else 'ignored', text=text, sequence=self.sequence,
                                 latency_ms=round((time.monotonic()-start)*1000),
                                 duration_ms=round(len(clip)/32))
-                if not text and question_clip and self.listening:
+                if not text and question_clip and (self.listening or self.continuous):
                     await self.emit('rejected', text='Chưa nghe rõ câu hỏi — Moon vẫn đang nghe.')
                 elif not text:
                     # Nhiễu nền bị VAD xem là giọng có thể tạo clip rỗng liên
@@ -248,7 +249,7 @@ class Session:
                         self.segmenter.calibration = []
                         self.segmenter.calibration_frames = round(1200 / FRAME_MS)
                         await self.emit('recalibrating')
-                elif question_clip and self.listening:
+                elif question_clip and (self.listening or self.continuous):
                     self.standby_rejects = 0
                     await self.emit('question', text=tail if tail else text)
                     self.listening = False
@@ -293,13 +294,18 @@ async def socket_handler(request):
         await ws.send_json(dict(event='error', text='Thiếu GROQ_API_KEY trong config/secrets.py hoặc môi trường.'))
         await ws.close()
         return ws
+    continuous = request.query.get('mode') == 'continuous'
     engine = None
     tasks = []
     try:
-        engine, description = acoustic_engine()
+        if continuous:
+            description = 'Groq Whisper liên tục: không cần wake word'
+        else:
+            engine, description = acoustic_engine()
         async with AsyncGroq(api_key=settings.GROQ_API_KEY, timeout=15, max_retries=0) as client:
-            session = Session(ws, client, engine)
-            await session.emit('ready', engine=description, calibrating=True)
+            session = Session(ws, client, engine, continuous=continuous)
+            await session.emit('ready', engine=description, calibrating=True,
+                               mode='continuous' if continuous else 'wakeword')
             tasks = [asyncio.create_task(session.worker()), asyncio.create_task(session.watchdog())]
             async for msg in ws:
                 if msg.type == WSMsgType.BINARY:
