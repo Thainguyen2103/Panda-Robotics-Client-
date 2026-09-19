@@ -98,6 +98,9 @@ async function playEncodedAudio(arrayBuffer) {
         if (token === playbackGeneration) {
             $('error').textContent = 'Trình duyệt không giải mã được âm thanh Fish Audio.';
             turnComplete = false;
+            if (ws?.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({command: 'playback_failed'}));
+            }
         }
     } finally {
         if (token === playbackGeneration) {

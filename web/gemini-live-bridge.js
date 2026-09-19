@@ -105,6 +105,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
         let fishAbort;
         let fishFinalizeTimer;
         let failed = false;
+        let lastPlaybackFallback = [];
 
         const cleanup = () => {
             if (closed) return;
@@ -159,6 +160,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             pendingText = '';
             pendingNativeAudio = [];
             pendingNativeBytes = 0;
+            lastPlaybackFallback = [];
         };
         const sendAudio = (chunks, format, fallbackText = '', complete = true, announce = true) => {
             if (!Array.isArray(chunks) || chunks.length === 0 || downstream.readyState !== WebSocket.OPEN) return false;
@@ -194,6 +196,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 const audio = await synthesize(text, fishConfig, {signal: fishAbort.signal});
                 if (closed || generation !== responseGeneration || downstream.readyState !== WebSocket.OPEN) return;
                 sentSpeaking = true;
+                lastPlaybackFallback = fallbackAudio;
                 sendAudio([audio], 'mp3');
                 sentSpeaking = false;
             } catch (error) {
@@ -388,8 +391,13 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             try {
                 const command = JSON.parse(data.toString()).command;
                 if (command === 'playback_complete') {
+                    lastPlaybackFallback = [];
                     resetFace();
                     sendJson({event: 'listening'});
+                } else if (command === 'playback_failed' && outputMode === 'fish') {
+                    const fallbackAudio = lastPlaybackFallback;
+                    lastPlaybackFallback = [];
+                    fallbackToGeminiAudio(fallbackAudio, 'trình duyệt không phát được MP3 Fish');
                 } else if (command === 'audio_stream_end') {
                     callSession('sendRealtimeInput', {audioStreamEnd: true});
                 }

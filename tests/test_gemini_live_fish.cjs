@@ -70,7 +70,11 @@ function waitFor(check, timeoutMs = 2000) {
     assert.deepEqual(connectParams.config.outputAudioTranscription, {});
     assert.equal(jsonMessages.find(message => message.event === 'ready').outputMode, 'fish');
 
-    callbacks.onmessage({serverContent: {outputTranscription: {text: 'Xin chào '}}});
+    const decodeFallbackPcm = Buffer.from([3, 0, 4, 0]);
+    callbacks.onmessage({serverContent: {
+        modelTurn: {parts: [{inlineData: {mimeType: 'audio/pcm;rate=24000', data: decodeFallbackPcm.toString('base64')}}]},
+        outputTranscription: {text: 'Xin chào '},
+    }});
     callbacks.onmessage({serverContent: {outputTranscription: {text: 'bạn.'}}});
     callbacks.onmessage({serverContent: {turnComplete: true}});
     await waitFor(() => audioMessages.length === 1);
@@ -80,14 +84,18 @@ function waitFor(check, timeoutMs = 2000) {
     assert.equal(jsonMessages.some(message => message.event === 'fish_synthesizing'), true);
     assert.equal(jsonMessages.some(message => message.event === 'turn_complete'), true);
 
+    client.send(JSON.stringify({command: 'playback_failed'}));
+    await waitFor(() => audioMessages.length === 2);
+    assert.deepEqual(audioMessages[1], decodeFallbackPcm);
+
     const fallbackPcm = Buffer.from([0, 0, 1, 0, 2, 0]);
     callbacks.onmessage({serverContent: {
         modelTurn: {parts: [{inlineData: {mimeType: 'audio/pcm;rate=24000', data: fallbackPcm.toString('base64')}}]},
         outputTranscription: {text: 'Câu dự phòng.'},
     }});
     callbacks.onmessage({serverContent: {turnComplete: true}});
-    await waitFor(() => audioMessages.length === 2);
-    assert.deepEqual(audioMessages[1], fallbackPcm);
+    await waitFor(() => audioMessages.length === 3);
+    assert.deepEqual(audioMessages[2], fallbackPcm);
     assert.equal(jsonMessages.some(message => message.event === 'fish_fallback'), true);
     assert.equal(jsonMessages.some(message => message.event === 'speaking' && message.format === 'pcm'), true);
 
