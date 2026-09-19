@@ -248,6 +248,9 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             if (activity === 'ACTIVITY_END') sendJson({event: 'thinking'});
 
             const content = message.serverContent;
+            if (typeof content?.inputTranscription?.text === 'string') {
+                sendJson({event: 'input_transcript', text: content.inputTranscription.text});
+            }
             if (content?.interrupted) {
                 interruptFish();
                 sentSpeaking = false;
@@ -316,6 +319,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 config: {
                     responseModalities: [Modality.AUDIO],
                     speechConfig: {voiceConfig: {prebuiltVoiceConfig: {voiceName: voice}}},
+                    inputAudioTranscription: {},
                     ...(outputMode === 'fish' ? {outputAudioTranscription: {}} : {}),
                     systemInstruction: {
                         parts: [{text: [

@@ -5,10 +5,21 @@ let starting = false, active = false, ready = false, generation = 0;
 let releaseMicLock, micLockHeld = false, startedAt = 0, clockTimer;
 let playHead = 0, turnComplete = false, outputMode = 'fish', incomingFormat = 'mp3';
 let playbackGeneration = 0, decodingCount = 0;
+let pipeline = 'gemini', turnTranscript = '', responseStartedAt = 0;
+let brainWaiting = false, brainTimer, brainResumeTimer;
 const playing = new Set();
 
 function dispatch(event, extra = {}) {
-    window.dispatchEvent(new CustomEvent('moon-live', {detail: {event, ...extra}}));
+    window.dispatchEvent(new CustomEvent('moon-live', {detail: {event, pipeline, ...extra}}));
+}
+
+function showHeard(text) {
+    const clean = String(text || '').trim();
+    $('heard').textContent = clean || 'Chưa nhận diện được nội dung';
+}
+
+function showLatency(text) {
+    $('latency').textContent = `Độ trễ: ${text || '—'}`;
 }
 
 function setState(state, text) {
@@ -115,6 +126,14 @@ function handleServer(message) {
         setState('connecting', 'Đang mở phiên Gemini Live…');
     } else if (message.event === 'ready') {
         ready = true;
+        if (pipeline === 'brain') {
+            outputMode = 'brain';
+            $('model').textContent = 'Brain · Groq STT · LLM · Fish';
+            setState('listening', message.calibrating
+                ? 'Đang đo tiếng nền — hãy giữ im lặng' : 'Brain đang nghe — không cần gọi Moon');
+            dispatch('ready', {engine: message.engine});
+            return;
+        }
         outputMode = message.outputMode || 'native';
         incomingFormat = outputMode === 'fish' ? 'mp3' : 'pcm';
         $('model').textContent = `${message.model} · ${message.voice}`;
@@ -124,10 +143,15 @@ function handleServer(message) {
         if (message.event === 'user_speaking') {
             clearPlayback();
             $('error').textContent = '';
+            turnTranscript = '';
+            responseStartedAt = 0;
+            showHeard('Đang nghe…');
+            showLatency('đang đo');
         }
         setState('listening', message.event === 'user_speaking' ? 'Bạn đang nói…' : 'Moon đang nghe — cứ nói tự nhiên');
         dispatch(message.event);
     } else if (message.event === 'thinking') {
+        if (!responseStartedAt) responseStartedAt = performance.now();
         setState('thinking', 'Moon đang suy nghĩ…');
         dispatch('thinking');
     } else if (message.event === 'fish_synthesizing') {
@@ -135,8 +159,41 @@ function handleServer(message) {
         dispatch('thinking');
     } else if (message.event === 'speaking') {
         incomingFormat = message.format || (outputMode === 'fish' ? 'mp3' : 'pcm');
+        if (responseStartedAt) showLatency(`${Math.round(performance.now() - responseStartedAt)} ms tới âm thanh`);
         setState('speaking', 'Moon đang trả lời — bạn có thể ngắt lời');
         dispatch('speaking');
+    } else if (message.event === 'input_transcript') {
+        turnTranscript += message.text || '';
+        showHeard(turnTranscript);
+    } else if (pipeline === 'brain' && message.event === 'calibrated') {
+        setState('listening', 'Brain đang nghe — nói trực tiếp, không cần gọi Moon');
+    } else if (pipeline === 'brain' && message.event === 'meter') {
+        if (typeof message.rms === 'number') $('level').value = message.rms;
+    } else if (pipeline === 'brain' && message.event === 'processing') {
+        setState('thinking', 'Đang chuyển giọng nói thành văn bản…');
+    } else if (pipeline === 'brain' && message.event === 'transcript') {
+        showHeard(message.text);
+        showLatency(`STT ${message.latency_ms || 0} ms · đang chờ Brain`);
+    } else if (pipeline === 'brain' && message.event === 'question') {
+        brainWaiting = true;
+        responseStartedAt = performance.now();
+        showHeard(message.text);
+        setState('thinking', 'Brain và LLM đang xử lý…');
+        if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({command: 'pause'}));
+        dispatch('brain_question', {text: message.text});
+        clearTimeout(brainTimer);
+        brainTimer = setTimeout(() => {
+            if (!brainWaiting) return;
+            $('error').textContent = 'Brain chưa phản hồi sau 60 giây. Mic đã được mở lại.';
+            brainWaiting = false;
+            if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({command: 'resume'}));
+            setState('listening', 'Brain đang nghe — hãy thử hỏi lại');
+        }, 60000);
+    } else if (pipeline === 'brain' && message.event === 'rejected') {
+        $('error').textContent = message.text || 'Chưa nghe rõ — hãy nói lại.';
+        setState('listening', 'Brain đang nghe — hãy nói lại');
+    } else if (pipeline === 'brain' && message.event === 'state') {
+        if (!brainWaiting) setState('listening', 'Brain đang nghe — không cần gọi Moon');
     } else if (message.event === 'fish_fallback') {
         $('error').textContent = message.text || 'Fish Audio tạm lỗi; đang dùng giọng Gemini cho câu này.';
         setState('speaking', 'Đang chuyển sang giọng Gemini dự phòng…');
@@ -163,13 +220,15 @@ function handleServer(message) {
 }
 
 async function connectSocket(token) {
+    pipeline = $('pipeline').value === 'brain' ? 'brain' : 'gemini';
     const mode = $('mode').value === 'native' ? 'native' : 'fish';
-    const endpoint = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/live/ws?mode=${encodeURIComponent(mode)}`;
+    const path = pipeline === 'brain' ? '/voice/ws?mode=continuous' : `/live/ws?mode=${encodeURIComponent(mode)}`;
+    const endpoint = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${path}`;
     const socket = new WebSocket(endpoint);
     socket.binaryType = 'arraybuffer';
     ws = socket;
     await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Gemini Live không phản hồi sau 25 giây.')), 25000);
+        const timeout = setTimeout(() => reject(new Error(`${pipeline === 'brain' ? 'Voice/Brain' : 'Gemini Live'} không phản hồi sau 25 giây.`)), 25000);
         socket.onerror = () => { clearTimeout(timeout); reject(new Error('Không kết nối được Live Talk server.')); };
         socket.onclose = event => { clearTimeout(timeout); reject(new Error(event.reason || 'Live Talk server đã đóng kết nối.')); };
         socket.onmessage = event => {
@@ -184,8 +243,10 @@ async function connectSocket(token) {
     socket.onmessage = event => {
         if (token !== generation) return;
         if (typeof event.data === 'string') handleServer(JSON.parse(event.data));
-        else if (incomingFormat === 'mp3') void playEncodedAudio(event.data);
-        else playPcm24k(event.data);
+        else if (pipeline === 'gemini') {
+            if (incomingFormat === 'mp3') void playEncodedAudio(event.data);
+            else playPcm24k(event.data);
+        }
     };
     socket.onclose = event => {
         if (token !== generation || (!active && !starting)) return;
@@ -249,9 +310,15 @@ async function start() {
     $('error').textContent = '';
     $('start').disabled = true;
     $('stop').disabled = false;
+    $('pipeline').disabled = true;
     $('mode').disabled = true;
     $('device').disabled = true;
     setState('connecting', 'Đang chuẩn bị Live Talk…');
+    pipeline = $('pipeline').value === 'brain' ? 'brain' : 'gemini';
+    turnTranscript = '';
+    brainWaiting = false;
+    showHeard('Đang chuẩn bị…');
+    showLatency('đang đo');
     dispatch('starting');
     window.dispatchEvent(new Event('moon-live-request-mic'));
     try {
@@ -266,7 +333,9 @@ async function start() {
             const seconds = Math.floor((Date.now() - startedAt) / 1000);
             $('duration').textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
         }, 1000);
-        setState('listening', 'Moon đang nghe — cứ nói tự nhiên');
+        setState('listening', pipeline === 'brain'
+            ? 'Brain đang nghe — nói trực tiếp, không cần gọi Moon'
+            : 'Moon đang nghe — cứ nói tự nhiên');
         dispatch('listening');
     } catch (error) {
         if (token === generation) {
@@ -282,6 +351,9 @@ async function stop(userRequested = true, preserveError = false) {
     active = false;
     ready = false;
     clearInterval(clockTimer);
+    clearTimeout(brainTimer);
+    clearTimeout(brainResumeTimer);
+    brainWaiting = false;
     clearPlayback();
     if (capture) { capture.port.onmessage = null; capture.disconnect(); capture = null; }
     if (source) { source.disconnect(); source = null; }
@@ -292,7 +364,9 @@ async function stop(userRequested = true, preserveError = false) {
     ws = null;
     if (socket) {
         socket.onclose = null;
-        if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({command: 'audio_stream_end'}));
+        if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({
+            command: pipeline === 'brain' ? 'pause' : 'audio_stream_end',
+        }));
         socket.close();
     }
     const oldContext = context;
@@ -301,7 +375,7 @@ async function stop(userRequested = true, preserveError = false) {
     unlockMicrophone();
     $('start').disabled = false;
     $('stop').disabled = true;
-    $('mode').disabled = false;
+    $('pipeline').disabled = false;
     $('device').disabled = false;
     $('level').value = 0;
     $('duration').textContent = '00:00';
@@ -309,10 +383,29 @@ async function stop(userRequested = true, preserveError = false) {
     setState(preserveError ? 'error' : 'idle', preserveError ? 'Phiên Live Talk đã dừng' : 'Sẵn sàng kết nối');
     dispatch(preserveError ? 'error' : 'stopped', preserveError ? {text: $('error').textContent} : {});
     if (userRequested) $('state').textContent = 'Đã kết thúc Live Talk';
+    updatePipelineUi();
+}
+
+function updatePipelineUi() {
+    pipeline = $('pipeline').value === 'brain' ? 'brain' : 'gemini';
+    const brain = pipeline === 'brain';
+    $('mode').disabled = brain || active || starting;
+    $('description').textContent = brain
+        ? 'Nói liên tục không cần wake word. Groq STT chuyển câu nói cho Brain và LLM hiện tại; Fish Audio trả lời như pipeline cũ.'
+        : 'Gemini nghe và hiểu âm thanh trực tiếp. Có thể trả lời bằng Fish Voice hoặc Gemini Native; OLED chỉ hiển thị biểu cảm.';
+    $('model').textContent = brain
+        ? 'Brain · Groq STT · LLM · Fish'
+        : `gemini-3.8-live · ${$('mode').value === 'fish' ? 'Fish Voice' : 'Kore'}`;
+    if (!active && !starting) $('state').textContent = brain
+        ? 'Sẵn sàng thử Brain Pipeline không wake word'
+        : 'Sẵn sàng kết nối Gemini Live';
+    showHeard('Chưa có dữ liệu');
+    showLatency('—');
 }
 
 $('start').onclick = start;
 $('stop').onclick = () => stop(true);
+$('pipeline').onchange = updatePipelineUi;
 $('mode').onchange = () => {
     const fish = $('mode').value === 'fish';
     $('model').textContent = fish ? 'gemini-3.8-live · Fish Voice' : 'gemini-3.8-live · Kore';
@@ -320,5 +413,25 @@ $('mode').onchange = () => {
         ? 'Fish Voice chậm hơn một chút nhưng giữ đúng giọng Moon'
         : 'Gemini Native phản hồi nhanh hơn';
 };
+window.addEventListener('moon-brain-pipeline', ({detail}) => {
+    if (!active || pipeline !== 'brain') return;
+    if (detail.event === 'state' && detail.state === 'thinking') {
+        setState('thinking', 'Brain và LLM đang xử lý…');
+    } else if (detail.event === 'state' && detail.state === 'speaking') {
+        if (responseStartedAt) showLatency(`${Math.round(performance.now() - responseStartedAt)} ms tới âm thanh`);
+        setState('speaking', 'Moon đang trả lời bằng Brain + Fish…');
+    } else if (detail.event === 'state' && detail.state === 'standby' && brainWaiting) {
+        clearTimeout(brainTimer);
+        clearTimeout(brainResumeTimer);
+        const token = generation;
+        brainResumeTimer = setTimeout(() => {
+            if (token !== generation || !active || pipeline !== 'brain') return;
+            brainWaiting = false;
+            if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({command: 'resume'}));
+            setState('listening', 'Brain đang nghe — nói câu tiếp theo');
+        }, 1200);
+    }
+});
+updatePipelineUi();
 window.addEventListener('pagehide', () => stop(false));
 })();

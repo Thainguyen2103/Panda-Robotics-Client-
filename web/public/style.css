@@ -1295,6 +1295,23 @@ button:active { transform: translateY(0); }
     color: var(--text-muted);
     font: 500 11px/1.4 'JetBrains Mono', monospace;
 }
+.live-talk-result {
+    display: grid;
+    gap: 5px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid rgba(86, 112, 142, .34);
+    border-radius: 10px;
+    background: rgba(5, 12, 22, .45);
+    color: #7890aa;
+    font-size: 11px;
+}
+.live-talk-result strong {
+    color: #d6e3f2;
+    font-size: 13px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
 .live-talk-group select {
     width: 100%;
     padding: 10px;

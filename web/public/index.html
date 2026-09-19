@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20260919a">
+    <link rel="stylesheet" href="style.css?v=20260919b">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -244,7 +244,7 @@
                         </div>
                         <span class="live-talk-badge" id="live-badge" data-state="idle">Chưa chạy</span>
                     </div>
-                    <p class="live-talk-description">
+                    <p class="live-talk-description" id="live-description">
                         Gemini nghe và hiểu âm thanh trực tiếp, không dùng dịch vụ STT riêng.
                         Fish Audio giữ đúng giọng Moon; phản hồi chậm hơn một chút và có dùng quota Fish. OLED chỉ hiển thị biểu cảm.
                     </p>
@@ -258,6 +258,16 @@
                         <span id="live-model">gemini-3.8-live · Fish Voice</span>
                         <span id="live-duration">00:00</span>
                     </div>
+                    <div class="live-talk-result" aria-live="polite">
+                        <span>Nhận diện gần nhất</span>
+                        <strong id="live-heard">Chưa có dữ liệu</strong>
+                        <span id="live-latency">Độ trễ: —</span>
+                    </div>
+                    <label class="live-talk-select-label" for="live-pipeline">Hệ thống xử lý</label>
+                    <select id="live-pipeline" aria-label="Hệ thống xử lý hội thoại">
+                        <option value="gemini" selected>Gemini Live — audio native</option>
+                        <option value="brain">Brain Pipeline — STT → LLM → Fish</option>
+                    </select>
                     <label class="live-talk-select-label" for="live-mode">Giọng trả lời</label>
                     <select id="live-mode" aria-label="Giọng trả lời Live Talk">
                         <option value="fish" selected>Fish Voice — cùng giọng Moon (dùng quota Fish)</option>
@@ -316,9 +326,9 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="vision-ui.js?v=20260914e"></script>
-    <script src="app.js?v=20260919a"></script>
-    <script src="voice-panel.js?v=20260919a"></script>
-    <script src="live-talk.js?v=20260919a"></script>
+    <script src="app.js?v=20260919b"></script>
+    <script src="voice-panel.js?v=20260919b"></script>
+    <script src="live-talk.js?v=20260919b"></script>
     <script>
         lucide.createIcons();
     </script>

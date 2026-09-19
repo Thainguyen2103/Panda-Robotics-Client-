@@ -82,6 +82,11 @@ function waitFor(check, timeoutMs = 2000) {
     await waitFor(() => jsonMessages.some(message => message.event === 'ready'));
     assert.equal(Object.hasOwn(connectParams.config, 'enableAffectiveDialog'), false);
     assert.equal(connectParams.config.responseModalities[0], 'AUDIO');
+    assert.deepEqual(connectParams.config.inputAudioTranscription, {});
+
+    callbacks.onmessage({serverContent: {inputTranscription: {text: 'Xin chào Moon'}}});
+    await waitFor(() => jsonMessages.some(message => message.event === 'input_transcript'));
+    assert.equal(jsonMessages.find(message => message.event === 'input_transcript').text, 'Xin chào Moon');
 
     client.send(Buffer.alloc(960), {binary: true});
     await waitFor(() => inputs.some(input => input.audio));

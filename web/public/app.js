@@ -9,6 +9,7 @@ let robotTtsResumeTimer;
 let robotTtsEndedAt = 0;
 let transcriptTimer;
 let liveTalkActive = false;
+let liveTalkMode = '';
 function cancelTranscriptTimer() {
     clearTimeout(transcriptTimer);
     transcriptTimer = undefined;
@@ -257,9 +258,14 @@ function finalizeMoonResponse() {
 // ─── MQTT message handler ─────────────────────────────────────────────────────
 socket.on('mqtt_message', (data) => {
     const { topic, payload } = data;
+    if (liveTalkMode === 'brain' && topic === 'panda/ai/state') {
+        window.dispatchEvent(new CustomEvent('moon-brain-pipeline', {
+            detail: {event: 'state', state: payload},
+        }));
+    }
     // Live Talk có phiên audio/LLM riêng. Trạng thái AI từ Brain cũ không được
     // ghi đè giao diện trong lúc phiên Gemini Live đang hoạt động.
-    if (liveTalkActive && topic.startsWith('panda/ai/')) return;
+    if (liveTalkActive && liveTalkMode === 'gemini' && topic.startsWith('panda/ai/')) return;
     // Before a question is accepted, retained AI messages must not overwrite
     // local wake/STT progress. After handoff, live Brain messages own the UI.
     if (voiceOnlyDashboard && !webVoiceHandedOff && (topic.startsWith('panda/ai/') || topic.startsWith('panda/log/voice'))) return;
@@ -487,11 +493,22 @@ function logToTerminal(text, type) {
 window.addEventListener('moon-live', ({detail: msg}) => {
     if (msg.event === 'starting') {
         liveTalkActive = true;
+        liveTalkMode = msg.pipeline || 'gemini';
         voiceOnlyDashboard = false;
         hideThinking();
         setVoiceState('listening');
         setOledAiMode('neutral');
-        logToTerminal('LIVE: đang kết nối Gemini Native Audio', 'ai-state');
+        if (liveTalkMode === 'brain') socket.emit('mic_live', '1');
+        logToTerminal(liveTalkMode === 'brain'
+            ? 'LIVE: đang kết nối Brain Pipeline không wake word'
+            : 'LIVE: đang kết nối Gemini Native Audio', 'ai-state');
+    } else if (msg.event === 'brain_question') {
+        showUserQuestion(msg.text);
+        showThinking('Brain và LLM đang xử lý…');
+        setOledAiMode('hearing', msg.text);
+        setVoiceState('thinking');
+        logToTerminal(`VOICE CONTINUOUS: ${msg.text}`, 'log-voice');
+        socket.emit('voice_question', msg.text);
     } else if (['ready', 'listening', 'user_speaking', 'interrupted'].includes(msg.event)) {
         liveTalkActive = true;
         setVoiceState('listening');
@@ -503,7 +520,9 @@ window.addEventListener('moon-live', ({detail: msg}) => {
         drawFace(ALL_EMOTIONS.includes(msg.expression) ? msg.expression : 'neutral');
         logToTerminal(`LIVE OLED: ${msg.expression}`, 'status');
     } else if (['stopped', 'error'].includes(msg.event)) {
+        if (liveTalkMode === 'brain') socket.emit('mic_live', '0');
         liveTalkActive = false;
+        liveTalkMode = '';
         setVoiceState('standby');
         setOledAiMode('neutral');
         logToTerminal(msg.event === 'error' ? `LIVE lỗi: ${msg.text || 'Mất kết nối'}` : 'LIVE: đã kết thúc', 'sys');
