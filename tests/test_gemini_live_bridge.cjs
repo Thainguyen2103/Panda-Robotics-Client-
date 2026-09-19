@@ -42,8 +42,12 @@ function waitFor(check, timeoutMs = 2000) {
     let callbacks;
     let connectParams;
     let closed = false;
+    let rejectInput = false;
     const fakeSession = {
-        sendRealtimeInput(input) { inputs.push(input); },
+        sendRealtimeInput(input) {
+            inputs.push(input);
+            if (rejectInput) return Promise.reject(new Error('socket already closed'));
+        },
         sendToolResponse(response) { toolResponses.push(response); },
         close() { closed = true; },
     };
@@ -103,10 +107,11 @@ function waitFor(check, timeoutMs = 2000) {
     client.send(JSON.stringify({command: 'playback_complete'}));
     await waitFor(() => published.some(item => item.payload === 'neutral'));
 
-    await new Promise(resolve => {
-        client.once('close', resolve);
-        client.close();
-    });
+    const closePromise = new Promise(resolve => client.once('close', resolve));
+    rejectInput = true;
+    client.send(Buffer.from([1, 0]), {binary: true});
+    await waitFor(() => jsonMessages.some(message => message.code === 'gemini_send_error'));
+    await closePromise;
     await waitFor(() => closed);
     assert.equal(closed, true);
     await new Promise(resolve => wss.close(resolve));

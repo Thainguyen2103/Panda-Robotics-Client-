@@ -3,7 +3,7 @@ const $ = id => document.getElementById(`live-${id}`);
 let stream, context, source, highpass, capture, ws;
 let starting = false, active = false, ready = false, generation = 0;
 let releaseMicLock, micLockHeld = false, startedAt = 0, clockTimer;
-let playHead = 0, turnComplete = false, outputMode = 'fish';
+let playHead = 0, turnComplete = false, outputMode = 'fish', incomingFormat = 'mp3';
 let playbackGeneration = 0, decodingCount = 0;
 const playing = new Set();
 
@@ -113,11 +113,15 @@ function handleServer(message) {
     } else if (message.event === 'ready') {
         ready = true;
         outputMode = message.outputMode || 'native';
+        incomingFormat = outputMode === 'fish' ? 'mp3' : 'pcm';
         $('model').textContent = `${message.model} · ${message.voice}`;
         setState('listening', 'Moon đang nghe — cứ nói tự nhiên');
         dispatch('ready');
     } else if (message.event === 'user_speaking' || message.event === 'listening') {
-        if (message.event === 'user_speaking') clearPlayback();
+        if (message.event === 'user_speaking') {
+            clearPlayback();
+            $('error').textContent = '';
+        }
         setState('listening', message.event === 'user_speaking' ? 'Bạn đang nói…' : 'Moon đang nghe — cứ nói tự nhiên');
         dispatch(message.event);
     } else if (message.event === 'thinking') {
@@ -127,8 +131,12 @@ function handleServer(message) {
         setState('thinking', 'Đang tạo giọng Fish Audio…');
         dispatch('thinking');
     } else if (message.event === 'speaking') {
+        incomingFormat = message.format || (outputMode === 'fish' ? 'mp3' : 'pcm');
         setState('speaking', 'Moon đang trả lời — bạn có thể ngắt lời');
         dispatch('speaking');
+    } else if (message.event === 'fish_fallback') {
+        $('error').textContent = message.text || 'Fish Audio tạm lỗi; đang dùng giọng Gemini cho câu này.';
+        setState('speaking', 'Đang chuyển sang giọng Gemini dự phòng…');
     } else if (message.event === 'interrupted') {
         clearPlayback();
         setState('listening', 'Đã ngắt câu trả lời — Moon đang nghe');
@@ -173,7 +181,7 @@ async function connectSocket(token) {
     socket.onmessage = event => {
         if (token !== generation) return;
         if (typeof event.data === 'string') handleServer(JSON.parse(event.data));
-        else if (outputMode === 'fish') void playEncodedAudio(event.data);
+        else if (incomingFormat === 'mp3') void playEncodedAudio(event.data);
         else playPcm24k(event.data);
     };
     socket.onclose = event => {

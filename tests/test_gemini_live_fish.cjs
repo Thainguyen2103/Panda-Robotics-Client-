@@ -36,6 +36,7 @@ function waitFor(check, timeoutMs = 2000) {
         },
         synthesizeFish: async (text, config) => {
             synthRequest = {text, config};
+            if (text === 'Câu dự phòng.') throw new Error('Fish timeout');
             return expectedAudio;
         },
         createClient: () => ({
@@ -78,6 +79,17 @@ function waitFor(check, timeoutMs = 2000) {
     assert.deepEqual(audioMessages[0], expectedAudio);
     assert.equal(jsonMessages.some(message => message.event === 'fish_synthesizing'), true);
     assert.equal(jsonMessages.some(message => message.event === 'turn_complete'), true);
+
+    const fallbackPcm = Buffer.from([0, 0, 1, 0, 2, 0]);
+    callbacks.onmessage({serverContent: {
+        modelTurn: {parts: [{inlineData: {mimeType: 'audio/pcm;rate=24000', data: fallbackPcm.toString('base64')}}]},
+        outputTranscription: {text: 'Câu dự phòng.'},
+    }});
+    callbacks.onmessage({serverContent: {turnComplete: true}});
+    await waitFor(() => audioMessages.length === 2);
+    assert.deepEqual(audioMessages[1], fallbackPcm);
+    assert.equal(jsonMessages.some(message => message.event === 'fish_fallback'), true);
+    assert.equal(jsonMessages.some(message => message.event === 'speaking' && message.format === 'pcm'), true);
 
     await new Promise(resolve => {
         client.once('close', resolve);

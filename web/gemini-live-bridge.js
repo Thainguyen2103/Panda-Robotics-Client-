@@ -10,6 +10,11 @@ const EXPRESSIONS = new Set([
     'neutral', 'happy', 'sad', 'surprised', 'angry', 'love',
     'wink', 'sleepy', 'dizzy', 'cool', 'cute',
 ]);
+const MAX_FALLBACK_AUDIO_BYTES = 6 * 1024 * 1024;
+
+function ignoreRejection(result) {
+    if (result && typeof result.catch === 'function') result.catch(() => {});
+}
 
 function readGeminiKey(options = {}) {
     const env = options.env || process.env;
@@ -94,28 +99,51 @@ function attachGeminiLive(server, mqttClient, options = {}) {
         let closed = false;
         let sentSpeaking = false;
         let pendingText = '';
+        let pendingNativeAudio = [];
+        let pendingNativeBytes = 0;
         let responseGeneration = 0;
         let fishAbort;
+        let fishFinalizeTimer;
+        let failed = false;
 
         const cleanup = () => {
             if (closed) return;
             closed = true;
             ready = false;
             responseGeneration++;
+            clearTimeout(fishFinalizeTimer);
             fishAbort?.abort();
-            try { session?.sendRealtimeInput({audioStreamEnd: true}); } catch (_) {}
-            try { session?.close(); } catch (_) {}
+            try { ignoreRejection(session?.sendRealtimeInput({audioStreamEnd: true})); } catch (_) {}
+            try { ignoreRejection(session?.close()); } catch (_) {}
             if (session) publishFace('neutral');
         };
         downstream.once('close', cleanup);
         downstream.once('error', cleanup);
 
         const sendJson = value => {
-            if (downstream.readyState === WebSocket.OPEN) downstream.send(JSON.stringify(value));
+            if (downstream.readyState !== WebSocket.OPEN) return;
+            try { downstream.send(JSON.stringify(value)); } catch (_) {}
         };
         const fail = (text, code = 'live_error') => {
+            if (failed || closed) return;
+            failed = true;
             sendJson({event: 'error', code, text});
-            if (downstream.readyState === WebSocket.OPEN) downstream.close(1011, code.slice(0, 123));
+            if (downstream.readyState === WebSocket.OPEN) {
+                try { downstream.close(1011, code.slice(0, 123)); } catch (_) {}
+            }
+        };
+        const callSession = (method, payload) => {
+            if (!session || closed || failed) return;
+            try {
+                const result = session[method](payload);
+                if (result && typeof result.catch === 'function') {
+                    result.catch(error => {
+                        if (!closed) fail(error?.message || 'Mất kết nối với Gemini Live.', 'gemini_send_error');
+                    });
+                }
+            } catch (error) {
+                fail(error?.message || 'Mất kết nối với Gemini Live.', 'gemini_send_error');
+            }
         };
         const resetFace = () => {
             publishFace('neutral');
@@ -124,11 +152,40 @@ function attachGeminiLive(server, mqttClient, options = {}) {
         const interruptFish = () => {
             if (outputMode !== 'fish') return;
             responseGeneration++;
+            clearTimeout(fishFinalizeTimer);
+            fishFinalizeTimer = undefined;
             fishAbort?.abort();
             fishAbort = undefined;
             pendingText = '';
+            pendingNativeAudio = [];
+            pendingNativeBytes = 0;
         };
-        const speakFish = async text => {
+        const sendAudio = (chunks, format, fallbackText = '', complete = true, announce = true) => {
+            if (!Array.isArray(chunks) || chunks.length === 0 || downstream.readyState !== WebSocket.OPEN) return false;
+            if (fallbackText) sendJson({event: 'fish_fallback', text: fallbackText});
+            if (announce) sendJson({event: 'speaking', format});
+            try {
+                for (const chunk of chunks) {
+                    if (downstream.bufferedAmount > 512 * 1024) throw new Error('Trình duyệt nhận audio quá chậm.');
+                    downstream.send(chunk, {binary: true});
+                }
+                if (complete) sendJson({event: 'turn_complete'});
+                return true;
+            } catch (error) {
+                fail(error?.message || 'Không gửi được audio tới trình duyệt.', 'audio_send_error');
+                return false;
+            }
+        };
+        const fallbackToGeminiAudio = (chunks, reason) => {
+            const text = reason
+                ? `Fish Audio tạm lỗi (${reason}). Moon dùng giọng Gemini cho câu này.`
+                : 'Không nhận được bản chữ Fish. Moon dùng giọng Gemini cho câu này.';
+            if (sendAudio(chunks, 'pcm', text)) return;
+            resetFace();
+            sendJson({event: 'turn_error', text: 'Gemini đã trả lời nhưng không có audio có thể phát.'});
+            sendJson({event: 'listening'});
+        };
+        const speakFish = async (text, fallbackAudio) => {
             const generation = ++responseGeneration;
             fishAbort?.abort();
             fishAbort = new AbortController();
@@ -137,18 +194,24 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 const audio = await synthesize(text, fishConfig, {signal: fishAbort.signal});
                 if (closed || generation !== responseGeneration || downstream.readyState !== WebSocket.OPEN) return;
                 sentSpeaking = true;
-                sendJson({event: 'speaking', format: 'mp3'});
-                downstream.send(audio, {binary: true});
+                sendAudio([audio], 'mp3');
                 sentSpeaking = false;
-                sendJson({event: 'turn_complete'});
             } catch (error) {
                 if (error?.name === 'AbortError' || generation !== responseGeneration || closed) return;
-                resetFace();
-                sendJson({event: 'turn_error', text: error?.message || 'Không tạo được giọng Fish Audio.'});
-                sendJson({event: 'listening'});
+                fallbackToGeminiAudio(fallbackAudio, error?.message || 'không tạo được giọng Fish');
             } finally {
                 if (generation === responseGeneration) fishAbort = undefined;
             }
+        };
+        const finalizeFishTurn = () => {
+            fishFinalizeTimer = undefined;
+            const text = pendingText.trim();
+            const fallbackAudio = pendingNativeAudio;
+            pendingText = '';
+            pendingNativeAudio = [];
+            pendingNativeBytes = 0;
+            if (text) void speakFish(text, fallbackAudio);
+            else fallbackToGeminiAudio(fallbackAudio, '');
         };
         const handleToolCalls = calls => {
             if (!session || !Array.isArray(calls) || calls.length === 0) return;
@@ -161,7 +224,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 sendJson({event: 'expression', expression});
                 return {id: call.id, name: call.name, response: {output: `OLED is now ${expression}`}};
             });
-            session.sendToolResponse({functionResponses});
+            callSession('sendToolResponse', {functionResponses});
         };
         const handleMessage = message => {
             if (message.setupComplete) {
@@ -198,43 +261,30 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 }
             }
 
-            const audioParts = outputMode === 'native'
-                ? (content?.modelTurn?.parts?.filter(part =>
-                    part.inlineData?.data && String(part.inlineData.mimeType || '').startsWith('audio/')) || [])
-                : [];
-            for (const part of audioParts) {
+            const audioParts = content?.modelTurn?.parts?.filter(part =>
+                part.inlineData?.data && String(part.inlineData.mimeType || '').startsWith('audio/')) || [];
+            const audioChunks = audioParts.map(part => Buffer.from(part.inlineData.data, 'base64'));
+            if (audioChunks.length === 0 && message.data) audioChunks.push(Buffer.from(message.data, 'base64'));
+            if (outputMode === 'fish') {
+                for (const chunk of audioChunks) {
+                    if (pendingNativeBytes + chunk.length > MAX_FALLBACK_AUDIO_BYTES) break;
+                    pendingNativeAudio.push(chunk);
+                    pendingNativeBytes += chunk.length;
+                }
+            } else if (audioChunks.length > 0) {
                 if (!sentSpeaking) {
                     sentSpeaking = true;
-                    sendJson({event: 'speaking'});
+                    sendJson({event: 'speaking', format: 'pcm'});
                 }
-                if (downstream.readyState === WebSocket.OPEN) {
-                    if (downstream.bufferedAmount > 512 * 1024) {
-                        downstream.close(1013, 'Audio client is too slow');
-                        return;
-                    }
-                    downstream.send(Buffer.from(part.inlineData.data, 'base64'), {binary: true});
-                }
-            }
-            if (outputMode === 'native' && audioParts.length === 0 && message.data) {
-                if (!sentSpeaking) {
-                    sentSpeaking = true;
-                    sendJson({event: 'speaking'});
-                }
-                if (downstream.readyState === WebSocket.OPEN) {
-                    downstream.send(Buffer.from(message.data, 'base64'), {binary: true});
-                }
+                if (!sendAudio(audioChunks, 'pcm', '', false, false)) return;
             }
 
             if (content?.turnComplete) {
                 sentSpeaking = false;
                 if (outputMode === 'fish') {
-                    const text = pendingText.trim();
-                    pendingText = '';
-                    if (text) void speakFish(text);
-                    else {
-                        sendJson({event: 'turn_error', text: 'Gemini chưa tạo được câu trả lời.'});
-                        sendJson({event: 'listening'});
-                    }
+                    clearTimeout(fishFinalizeTimer);
+                    // Output transcription can arrive a fraction after turnComplete.
+                    fishFinalizeTimer = setTimeout(finalizeFishTurn, 250);
                 } else {
                     sendJson({event: 'turn_complete'});
                 }
@@ -293,7 +343,10 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 },
                 callbacks: {
                     onopen: () => sendJson({event: 'connected'}),
-                    onmessage: handleMessage,
+                    onmessage: message => {
+                        try { handleMessage(message); }
+                        catch (error) { fail(error?.message || 'Lỗi xử lý phản hồi Gemini.', 'gemini_message_error'); }
+                    },
                     onerror: event => fail(event?.message || 'Gemini Live gặp lỗi kết nối.'),
                     onclose: event => {
                         if (!closed && downstream.readyState === WebSocket.OPEN) {
@@ -312,7 +365,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 },
             });
             if (closed || downstream.readyState !== WebSocket.OPEN) {
-                try { session.close(); } catch (_) {}
+                try { ignoreRejection(session.close()); } catch (_) {}
                 return;
             }
         } catch (error) {
@@ -327,7 +380,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                     downstream.close(1003, 'Invalid PCM frame');
                     return;
                 }
-                session.sendRealtimeInput({
+                callSession('sendRealtimeInput', {
                     audio: {data: preparePcmFrame(data).toString('base64'), mimeType: 'audio/pcm;rate=16000'},
                 });
                 return;
@@ -338,7 +391,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                     resetFace();
                     sendJson({event: 'listening'});
                 } else if (command === 'audio_stream_end') {
-                    session.sendRealtimeInput({audioStreamEnd: true});
+                    callSession('sendRealtimeInput', {audioStreamEnd: true});
                 }
             } catch (_) {
                 downstream.close(1003, 'Invalid control message');
