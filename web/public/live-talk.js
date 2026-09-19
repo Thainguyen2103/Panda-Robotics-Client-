@@ -389,6 +389,7 @@ async function stop(userRequested = true, preserveError = false) {
 function updatePipelineUi() {
     pipeline = $('pipeline').value === 'brain' ? 'brain' : 'gemini';
     const brain = pipeline === 'brain';
+    if (brain) $('mode').value = 'fish';
     $('mode').disabled = brain || active || starting;
     $('description').textContent = brain
         ? 'Nói liên tục không cần wake word. Groq STT chuyển câu nói cho Brain và LLM hiện tại; Fish Audio trả lời như pipeline cũ.'

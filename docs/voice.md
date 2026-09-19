@@ -25,6 +25,22 @@ Menu **Giọng trả lời** có hai lựa chọn:
 timeout/lỗi hoặc trình duyệt không giải mã được MP3, câu đó tự chuyển sang giọng
 Gemini thay vì im lặng; câu kế tiếp vẫn thử Fish như bình thường.
 
+### So sánh Gemini Live và Brain Pipeline
+
+Menu **Hệ thống xử lý** trong cùng thẻ Live Talk cho phép thử hai kiến trúc bằng
+cùng microphone:
+
+- **Gemini Live — audio native**: Gemini nghe và tạo câu trả lời; có thể chọn
+  Fish Voice hoặc giọng Gemini Native.
+- **Brain Pipeline — STT → LLM → Fish**: VAD chia câu, Groq Whisper nhận diện,
+  `brain.py` xử lý bằng LLM hiện tại và Fish phát giọng. Đây là phiên liên tục,
+  không cần gọi từ khóa Moon.
+
+Ô **Nhận diện gần nhất** cho biết hệ thống nghe được gì. Ô **Độ trễ** hiển thị
+thời gian STT và thời gian từ lúc chốt câu tới lúc bắt đầu trả lời. Nên hỏi cùng
+một bộ 10–20 câu ở cả hai chế độ, cùng vị trí micro và mức tiếng ồn. Brain
+Pipeline tự dừng mic khi xử lý/TTS và mở lại sau 1,2 giây để tránh nghe tiếng loa.
+
 Thêm key vào file không được Git theo dõi `config/secrets.py`:
 
 ```python
