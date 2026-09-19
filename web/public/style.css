@@ -581,15 +581,6 @@ button:active { transform: translateY(0); }
 }
 
 /* ─── AI Chat Panel ──────────────────────────────────────────────────────── */
-.ai-chat-group h3 {
-    display: flex; align-items: center; gap: 8px;
-    color: var(--text);
-    font-size: 12px; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 1px;
-    margin-bottom: 12px;
-}
-.moon-icon-h3 { font-size: 16px; }
-
 .ai-chat-panel {
     background: linear-gradient(160deg, #0d1117, #10151e);
     border: 1px solid var(--border-light);
@@ -1138,46 +1129,6 @@ button:active { transform: translateY(0); }
 .oled-face.speaking.has-topic .oled-bars  { display: none; }
 .oled-face.speaking.has-topic .oled-topic { margin-top: -64px; }  /* icon nhô trên trục, caption dưới */
 
-/* ─── Browser push-to-talk mic button ─────────────────────────────────────── */
-.btn-browser-mic {
-    width: 100%;
-    margin: 10px 0 6px;
-    padding: 10px 14px;
-    border: 1px solid var(--accent);
-    border-radius: 8px;
-    background: rgba(0, 210, 255, 0.08);
-    color: var(--accent);
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s, box-shadow 0.2s;
-}
-.btn-browser-mic:hover { background: rgba(0, 210, 255, 0.18); }
-.btn-browser-mic.recording {
-    border-color: #ff4757;
-    background: rgba(255, 71, 87, 0.15);
-    color: #ff4757;
-    animation: mic-pulse 1s ease-in-out infinite;
-}
-@keyframes mic-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.5); }
-    50%      { box-shadow: 0 0 0 8px rgba(255, 71, 87, 0); }
-}
-
-/* Voice controls inside the existing Moon panel. */
-.voice-controls { min-width: 0; padding-top: 12px; }
-.voice-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
-.voice-buttons .btn-browser-mic { flex: 1 1 120px; margin: 4px 0; }
-.voice-controls select { max-width: 100%; width: 100%; padding: 10px; background: #182233; color: #e2e8f0; border: 1px solid #475569; border-radius: 8px; }
-.voice-controls p { margin: 10px 0; font-size: 13px; overflow-wrap: anywhere; }
-.voice-controls meter { width: 55%; }
-#voice-state { color: #86efac; font-weight: 600; }
-#voice-error { color: #fca5a5; }
-#voice-log { max-height: 260px; overflow: auto; padding-left: 24px; font-size: 12px; }
-#voice-log li { padding: 8px 0; overflow-wrap: anywhere; }
-.voice-controls button:disabled { opacity: .5; cursor: default; }
-
 /* ─── Gemini Native Audio / Live Talk ───────────────────────────────────── */
 .live-talk-group {
     position: relative;
@@ -1226,6 +1177,7 @@ button:active { transform: translateY(0); }
     font-weight: 600;
 }
 .live-talk-badge[data-state="listening"] { color: var(--green); border-color: rgba(46, 213, 115, .5); }
+.live-talk-badge[data-state="waiting"] { color: #facc15; border-color: rgba(250, 204, 21, .5); }
 .live-talk-badge[data-state="thinking"] { color: var(--purple); border-color: rgba(162, 155, 254, .5); }
 .live-talk-badge[data-state="speaking"] { color: var(--accent); border-color: rgba(0, 210, 255, .55); }
 .live-talk-badge[data-state="error"] { color: #fca5a5; border-color: rgba(255, 71, 87, .55); }
@@ -1275,6 +1227,12 @@ button:active { transform: translateY(0); }
     box-shadow: 0 0 25px rgba(46, 213, 115, .18);
     animation: live-pulse 1.5s ease-in-out infinite;
 }
+.live-talk-orb[data-state="waiting"] .live-talk-core {
+    color: #facc15;
+    border-color: rgba(250, 204, 21, .65);
+    box-shadow: 0 0 25px rgba(250, 204, 21, .15);
+    animation: live-pulse 2s ease-in-out infinite;
+}
 .live-talk-orb[data-state="speaking"] .live-talk-core {
     animation: live-speaking .62s ease-in-out infinite alternate;
     box-shadow: 0 0 30px rgba(0, 210, 255, .28);
@@ -1312,6 +1270,8 @@ button:active { transform: translateY(0); }
     font-weight: 600;
     overflow-wrap: anywhere;
 }
+.live-talk-chat { min-height: 140px; margin: 12px 0; padding: 12px; }
+.live-talk-chat .ai-idle-hint { padding: 12px; }
 .live-talk-group select {
     width: 100%;
     padding: 10px;

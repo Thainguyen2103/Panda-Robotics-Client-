@@ -174,72 +174,10 @@
                     </div>
                 </div>
 
-                <!-- Voice Transcript box đã được tích hợp trực tiếp lên OLED Face và Moon AI Chat -->
-
-
-                <!-- ✨ MOON AI CHAT PANEL (NEW) -->
-                <div class="visual-group ai-chat-group">
-                    <h3><span class="moon-icon-h3">🐼</span> Moon Voice</h3>
-
-                    <div class="ai-chat-panel" id="ai-chat-panel">
-
-                        <!-- Trạng thái mặc định: chờ wake-word -->
-                        <div class="ai-idle-hint" id="ai-idle-hint">
-                            <div class="ai-idle-icon">🎙️</div>
-                            <p>Nói <strong>"Moon..."</strong> để kiểm tra giọng nói</p>
-                            <p class="ai-idle-sub">Gọi “Moon”, nói câu hỏi; transcript sẽ được chuyển sang Brain để trả lời.</p>
-                        </div>
-
-                        <!-- Bubble câu hỏi người dùng -->
-                        <div class="ai-bubble user-bubble" id="ai-user-bubble" style="display:none">
-                            <div class="bubble-label"><i data-lucide="user"></i> Bạn đã nói</div>
-                            <div class="bubble-text" id="ai-user-text"></div>
-                        </div>
-
-                        <!-- Thinking indicator -->
-                        <div class="ai-thinking" id="ai-thinking-bar" style="display:none">
-                            <div class="thinking-dots">
-                                <span></span><span></span><span></span>
-                            </div>
-                            <span class="thinking-label" id="ai-thinking-label">Moon đang suy nghĩ...</span>
-                        </div>
-
-                        <!-- Bubble câu trả lời Moon -->
-                        <div class="ai-bubble moon-bubble" id="ai-moon-bubble" style="display:none">
-                            <div class="bubble-label"><span>🐼</span> Moon trả lời</div>
-                            <div class="bubble-text" id="ai-moon-text"></div>
-                            <div class="bubble-cursor" id="ai-cursor">▋</div>
-                        </div>
-
-                    </div>
-
-                    <div class="voice-controls" id="dashboard-voice" data-endpoint="/voice/ws">
-                        <div class="voice-buttons">
-                            <button class="btn-browser-mic" id="voice-start">🎙️ Bật microphone</button>
-                            <button class="btn-browser-mic" id="voice-stop" disabled>Dừng mic</button>
-                            <button class="btn-browser-mic" id="voice-test-sound">Thử tiếng tick</button>
-                        </div>
-                        <select id="voice-device" aria-label="Microphone"><option value="">Microphone mặc định</option></select>
-                        <p id="voice-display-source">Nguồn hiển thị: Brain qua MQTT (nếu đang chạy)</p>
-                        <p id="voice-state" role="status">Chưa bật mic</p>
-                        <meter id="voice-level" min="0" max="0.15" value="0" aria-label="Mức microphone"></meter>
-                        <span id="voice-speech"></span>
-                        <p id="voice-noise">Giữ im lặng 1.8 giây khi bật mic để đo tiếng nền.</p>
-                        <p id="voice-wake">Đã bắt wakeword: 0 lần</p>
-                        <p id="voice-engine">Âm thanh được gửi tới Groq để nhận diện; chỉ text câu hỏi được chuyển sang Brain/LLM.</p>
-                        <p id="voice-error" role="alert"></p>
-                        <details><summary>Chẩn đoán Voice và transcript nguyên văn</summary>
-                            <p id="voice-diagnostic"></p>
-                            <button class="btn-clear-history" id="voice-clear">Xóa nhật ký Voice</button>
-                            <ol id="voice-log" reversed></ol>
-                        </details>
-                    </div>
-                </div>
-
                 <div class="visual-group live-talk-group">
                     <div class="live-talk-heading">
                         <div>
-                            <p class="live-talk-kicker">LIVE VOICE COMPARISON</p>
+                            <p class="live-talk-kicker">MOON LIVE VOICE</p>
                             <h3><i data-lucide="audio-lines"></i> Live Talk</h3>
                         </div>
                         <span class="live-talk-badge" id="live-badge" data-state="idle">Chưa chạy</span>
@@ -265,6 +203,31 @@
                         <strong id="live-corrected" hidden>Chưa hiệu chỉnh</strong>
                         <span id="live-latency">Độ trễ: —</span>
                     </div>
+                    <div class="ai-chat-panel live-talk-chat" id="ai-chat-panel">
+                        <div class="ai-idle-hint" id="ai-idle-hint">
+                            <div class="ai-idle-icon">🎙️</div>
+                            <p>Bật trực tiếp hoặc chọn <strong>“Chờ Hey Moon”</strong></p>
+                            <p class="ai-idle-sub">Sau khi được kích hoạt, Moon sẽ trò chuyện liên tục cho đến khi bạn bấm kết thúc.</p>
+                        </div>
+                        <div class="ai-bubble user-bubble" id="ai-user-bubble" style="display:none">
+                            <div class="bubble-label"><i data-lucide="user"></i> Bạn đã nói</div>
+                            <div class="bubble-text" id="ai-user-text"></div>
+                        </div>
+                        <div class="ai-thinking" id="ai-thinking-bar" style="display:none">
+                            <div class="thinking-dots"><span></span><span></span><span></span></div>
+                            <span class="thinking-label" id="ai-thinking-label">Moon đang suy nghĩ...</span>
+                        </div>
+                        <div class="ai-bubble moon-bubble" id="ai-moon-bubble" style="display:none">
+                            <div class="bubble-label"><span>🐼</span> Moon trả lời</div>
+                            <div class="bubble-text" id="ai-moon-text"></div>
+                            <div class="bubble-cursor" id="ai-cursor">▋</div>
+                        </div>
+                    </div>
+                    <label class="live-talk-select-label" for="live-activation">Cách kích hoạt</label>
+                    <select id="live-activation" aria-label="Cách kích hoạt Live Talk">
+                        <option value="manual" selected>Bật trực tiếp</option>
+                        <option value="wakeword">Chờ “Hey Moon” rồi trò chuyện</option>
+                    </select>
                     <label class="live-talk-select-label" for="live-pipeline">Hệ thống xử lý</label>
                     <select id="live-pipeline" aria-label="Hệ thống xử lý hội thoại">
                         <option value="gemini" selected>Gemini Live — audio native</option>
@@ -328,9 +291,8 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="vision-ui.js?v=20260914e"></script>
-    <script src="app.js?v=20260919c"></script>
-    <script src="voice-panel.js?v=20260919b"></script>
-    <script src="live-talk.js?v=20260919c"></script>
+    <script src="app.js?v=20260919d"></script>
+    <script src="live-talk.js?v=20260919d"></script>
     <script>
         lucide.createIcons();
     </script>

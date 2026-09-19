@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const {chromium} = require('playwright');
+
 (async () => {
     const browser = await chromium.launch({channel: 'msedge', headless: true});
     try {
@@ -8,98 +9,54 @@ const {chromium} = require('playwright');
         page.on('pageerror', error => errors.push(error.message));
         await page.goto('http://localhost:3000');
         await page.waitForFunction(() => typeof setOledAiMode === 'function');
-        const say = msg => page.evaluate(detail => window.dispatchEvent(new CustomEvent('moon-voice', {detail})), msg);
-        await say({event: 'starting'});
-        await say({event: 'processing', phase: 'wake'});
-        await say({event: 'verifying_wake'});
-        assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/,
-            'noise/wake verification must not show listening OLED');
-        await say({event: 'wake'});
+        const say = message => page.evaluate(detail => window.dispatchEvent(
+            new CustomEvent('moon-live', {detail})), message);
+
+        // Wakeword chỉ là cổng kích hoạt. Trong lúc chờ OLED giữ trạng thái mặc định.
+        await say({event: 'starting', pipeline: 'gemini'});
+        await say({event: 'waiting_wake', pipeline: 'gemini'});
+        assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/);
+        await say({event: 'wake', pipeline: 'gemini'});
         assert.match(await page.locator('#oled-face').getAttribute('class'), /questioning/);
-        await say({event: 'processing'});
-        await say({event: 'meter', rms: .03, speech: true});
-        assert.match(await page.locator('#oled-face').getAttribute('class'), /questioning/);
-        assert.equal(await page.locator('#ai-thinking-bar').isVisible(), true);
-        assert.equal(await page.locator('#ai-thinking-label').textContent(), 'Đang nhận diện câu hỏi…');
-        await say({event: 'armed'});
-        assert.match(await page.locator('#oled-face').getAttribute('class'), /questioning/);
-        await say({event: 'state', state: 'listening'});
-        assert.match(await page.locator('#oled-face').getAttribute('class'), /questioning/);
-        await say({event: 'processing'});
-        await say({event: 'verifying_wake'});
-        assert.match(await page.locator('#oled-face').getAttribute('class'), /ai-thinking/);
-        await say({event: 'question', text: 'Ronaldo là ai?'});
-        await say({event: 'state', state: 'standby'});
-        assert.match(await page.locator('#oled-face').getAttribute('class'), /hearing/);
-        assert.equal(await page.locator('#oled-text').textContent(), '"Ronaldo là ai?"');
-        assert.equal(await page.locator('#ai-thinking-bar').isVisible(), false);
-        // Once Voice has a question, Brain owns MQTT → OLED/LLM/TTS progression.
-        await page.evaluate(() => {
-            const receive = socket.listeners('mqtt_message')[0];
-            receive({topic: 'panda/ai/state', payload: 'thinking'});
-            receive({topic: 'panda/ai/thinking', payload: JSON.stringify({stage: 'thinking'})});
-        });
-        assert.equal(await page.locator('#ai-thinking-bar').isVisible(), true);
-        assert.match(await page.locator('#oled-face').getAttribute('class'), /ai-thinking/);
-        await page.evaluate(() => socket.listeners('mqtt_message')[0]({topic: 'panda/ai/state', payload: 'standby'}));
+        await say({event: 'ready', pipeline: 'gemini'});
+        assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/);
+        await say({event: 'expression', pipeline: 'gemini', expression: 'happy'});
+        assert.match(await page.locator('#oled-face').getAttribute('class'), /happy/);
+        await say({event: 'stopped', pipeline: 'gemini'});
         assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/);
 
-        await say({event: 'wake'});
-        const text = 'Tôi muốn học tiếng Việt, dấu hỏi, dấu ngã và ký hiệu <b>nguyên văn</b>. '.repeat(8);
-        await say({event: 'question', text});
-        assert.equal(await page.locator('#ai-user-text').textContent(), text);
-        assert.equal(await page.locator('#oled-text').textContent(), `"${text}"`);
-        assert.equal(await page.locator('#ai-thinking-bar').isVisible(), false);
-        assert.equal(await page.locator('#ai-moon-bubble').isVisible(), false);
-        assert.equal(await page.locator('#terminal-log b').count(), 0, 'transcript must not become HTML');
-        assert(await page.locator('#terminal-log').textContent().then(t => t.includes('<b>nguyên văn</b>')));
-        const layout = await page.locator('#oled-text').evaluate(el => ({
-            animation: getComputedStyle(el).animationName,
-            overflow: getComputedStyle(el).overflowY,
-            canScroll: el.scrollHeight > el.clientHeight
-        }));
-        assert.deepEqual(layout, {animation: 'none', overflow: 'auto', canScroll: true});
-        await page.locator('#oled-face').screenshot({path: '.voice-venv/oled-transcript.png'});
-        await page.evaluate(() => socket.listeners('mqtt_message')[0]({topic: 'panda/ai/state', payload: 'standby'}));
-        assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/);
-        await say({event: 'question', text: 'Câu cuối'});
-        await say({event: 'stopped'});
-        assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/);
-        // With the web mic stopped, the real Brain owns all subsequent stages.
-        await page.evaluate(() => {
-            const receive = socket.listeners('mqtt_message')[0];
-            receive({topic: 'panda/ai/thinking', payload: JSON.stringify({stage: 'question', text: 'Ronaldo là ai?'})});
-            receive({topic: 'panda/ai/state', payload: 'thinking'});
-            receive({topic: 'panda/ai/thinking', payload: JSON.stringify({stage: 'thinking'})});
-        });
+        // Brain Live giữ chữ trong thẻ hội thoại; OLED chỉ hiện trạng thái/biểu cảm.
+        await say({event: 'starting', pipeline: 'brain'});
+        await say({event: 'brain_question', pipeline: 'brain', text: 'Ronaldo là ai?'});
         assert.equal(await page.locator('#ai-user-text').textContent(), 'Ronaldo là ai?');
         assert.equal(await page.locator('#ai-thinking-bar').isVisible(), true);
         assert.match(await page.locator('#oled-face').getAttribute('class'), /ai-thinking/);
-        await page.evaluate(() => socket.listeners('mqtt_message')[0]({
-            topic: 'panda/ai/thinking',
-            payload: JSON.stringify({stage: 'answer', text: 'Câu trả lời đầu tiên.'})
-        }));
-        assert.match(await page.locator('#oled-face').getAttribute('class'), /answering/);
-        assert.equal(await page.locator('#oled-text').textContent(), '"Câu trả lời đầu tiên."');
+        assert.equal(await page.locator('#oled-text').textContent(), '');
+
         await page.evaluate(() => {
             const receive = socket.listeners('mqtt_message')[0];
-            receive({topic: 'panda/ai/state', payload: 'speaking'});
-            receive({topic: 'panda/ai/response', payload: JSON.stringify({text: 'Câu trả lời từ Brain', done: true})});
+            receive({topic: 'panda/ai/thinking', payload: JSON.stringify({
+                stage: 'question_corrected', text: 'Ronaldo là ai?',
+                original: 'ronando là ai?', changed: true,
+            })});
+            receive({topic: 'panda/ai/thinking', payload: JSON.stringify({
+                stage: 'answer', text: 'Một cầu thủ.',
+            })});
+            receive({topic: 'panda/ai/response', payload: JSON.stringify({
+                text: 'Một cầu thủ.', done: true,
+            })});
         });
-        assert.equal(await page.locator('#ai-moon-bubble').isVisible(), true);
-        assert.equal(await page.locator('#ai-moon-text').textContent(), 'Câu trả lời từ Brain');
-        assert.equal(await page.locator('#ai-thinking-bar').isVisible(), false);
-        assert.match(await page.locator('#oled-face').getAttribute('class'), /answering/);
-        assert.equal(await page.locator('#oled-text').textContent(), '"Câu trả lời từ Brain"');
-        assert.deepEqual(await page.locator('#oled-text').evaluate(el => ({
-            display: getComputedStyle(el).display,
-            align: getComputedStyle(el).alignItems,
-            justify: getComputedStyle(el).justifyContent,
-            textAlign: getComputedStyle(el).textAlign
-        })), {display: 'flex', align: 'center', justify: 'center', textAlign: 'center'});
-        await page.evaluate(() => socket.listeners('mqtt_message')[0]({topic: 'panda/ai/state', payload: 'standby'}));
+        assert.equal(await page.locator('#ai-moon-text').textContent(), 'Một cầu thủ.');
+        assert.equal(await page.locator('#oled-text').textContent(), '');
+        assert.match(await page.locator('#oled-face').getAttribute('class'), /speaking/);
+
+        await page.evaluate(() => socket.listeners('mqtt_message')[0](
+            {topic: 'panda/ai/state', payload: 'standby'}));
         assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/);
+        await say({event: 'stopped', pipeline: 'brain'});
         assert.deepEqual(errors, []);
-        console.log('Voice display: Brain handoff, literal long text, MQTT progression and stop reset passed');
-    } finally { await browser.close(); }
-})().catch(error => {console.error(error); process.exitCode = 1;});
+        console.log('Voice display: wake gate, Live Voice OLED states and Brain chat passed');
+    } finally {
+        await browser.close();
+    }
+})().catch(error => { console.error(error); process.exitCode = 1; });

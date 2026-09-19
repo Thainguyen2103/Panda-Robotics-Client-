@@ -1,35 +1,7 @@
 // ─── Socket.IO setup ──────────────────────────────────────────────────────────
 const socket = io();
-let voiceOnlyDashboard = false; // The web mic claims the display only during its session.
-let webVoiceAwake = false;      // Wake đã bắt; processing tiếp theo là STT câu hỏi.
-let webVoiceHandedOff = false;  // Brain owns OLED/LLM/TTS while web mic is paused.
-let webVoiceHandoffTimer;
-let robotTtsActive = false;
-let robotTtsResumeTimer;
-let robotTtsEndedAt = 0;
-let transcriptTimer;
 let liveTalkActive = false;
 let liveTalkMode = '';
-function cancelTranscriptTimer() {
-    clearTimeout(transcriptTimer);
-    transcriptTimer = undefined;
-}
-
-function resumeWebVoiceWhenSafe() {
-    clearTimeout(robotTtsResumeTimer);
-    if (robotTtsActive) return;
-    const elapsed = robotTtsEndedAt ? performance.now() - robotTtsEndedAt : 1200;
-    const delay = Math.max(0, 1200 - elapsed);
-    robotTtsResumeTimer = setTimeout(() => {
-        if (voiceOnlyDashboard && !webVoiceHandedOff && !robotTtsActive) {
-            window.dispatchEvent(new CustomEvent('moon-voice-control', {
-                detail: {command: 'resume', reason: 'tts'}
-            }));
-            const sourceLabel = document.getElementById('voice-display-source');
-            if (sourceLabel) sourceLabel.textContent = 'Nguồn hiển thị: mic web — đang chờ Moon';
-        }
-    }, delay);
-}
 
 const visionPanel = new VisionPanel(document);
 let lastCameraFrame = 0;
@@ -117,7 +89,6 @@ const TOPIC_COLOR = {
 };
 
 function drawFace(faceName) {
-    cancelTranscriptTimer();
     // Khi set emotion thường → thoát khỏi AI mode
     oledFace.classList.remove(...ALL_EMOTIONS, ...ALL_AI_MODES, ...IDLE_BEHAVIORS);
     const pm = oledFace.className.match(/topic-[\w-]+/);
@@ -138,7 +109,6 @@ drawFace('neutral');
  * text: dùng cho hearing/answering để hiển thị transcript/câu trả lời
  */
 function setOledAiMode(mode, text = '') {
-    cancelTranscriptTimer();
     if (mode === 'neutral') {
         drawFace('neutral');
         if (oledTextEl) { oledTextEl.textContent = ''; oledTextEl.scrollTop = 0; }
@@ -178,7 +148,7 @@ socket.on('connect', () => {
 socket.on('disconnect', () => {
     dot.className = 'dot offline';
     statusText.textContent = 'Offline';
-    if (!voiceOnlyDashboard) { hideThinking(); aiCursor.style.display = 'none'; setVoiceState('standby'); setOledAiMode('neutral'); }
+    if (!liveTalkActive) { hideThinking(); aiCursor.style.display = 'none'; setVoiceState('standby'); setOledAiMode('neutral'); }
     logToTerminal('Disconnected from Server', 'sys');
 });
 
@@ -266,30 +236,8 @@ socket.on('mqtt_message', (data) => {
     // Live Talk có phiên audio/LLM riêng. Trạng thái AI từ Brain cũ không được
     // ghi đè giao diện trong lúc phiên Gemini Live đang hoạt động.
     if (liveTalkActive && liveTalkMode === 'gemini' && topic.startsWith('panda/ai/')) return;
-    // Before a question is accepted, retained AI messages must not overwrite
-    // local wake/STT progress. After handoff, live Brain messages own the UI.
-    if (voiceOnlyDashboard && !webVoiceHandedOff && (topic.startsWith('panda/ai/') || topic.startsWith('panda/log/voice'))) return;
-
     // ── Sensor status ─────────────────────────────────────────────────────────
-    if (topic === 'panda/audio/tts_active') {
-        robotTtsActive = payload === '1';
-        clearTimeout(robotTtsResumeTimer);
-        if (robotTtsActive) {
-            webVoiceAwake = false;
-            if (voiceOnlyDashboard) {
-                window.dispatchEvent(new CustomEvent('moon-voice-control', {
-                    detail: {command: 'pause', reason: 'tts'}
-                }));
-                const sourceLabel = document.getElementById('voice-display-source');
-                if (sourceLabel) sourceLabel.textContent = 'Moon đang nói — mic tạm nghỉ để không tự nghe';
-            }
-        } else {
-            // Đợi tiếng loa/echo trong phòng tắt hẳn rồi mới nghe wakeword lại.
-            robotTtsEndedAt = performance.now();
-            resumeWebVoiceWhenSafe();
-        }
-
-    } else if (topic === 'panda/status') {
+    if (topic === 'panda/status') {
         try {
             const status = JSON.parse(payload);
             distVal.textContent = status.dist + ' cm';
@@ -322,7 +270,7 @@ socket.on('mqtt_message', (data) => {
 
     // ── Face command ──────────────────────────────────────────────────────────
     } else if (topic === 'panda/cmd/face') {
-        if (voiceOnlyDashboard && ALL_AI_MODES.some(mode => oledFace.classList.contains(mode))) return;
+        if (liveTalkActive && ALL_AI_MODES.some(mode => oledFace.classList.contains(mode))) return;
         drawFace(payload);
         logToTerminal(`RX: ${topic} → ${payload}`, 'status');
 
@@ -374,11 +322,6 @@ socket.on('mqtt_message', (data) => {
             // Playback đã kết thúc: trả OLED về mặt mặc định ngay, đồng bộ
             // với loa thay vì giữ câu trả lời thêm nhiều giây.
             setOledAiMode('neutral');
-            if (webVoiceHandedOff) {
-                clearTimeout(webVoiceHandoffTimer);
-                webVoiceHandedOff = false;
-                resumeWebVoiceWhenSafe();
-            }
         }
         logToTerminal(`AI State: ${payload}`, 'ai-state');
 
@@ -395,14 +338,14 @@ socket.on('mqtt_message', (data) => {
                     break;
                 case 'question':
                     showUserQuestion(msg.text);
-                    setOledAiMode('hearing', msg.text); // OLED: text transcript
+                    setOledAiMode(liveTalkActive ? 'questioning' : 'hearing', liveTalkActive ? '' : msg.text);
                     break;
                 case 'correcting':
                     showThinking('🧠 Moon đang kiểm tra câu vừa nghe...');
                     break;
                 case 'question_corrected':
                     showUserQuestion(msg.text);
-                    setOledAiMode('hearing', msg.text);
+                    setOledAiMode(liveTalkActive ? 'questioning' : 'hearing', liveTalkActive ? '' : msg.text);
                     if (liveTalkMode === 'brain') {
                         window.dispatchEvent(new CustomEvent('moon-brain-pipeline', {
                             detail: {
@@ -427,7 +370,7 @@ socket.on('mqtt_message', (data) => {
                     break;
                 case 'answer':
                     hideThinking();
-                    setOledAiMode('answering', msg.text || '');
+                    setOledAiMode(liveTalkActive ? 'speaking' : 'answering', liveTalkActive ? '' : (msg.text || ''));
                     break;
                 case 'done':
                     hideThinking();
@@ -506,30 +449,40 @@ function logToTerminal(text, type) {
     }, 5000 + Math.random() * 9000);
 })();
 
-// Gemini Live chỉ điều khiển trạng thái và biểu cảm OLED; không hiển thị
+// Live Voice chỉ điều khiển trạng thái và biểu cảm OLED; không hiển thị
 // transcript/câu trả lời lên OLED như pipeline Voice cũ.
 window.addEventListener('moon-live', ({detail: msg}) => {
     if (msg.event === 'starting') {
         liveTalkActive = true;
         liveTalkMode = msg.pipeline || 'gemini';
-        voiceOnlyDashboard = false;
         hideThinking();
         setVoiceState('listening');
         setOledAiMode('neutral');
         if (liveTalkMode === 'brain') socket.emit('mic_live', '1');
         logToTerminal(liveTalkMode === 'brain'
-            ? 'LIVE: đang kết nối Brain Pipeline không wake word'
-            : 'LIVE: đang kết nối Gemini Native Audio', 'ai-state');
+            ? 'LIVE: đang chuẩn bị Brain Pipeline'
+            : 'LIVE: đang chuẩn bị Gemini Native Audio', 'ai-state');
+    } else if (msg.event === 'waiting_wake') {
+        liveTalkActive = true;
+        setVoiceState('standby');
+        setOledAiMode('neutral');
+        logToTerminal('LIVE: đang chờ “Hey Moon”', 'ai-state');
+    } else if (msg.event === 'wake') {
+        liveTalkActive = true;
+        setVoiceState('listening');
+        setOledAiMode('questioning');
+        logToTerminal('WAKE: đã nhận “Hey Moon” — mở Live Talk', 'log-voice');
     } else if (msg.event === 'brain_question') {
         showUserQuestion(msg.text);
         showThinking('Brain và LLM đang xử lý…');
-        setOledAiMode('hearing', msg.text);
+        setOledAiMode('ai-thinking');
         setVoiceState('thinking');
         logToTerminal(`VOICE CONTINUOUS: ${msg.text}`, 'log-voice');
         socket.emit('voice_question', msg.text);
     } else if (['ready', 'listening', 'user_speaking', 'interrupted'].includes(msg.event)) {
         liveTalkActive = true;
         setVoiceState('listening');
+        if (msg.event === 'ready') setOledAiMode('neutral');
     } else if (msg.event === 'thinking') {
         setVoiceState('thinking');
     } else if (msg.event === 'speaking') {
@@ -544,117 +497,5 @@ window.addEventListener('moon-live', ({detail: msg}) => {
         setVoiceState('standby');
         setOledAiMode('neutral');
         logToTerminal(msg.event === 'error' ? `LIVE lỗi: ${msg.text || 'Mất kết nối'}` : 'LIVE: đã kết thúc', 'sys');
-    }
-});
-
-// Voice test shares dashboard state, OLED preview and Activity Log.
-window.addEventListener('moon-voice', ({detail: msg}) => {
-    // Meter/diagnostic packets arrive continuously; they must not erase the
-    // active progress indicator or interrupt the OLED transition.
-    if (['meter', 'ignored', 'transcript', 'calibrated'].includes(msg.event)) return;
-    if (['starting', 'ready'].includes(msg.event)) {
-        voiceOnlyDashboard = true;
-        webVoiceAwake = false;
-        webVoiceHandedOff = false;
-        if (msg.event === 'starting') socket.emit('mic_live','1');
-        if (robotTtsActive) window.dispatchEvent(new CustomEvent('moon-voice-control', {
-            detail: {command: 'pause', reason: 'tts'}
-        }));
-    }
-    if (msg.event === 'stopped') {
-        voiceOnlyDashboard = false;
-        webVoiceAwake = false;
-        webVoiceHandedOff = false;
-        clearTimeout(webVoiceHandoffTimer);
-        socket.emit('mic_live','0');
-    }
-    // After handing a recognized question to Brain, ignore Voice Lab's final
-    // standby packet so it cannot erase the real LLM/TTS/OLED progression.
-    if (webVoiceHandedOff && !['stopped'].includes(msg.event)) return;
-    const sourceLabel = document.getElementById('voice-display-source');
-    if (sourceLabel) sourceLabel.textContent = voiceOnlyDashboard ? 'Nguồn hiển thị: mic web — test STT' : 'Nguồn hiển thị: Brain qua MQTT (nếu đang chạy)';
-    aiMoonBubble.style.display = 'none';
-    aiMoonText.textContent = '';
-    aiCursor.style.display = 'none';
-    if (['starting', 'ready'].includes(msg.event)) {
-        hideThinking();
-        setVoiceState('standby');
-        setOledAiMode('neutral');
-    }
-    if (msg.event === 'wake') {
-        webVoiceAwake = true;
-        hideThinking();
-        setOledAiMode('questioning');
-        setVoiceState('listening');
-        logToTerminal('WAKE: Moon — đang nghe', 'log-voice');
-    }
-    if (msg.event === 'armed') {
-        hideThinking();
-        setOledAiMode('questioning');
-        setVoiceState('listening');
-    }
-    if (msg.event === 'processing') {
-        aiIdleHint.style.display = 'none';
-        const questionPhase = msg.phase === 'question' || webVoiceAwake;
-        showThinking(questionPhase ? 'Đang nhận diện câu hỏi…' : 'Đang kiểm tra từ khóa Moon…');
-        setVoiceState('transcribing');
-        // Tiếng động lớn chỉ được phép làm dashboard kiểm tra STT. OLED giữ
-        // mặt mặc định cho đến khi event `wake` xác nhận đúng tên Moon.
-        if (questionPhase) setOledAiMode('questioning');
-    }
-    if (msg.event === 'verifying_wake') {
-        aiIdleHint.style.display = 'none';
-        showThinking('Đang xác minh tên Moon…');
-        setVoiceState('transcribing');
-        // Chưa phải wake đã xác nhận: OLED vẫn giữ mặt mặc định.
-    }
-    if (msg.event === 'question') {
-        webVoiceAwake = false;
-        showUserQuestion(msg.text);
-        hideThinking();
-        setOledAiMode('hearing', msg.text);
-        aiCursor.style.display = 'none';
-        transcriptTimer = setTimeout(() => setOledAiMode('neutral'), 6000);
-        logToTerminal(`VOICE: ${msg.text}`, 'log-voice');
-        socket.emit('voice_question',msg.text);
-        webVoiceHandedOff = true;
-        window.dispatchEvent(new CustomEvent('moon-voice-control',{detail:{command:'pause',reason:'brain'}}));
-        clearTimeout(webVoiceHandoffTimer);
-        webVoiceHandoffTimer = setTimeout(() => {
-            if (!webVoiceHandedOff) return;
-            webVoiceHandedOff = false;
-            window.dispatchEvent(new CustomEvent('moon-voice-control',{detail:{command:'resume'}}));
-            logToTerminal('Brain không phản hồi sau 60 giây — mic đã nghe lại.', 'sys');
-        },60000);
-        const sourceLabel = document.getElementById('voice-display-source');
-        if (sourceLabel) sourceLabel.textContent = 'Nguồn hiển thị: Brain đang xử lý câu hỏi từ mic web';
-    }
-    if (msg.event === 'state') {
-        hideThinking();
-        setVoiceState(msg.state);
-        // Preserve a completed transcript, but never leave the processing
-        // animation running after a rejected clip or a wake-only result.
-        if (!oledFace.classList.contains('hearing')) {
-            setOledAiMode(msg.state === 'listening' ? 'questioning' : 'neutral');
-        }
-    }
-    if (msg.event === 'rejected') {
-        hideThinking();
-        logToTerminal(msg.text, 'sys');
-    }
-    if (msg.event === 'timeout') {
-        webVoiceAwake = false;
-        hideThinking();
-        setVoiceState('standby');
-        setOledAiMode('hearing', 'Mình chưa nghe rõ câu hỏi');
-        transcriptTimer = setTimeout(() => setOledAiMode('neutral'), 2500);
-        if (msg.text) logToTerminal(msg.text, 'sys');
-    }
-    if (['stopped', 'error'].includes(msg.event)) {
-        webVoiceAwake = false;
-        hideThinking();
-        setVoiceState('standby');
-        setOledAiMode('neutral');
-        if (msg.text) logToTerminal(msg.text, 'sys');
     }
 });

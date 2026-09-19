@@ -1,13 +1,13 @@
-# Moon Voice trên dashboard
+# Moon Live Voice trên dashboard
 
-Test trực tiếp trong dashboard hiện tại, ô **Moon Voice**. Microphone →
-WebSocket cùng origin `/voice/ws` → Python Voice → STT; không gửi audio tới
-MQTT hoặc Brain/LLM. Giữ microphone mở liên tục cả khi gọi STT.
-Các phần điều khiển, camera, OLED và Monitor của dashboard vẫn giữ nguyên.
+Dashboard chỉ còn một khu vực **Live Voice**. Khi phiên được kích hoạt, Moon trò
+chuyện liên tục cho tới khi người dùng bấm **Kết thúc**; không còn luồng cũ yêu
+cầu gọi wakeword trước từng câu hỏi. Camera, OLED, điều khiển và Monitor vẫn giữ
+nguyên. OLED chỉ thể hiện trạng thái/biểu cảm phù hợp.
 
-## Live Talk: Gemini Live + Fish Voice
+## Gemini Live + Fish Voice
 
-Mục **Live Talk** là chế độ riêng nằm dưới Moon Voice. Chế độ này gửi PCM mono
+Live Voice gửi PCM mono
 16 kHz qua WebSocket cùng origin `/live/ws`; Node giữ API key và mở phiên Gemini
 Live. Gemini hiểu audio trực tiếp, không chạy Groq/Whisper STT và không dùng
 pipeline Voice của Brain. Chế độ mặc định lấy transcript nội bộ của chính câu
@@ -22,8 +22,21 @@ Menu **Giọng trả lời** có hai lựa chọn:
 - **Gemini Native**: phát PCM trực tiếp bằng giọng `Kore`, nhanh hơn và không gọi Fish.
 
 Ở Fish Voice, bridge vẫn giữ audio Gemini của từng câu trong bộ nhớ. Nếu Fish
-timeout/lỗi hoặc trình duyệt không giải mã được MP3, câu đó tự chuyển sang giọng
+ timeout/lỗi hoặc trình duyệt không giải mã được MP3, câu đó tự chuyển sang giọng
 Gemini thay vì im lặng; câu kế tiếp vẫn thử Fish như bình thường.
+
+### Hai cách kích hoạt
+
+Menu **Cách kích hoạt** có hai lựa chọn dùng chung một phiên Live Voice:
+
+- **Bật trực tiếp**: bấm nút để Moon bắt đầu nghe và trò chuyện ngay.
+- **Chờ “Hey Moon” rồi trò chuyện**: microphone trước tiên chỉ chạy bộ nhận
+  wakeword. Khi nhận đúng “Hey Moon”, dashboard phát hai tiếng tick xác nhận và
+  chuyển chính microphone đó sang hội thoại liên tục. Sau lần kích hoạt này không
+  cần gọi Moon lại; bấm **Kết thúc** để đóng phiên.
+
+Wakeword chỉ là cổng kích hoạt, không còn tự thu một câu rồi gửi qua pipeline cũ.
+Chế độ chờ giữ audio ngoài Gemini/Brain cho tới khi wakeword được xác nhận.
 
 ### So sánh Gemini Live và Brain Pipeline
 
@@ -33,8 +46,8 @@ cùng microphone:
 - **Gemini Live — audio native**: Gemini nghe và tạo câu trả lời; có thể chọn
   Fish Voice hoặc giọng Gemini Native.
 - **Brain Pipeline — STT → LLM → Fish**: VAD chia câu, Groq Whisper nhận diện,
-  `brain.py` xử lý bằng LLM hiện tại và Fish phát giọng. Đây là phiên liên tục,
-  không cần gọi từ khóa Moon.
+  `brain.py` xử lý bằng LLM hiện tại và Fish phát giọng. Sau khi được bật trực
+  tiếp hoặc bằng wakeword, đây là một phiên liên tục.
 
 Ô **Nhận diện gần nhất** cho biết hệ thống nghe được gì. Ô **Độ trễ** hiển thị
 thời gian STT và thời gian từ lúc chốt câu tới lúc bắt đầu trả lời. Nên hỏi cùng
@@ -51,15 +64,17 @@ SECRETS = {
 }
 ```
 
-Sau đó chạy lại `start.bat`, mở dashboard và bấm **Bắt đầu Live Talk**. Có thể
+Sau đó chạy lại `start.bat`, mở dashboard, chọn cách kích hoạt rồi bấm nút bắt
+đầu. Có thể
 đặt biến môi trường `GEMINI_API_KEY`/`FISH_AUDIO_API_KEY` thay cho file. Fish Voice
 đọc `FISH_VOICE_ID` và `FISH_TTS_MODEL` trong `config/settings.py`; có thể đặt
 `FISH_VOICE_ID` và `FISH_LIVE_TTS_MODEL` bằng biến môi trường. Mặc định Gemini
 dùng model `gemini-3.8-live` và voice nội bộ `Kore`; có thể đổi bằng
 `GEMINI_LIVE_MODEL` và `GEMINI_LIVE_VOICE` trước khi chạy Node.
 
-Live Talk và Moon Voice dùng chung Web Lock `moon-voice-microphone`, vì vậy chỉ
-một chế độ hoặc một tab giữ mic. Khi bật Live Talk, mic wake-word cũ tự dừng.
+Live Voice dùng Web Lock `moon-voice-microphone`, vì vậy chỉ một tab được giữ
+mic. Khi wakeword đã được nhận, socket chờ được đóng trước khi socket hội thoại
+được mở; trình duyệt không xin lại quyền hay mở microphone lần thứ hai.
 AEC, khử nhiễu và AGC của trình duyệt được bật để giảm việc Moon tự nghe loa.
 Khi người dùng nói chen, client xóa ngay hàng đợi audio cũ. Khi phát xong, OLED
 trở lại `neutral`. API key không được đưa vào HTML/JavaScript trình duyệt, log
@@ -95,17 +110,17 @@ py -3.12 -m venv .voice-venv
 .\start-voice.bat
 ```
 
-Mở [Dashboard](http://localhost:3000) trong Chrome/Edge. Lần đầu cần bấm
-**Bật microphone** để cấp quyền, giữ im lặng 1.8 giây để đo nền rồi mới gọi Moon.
-Các lần tải trang sau mic tự bật khi quyền vẫn được cấp; bấm **Dừng mic** để tắt
-tự động. Có thể đổi thiết bị sau khi dừng.
+Mở [Dashboard](http://localhost:3000) trong Chrome/Edge. Lần đầu cần bấm nút bắt
+đầu để cấp quyền microphone. Chọn **Bật trực tiếp** hoặc **Chờ “Hey Moon” rồi
+trò chuyện**; có thể đổi thiết bị sau khi kết thúc phiên.
 Chỉ một tab Moon được giữ microphone. Nếu `start.bat` mở tab mới trong khi tab
 cũ vẫn nghe, tab mới sẽ báo đang dùng mic ở tab khác thay vì tranh mic và làm
 ngắt phiên wakeword.
-Nút **Thử tiếng tick** kiểm tra loa; mỗi wake thật phát tiếng tick 80ms. Không chạy `start.bat` cho
-bài test này vì lệnh đó khởi động toàn bộ Brain.
+Mỗi wake thật phát một tick xác nhận, sau đó tick thứ hai báo phiên hội thoại đã
+sẵn sàng. Không chạy `start.bat` cho bài test tự động vì lệnh đó khởi động toàn
+bộ Brain.
 
-## Hai chế độ wakeword
+## Hai engine wakeword
 
 - **Porcupine**: phát hiện âm học trên máy, báo wake ngay khi engine phát hiện,
   không đợi STT. Cài `pip install pvporcupine` bằng Python trong `.voice-venv`;
@@ -125,29 +140,29 @@ không âm thầm giả vờ đang chạy Porcupine.
 
 ## Những gì cần quan sát
 
-1. Nói “Moon”, nghe tiếng tick, xem số lần wake tăng, sau đó
-   chờ dòng **Moon đang nghe — hãy nói câu hỏi**.
-2. Nói “Hôm nay tôi muốn học tiếng Anh”. Text xuất hiện trong ô câu nói;
-   nhật ký giữ bản STT nguyên văn, độ dài audio và thời gian API xử lý.
-3. Thử nói liền “Moon, hôm nay trời đẹp quá”; không cần mở lại mic.
+1. Chọn chế độ chờ, bấm bắt đầu, nói “Hey Moon” và nghe hai tiếng tick. Trạng
+   thái phải chuyển từ **Chờ Moon** sang **Đang nghe** mà không quay về mặc định.
+2. Hỏi nhiều câu liên tiếp mà không gọi Moon lại; phiên chỉ dừng khi bấm
+   **Kết thúc** hoặc có lỗi kết nối.
+3. Chọn bật trực tiếp và xác nhận Gemini/Brain được kết nối mà không mở socket
+   wakeword.
 4. Thử 20 lần mỗi điều kiện: phòng yên, bật quạt, nói nhỏ, cách mic 0.5–1m.
    Ghi số wake đúng/bỏ sót/nhận nhầm, thời gian cảm nhận và lỗi text.
 5. Để im lặng 60 giây, gõ bàn phím, rồi nói câu không có Moon. Kiểm tra wake giả.
-6. Sau wake không nói: khoảng 12 giây sau trở lại chờ. Thử dừng/bật lại mic,
-   từ chối quyền mic, ngắt mạng và khôi phục mạng.
+6. Sau wake không nói, phiên vẫn ở chế độ hội thoại liên tục. Thử kết thúc/bật
+   lại, từ chối quyền mic, ngắt mạng và khôi phục mạng.
 
-Âm thanh được gửi tới Groq để STT; không lưu file và không gửi raw audio qua
-MQTT. Khi chạy đầy đủ bằng `start.bat`, text câu hỏi đã xác nhận được chuyển qua
-MQTT tới Brain để chạy LLM, TTS và OLED. `start-voice.bat` chỉ khởi động web +
-Voice service nên vẫn dùng được để test STT độc lập, nhưng không có câu trả lời AI.
-Trong lúc Moon phát câu chào hoặc TTS, mic web tự tạm nghỉ và bỏ mọi audio/STT
-đang chờ; sau khi loa im 1.2 giây mic mới nghe lại để tránh Moon tự gọi chính mình.
-Nhật ký tối đa 60 mục nằm trong trang. Tắt mic đóng socket và hủy yêu cầu STT
-đang chờ. Thu âm dùng AEC/NS của trình duyệt, tắt AGC để tránh khuếch đại quạt,
-lọc high-pass 150Hz và hiệu chuẩn nền 1.8 giây, PCM mono 16kHz,
-WebRTC VAD, pre-roll 300ms, onset 3/5 frame, tối thiểu 180ms giọng nói.
-Câu sau wake kết thúc sau 1,2 giây im lặng, giới hạn 15 giây mỗi đoạn.
-Hàng đợi giới hạn 3 đoạn; mạng quá chậm sẽ báo lỗi và dừng thay vì phát text cũ.
+Trong thời gian chờ wakeword, audio được gửi tới Voice service để Porcupine hoặc
+Groq xác nhận từ khóa. Sau khi thức, Gemini Live nhận audio trực tiếp; riêng Brain
+Pipeline dùng Groq STT rồi chuyển text qua MQTT tới Brain/LLM và Fish. Raw audio
+không đi qua MQTT. Khi Brain/Fish đang phát câu trả lời, luồng thu tạm nghỉ và mở
+lại sau khi loa im để hạn chế Moon tự nghe chính mình. Bấm **Kết thúc** sẽ đóng
+socket, dừng track microphone và hủy dữ liệu đang chờ.
+
+Thu âm dùng AEC/khử nhiễu của trình duyệt, high-pass 120 Hz và PCM mono 16 kHz.
+AGC bị tắt trong giai đoạn chờ để tránh tiếng động lớn giả làm wakeword; sau khi
+chuyển sang hội thoại vẫn tái sử dụng track đang mở. Voice service dùng WebRTC
+VAD, pre-roll và các ngưỡng trong `config/settings.py`.
 
 Tinh chỉnh `VOICE_*`, `WAKE_SENSITIVITY` trong `config/settings.py` rồi restart.
 Độ nhạy cao hơn có thể tăng nhận nhầm. VAD không tách được giọng người dùng khỏi
@@ -186,16 +201,7 @@ khử hết tiếng ồn. Kết quả chứa segment confidence thấp bị từ
 `start-voice.bat` chạy web dashboard; Node tự khởi động Python Voice khi
 port 8765 chưa có service. Port 8765 chỉ là backend nội bộ; đường `/` cũ
 chuyển tới dashboard 3000. Không còn trang test Voice riêng.
-Text câu sau wake hiện ở **Bạn đã nói**, OLED mô phỏng và Activity Log.
-Transcript thô/chẩn đoán nằm trong mục mở rộng ngay dưới các nút mic.
-
-Khi bật mic web, dashboard bỏ qua AI/state/thinking/response từ MQTT để
-không ghi đè phiên test. Khi mic web chưa bật hoặc đã dừng, dashboard theo
-Brain qua MQTT và hiển thị đầy đủ câu hỏi → suy nghĩ → nói → standby. OLED hiển thị transcript 6 giây rồi về mắt; câu đầy đủ
-vẫn giữ trong khung Bạn đã nói. Chữ dài xuống dòng, có thể cuộn trong OLED.
+Transcript gần nhất hiện trong thẻ Live Voice và Activity Log. Khi Live Voice
+chạy, dashboard bỏ qua trạng thái MQTT có thể ghi đè phiên; sau khi kết thúc,
+dashboard tiếp tục theo Brain qua MQTT. OLED chỉ hiển thị trạng thái và biểu cảm.
 Kiểm tra hồi quy giao diện: `node tests/test_voice_display.cjs` (cần Playwright).
-
-Dòng Nguồn hiển thị cho biết bên nào đang điều khiển OLED. Khi nhận xong câu
-hỏi, Voice tạm nghỉ mic để Brain điều khiển OLED, gọi LLM/TTS và tránh tự nghe
-tiếng loa; Brain về standby thì mic web tự nghe lại. Nếu Brain không phản hồi
-trong 60 giây, dashboard tự trả mic về chế độ chờ Moon.
