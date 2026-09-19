@@ -397,6 +397,24 @@ socket.on('mqtt_message', (data) => {
                     showUserQuestion(msg.text);
                     setOledAiMode('hearing', msg.text); // OLED: text transcript
                     break;
+                case 'correcting':
+                    showThinking('🧠 Moon đang kiểm tra câu vừa nghe...');
+                    break;
+                case 'question_corrected':
+                    showUserQuestion(msg.text);
+                    setOledAiMode('hearing', msg.text);
+                    if (liveTalkMode === 'brain') {
+                        window.dispatchEvent(new CustomEvent('moon-brain-pipeline', {
+                            detail: {
+                                event: 'corrected',
+                                text: msg.text,
+                                original: msg.original || msg.text,
+                                changed: Boolean(msg.changed),
+                            },
+                        }));
+                    }
+                    if (msg.changed) logToTerminal(`STT FIX: ${msg.original} → ${msg.text}`, 'log-voice');
+                    break;
                 case 'thinking':
                     showThinking('🧠 Moon đang suy nghĩ...');
                     setOledAiMode('ai-thinking');

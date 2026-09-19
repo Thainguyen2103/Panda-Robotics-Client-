@@ -17,6 +17,53 @@ _STT_HALLUCINATION_PHRASES = (
 )
 
 
+def _correction_tokens(text):
+    """Words used by the conservative ASR post-editing gate."""
+    normalized = unicodedata.normalize("NFC", text or "")
+    return re.findall(r"[\w%+.-]+", normalized, flags=re.UNICODE)
+
+
+def safe_asr_correction(original, candidate):
+    """Return a safe spelling repair, or the untouched STT transcript.
+
+    The LLM is allowed to repair Vietnamese homophones and punctuation, but it
+    may not add/remove numbers, identifiers or rewrite the sentence at length.
+    This keeps the user's meaning in control even when the repair model guesses.
+    """
+    source = re.sub(r"\s+", " ", str(original or "")).strip()
+    fixed = re.sub(r"\s+", " ", str(candidate or "")).strip().strip('"').strip()
+    if not source or not fixed:
+        return source
+
+    source_words = _correction_tokens(source)
+    fixed_words = _correction_tokens(fixed)
+    if not source_words or not fixed_words:
+        return source
+
+    allowed_word_delta = max(1, math.ceil(len(source_words) * .3))
+    if abs(len(source_words) - len(fixed_words)) > allowed_word_delta:
+        return source
+    ratio = len(fixed) / max(1, len(source))
+    if ratio < .55 or ratio > 1.65:
+        return source
+
+    # Dates, quantities, model names and other identifiers must survive exactly.
+    protected = {
+        token.casefold() for token in source_words
+        if any(char.isdigit() for char in token)
+        or (len(token) >= 2 and token.isupper())
+    }
+    fixed_folded = {token.casefold() for token in fixed_words}
+    if not protected.issubset(fixed_folded):
+        return source
+
+    # Moon is the robot's name, never a word for the repair model to reinterpret.
+    if re.search(r"(?<!\w)moon(?!\w)", source, re.I) and not re.search(
+            r"(?<!\w)moon(?!\w)", fixed, re.I):
+        return source
+    return fixed
+
+
 def wake_tail(text):
     """Return original text after the complete token Moon; None means no wake.
 

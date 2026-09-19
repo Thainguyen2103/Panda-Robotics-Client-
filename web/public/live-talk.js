@@ -18,6 +18,14 @@ function showHeard(text) {
     $('heard').textContent = clean || 'Chưa nhận diện được nội dung';
 }
 
+function showCorrected(text, visible = true) {
+    const label = $('corrected-label');
+    const value = $('corrected');
+    label.hidden = !visible;
+    value.hidden = !visible;
+    value.textContent = String(text || '').trim() || 'Giữ nguyên câu STT';
+}
+
 function showLatency(text) {
     $('latency').textContent = `Độ trễ: ${text || '—'}`;
 }
@@ -173,6 +181,7 @@ function handleServer(message) {
         setState('thinking', 'Đang chuyển giọng nói thành văn bản…');
     } else if (pipeline === 'brain' && message.event === 'transcript') {
         showHeard(message.text);
+        showCorrected('', false);
         showLatency(`STT ${message.latency_ms || 0} ms · đang chờ Brain`);
     } else if (pipeline === 'brain' && message.event === 'question') {
         brainWaiting = true;
@@ -318,6 +327,7 @@ async function start() {
     turnTranscript = '';
     brainWaiting = false;
     showHeard('Đang chuẩn bị…');
+    showCorrected('', false);
     showLatency('đang đo');
     dispatch('starting');
     window.dispatchEvent(new Event('moon-live-request-mic'));
@@ -401,6 +411,7 @@ function updatePipelineUi() {
         ? 'Sẵn sàng thử Brain Pipeline không wake word'
         : 'Sẵn sàng kết nối Gemini Live';
     showHeard('Chưa có dữ liệu');
+    showCorrected('', false);
     showLatency('—');
 }
 
@@ -416,7 +427,12 @@ $('mode').onchange = () => {
 };
 window.addEventListener('moon-brain-pipeline', ({detail}) => {
     if (!active || pipeline !== 'brain') return;
-    if (detail.event === 'state' && detail.state === 'thinking') {
+    if (detail.event === 'corrected') {
+        showCorrected(detail.changed ? detail.text : 'Giữ nguyên câu STT');
+        setState('thinking', detail.changed
+            ? 'Brain đã sửa lỗi nghe nhầm — đang hỏi LLM…'
+            : 'Brain xác nhận câu STT — đang hỏi LLM…');
+    } else if (detail.event === 'state' && detail.state === 'thinking') {
         setState('thinking', 'Brain và LLM đang xử lý…');
     } else if (detail.event === 'state' && detail.state === 'speaking') {
         if (responseStartedAt) showLatency(`${Math.round(performance.now() - responseStartedAt)} ms tới âm thanh`);

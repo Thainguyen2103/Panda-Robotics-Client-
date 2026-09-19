@@ -261,6 +261,8 @@
                     <div class="live-talk-result" aria-live="polite">
                         <span>Nhận diện gần nhất</span>
                         <strong id="live-heard">Chưa có dữ liệu</strong>
+                        <span id="live-corrected-label" hidden>Sau khi Brain kiểm tra</span>
+                        <strong id="live-corrected" hidden>Chưa hiệu chỉnh</strong>
                         <span id="live-latency">Độ trễ: —</span>
                     </div>
                     <label class="live-talk-select-label" for="live-pipeline">Hệ thống xử lý</label>
@@ -326,9 +328,9 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="vision-ui.js?v=20260914e"></script>
-    <script src="app.js?v=20260919b"></script>
+    <script src="app.js?v=20260919c"></script>
     <script src="voice-panel.js?v=20260919b"></script>
-    <script src="live-talk.js?v=20260919b"></script>
+    <script src="live-talk.js?v=20260919c"></script>
     <script>
         lucide.createIcons();
     </script>

@@ -46,6 +46,7 @@ from server.voice import (register_callbacks, continuous_listen_loop,
                           listen_for_question, pause_listening, resume_listening,
                           transcribe_bytes, _is_hallucination, _contains_wake_word,
                           STT_MODEL_QUESTION, _levenshtein, _strip_diacritics)
+from server.voice_core import safe_asr_correction
 from server.tts import speak, SentencePlayer
 from server import tts   # module object — cho tts.play_beep()/play_tick()
 from server import llm
@@ -256,12 +257,14 @@ def _set_voice_ai_state(state: str):
         pause_listening()
 
 
-def _publish_thinking(stage: str, text: str = ""):
+def _publish_thinking(stage: str, text: str = "", **details):
     """Publish trạng thái xử lý AI lên dashboard (chat panel)."""
-    mqtt_bridge.publish(settings.TOPIC_AI_THINKING, json.dumps({
+    message = {
         "stage": stage,
         "text":  text,
-    }))
+    }
+    message.update(details)
+    mqtt_bridge.publish(settings.TOPIC_AI_THINKING, json.dumps(message))
 
 
 def _topic_caption(tid: str, question: str) -> str:
@@ -317,7 +320,10 @@ def _correct_and_classify(text: str):
     phân loại chủ đề → (topic_id | None, câu đã sửa)."""
     r = llm.quick(
         "Bạn là bộ sửa lỗi + phân loại cho trợ lý giọng nói tiếng Việt.\n"
-        "Chọn 1 chủ đề phù hợp nhất và sửa lỗi chính tả câu chép từ giọng nói.\n"
+        "Hãy suy luận thầm theo ngữ cảnh rồi chọn 1 chủ đề phù hợp nhất và sửa lỗi "
+        "chính tả câu chép từ giọng nói. Chỉ sửa từ nghe nhầm/gần âm và dấu câu; "
+        "không thêm ý, không trả lời câu hỏi, giữ nguyên tên riêng, chữ viết tắt, "
+        "con số, đơn vị và mã sản phẩm. Nếu không chắc thì giữ nguyên từ gốc.\n"
         f"Danh sách chủ đề: {_TOPIC_ENUM}\n"
         "Ví dụ:\n"
         "- 'Hơ tiếp hôm nay như thế nào?' → weather|Thời tiết hôm nay như thế nào?\n"
@@ -333,9 +339,7 @@ def _correct_and_classify(text: str):
     fixed = fixed.strip().strip('"')
     if tid not in _TOPIC_ENUM.split(","):
         tid = None
-    if not fixed or abs(len(fixed) - len(text)) > max(8, len(text) // 2):
-        fixed = text
-    return tid, fixed
+    return tid, safe_asr_correction(text, fixed)
 
 
 _EMOTIONS = ("happy", "sad", "surprised", "angry", "love", "wink",
@@ -449,13 +453,23 @@ def _handle_wake_word(trigger_text: str):
 
         # Hiển thị ngay kết quả STT. Các bước phân loại/sửa nhẹ phía sau
         # không được làm người dùng chờ mới thấy Moon đã nghe gì.
-        _publish_thinking("question", question)
-        print(f"❓ [BRAIN] Câu nghe được: \"{question}\"")
+        raw_question = question
+        _publish_thinking("question", raw_question)
+        print(f"❓ [BRAIN] Câu nghe được: \"{raw_question}\"")
 
         # ASR post-editing + phân loại chủ đề HYBRID:
         # keyword bắt được → dùng ngay (0ms); hụt → LLM chọn (gộp chung call sửa lỗi)
-        kw = classify_topic(question)
-        llm_topic, question = _correct_and_classify(question)
+        kw = classify_topic(raw_question)
+        _publish_thinking("correcting", "Moon đang kiểm tra chính tả và ngữ cảnh...")
+        llm_topic, question = _correct_and_classify(raw_question)
+        _publish_thinking(
+            "question_corrected",
+            question,
+            original=raw_question,
+            changed=question != raw_question,
+        )
+        if question != raw_question:
+            print(f"✍️ [BRAIN] Hiệu chỉnh STT: \"{raw_question}\" → \"{question}\"")
         print(f"⏱ [BRAIN] wake→câu hỏi sẵn sàng: {time.time()-_t_wake:.1f}s")
 
         # ── BƯỚC 2: Hiển thị câu hỏi người dùng lên màn hình LED ─────────────

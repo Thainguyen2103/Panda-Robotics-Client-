@@ -4,7 +4,7 @@ import unittest
 
 from server.voice_core import (Segmenter, wake_tail, possible_moon_miss,
                                should_verify_wake, confirmed_wake_tail,
-                               reliable_transcript)
+                               reliable_transcript, safe_asr_correction)
 
 
 def frame(amplitude=1500):
@@ -17,6 +17,19 @@ class EnergyVad:
 
 
 class VoiceCoreTests(unittest.TestCase):
+    def test_safe_asr_correction_accepts_spelling_repair(self):
+        self.assertEqual(
+            safe_asr_correction('bây giờ là mẹ giờ', 'Bây giờ là mấy giờ?'),
+            'Bây giờ là mấy giờ?')
+
+    def test_safe_asr_correction_rejects_rewrite_and_changed_facts(self):
+        self.assertEqual(
+            safe_asr_correction('nhiệt độ là 28 độ', 'Thời tiết hôm nay rất đẹp và nhiệt độ là 30 độ.'),
+            'nhiệt độ là 28 độ')
+        self.assertEqual(
+            safe_asr_correction('Moon mở ESP32 số 2', 'Mở thiết bị số 3'),
+            'Moon mở ESP32 số 2')
+
     def test_fan_misclassified_as_speech_is_calibrated_out(self):
         s = Segmenter(EnergyVad(), calibration_frames=60)
         fan = frame(1600)
