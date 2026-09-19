@@ -4,7 +4,7 @@ import unittest
 
 from server.voice_core import (Segmenter, wake_tail, possible_moon_miss,
                                should_verify_wake, confirmed_wake_tail,
-                               confident_wake_tail, reliable_transcript,
+                               confident_wake_tail, reliable_transcript, wake_transcript,
                                safe_asr_correction)
 
 
@@ -87,15 +87,29 @@ class VoiceCoreTests(unittest.TestCase):
         self.assertIsNone(confirmed_wake_tail('trời mưa', 'Hey Moon'))
 
     def test_confident_explicit_call_skips_slow_second_pass(self):
-        for text in ['Hey Moon', 'Moon', 'Hey múa', 'Hey mưa', 'Hi Mun']:
+        for text in [
+                'Hey Moon', 'Moon', 'Hey múa', 'Hey mưa', 'Hi Mun',
+                'ê Môn', 'này Mun', 'Moon ơi', 'Mun ơi', 'alo Moon']:
             self.assertEqual(confident_wake_tail(text), '', text)
-        for text in ['trời mưa', 'đi múa', 'Hey man', 'xin chào']:
+        for text in ['trời mưa', 'đi múa', 'môn học', 'món ngon', 'Hey man', 'xin chào']:
             self.assertIsNone(confident_wake_tail(text), text)
 
     def test_one_pass_or_blank_noise_cannot_confirm_wake(self):
-        self.assertIsNone(confirmed_wake_tail('', 'Hey Moon'))
+        self.assertEqual(confirmed_wake_tail('', 'Hey Moon'), '')
+        self.assertIsNone(confirmed_wake_tail('', 'Moon'))
+        self.assertIsNone(confirmed_wake_tail('', 'Hey man'))
         self.assertIsNone(confirmed_wake_tail('A', 'Moon'))
         self.assertIsNone(confirmed_wake_tail('xin chào', 'Moon'))
+
+    def test_short_wake_uses_relaxed_confidence_but_still_rejects_noise(self):
+        uncertain = {'text': 'Hey Moon', 'segments': [
+            {'no_speech_prob': .65, 'avg_logprob': -1.2, 'compression_ratio': 1.1}]}
+        self.assertEqual(reliable_transcript(uncertain), '')
+        self.assertEqual(wake_transcript(uncertain), 'Hey Moon')
+        self.assertEqual(wake_transcript({
+            'text': 'Moon',
+            'segments': [{'no_speech_prob': .96, 'avg_logprob': -2.1}],
+        }), '')
 
     def test_silence_and_click_do_not_make_clip(self):
         s = Segmenter(EnergyVad())

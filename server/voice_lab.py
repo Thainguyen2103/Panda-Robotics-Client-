@@ -15,7 +15,7 @@ import webrtcvad
 from config import settings
 from server.voice_core import (Segmenter, wake_tail, should_verify_wake,
                                confirmed_wake_tail, confident_wake_tail,
-                               reliable_transcript,
+                               reliable_transcript, wake_transcript,
                                RATE, FRAME_BYTES, FRAME_MS)
 
 
@@ -70,6 +70,7 @@ class Session:
         self.listening = False
         self.waiting_for_wake_quiet = False
         self.wake_quiet_frames = 0
+        self.transcribing_wake = False
         self.segmenter.reset()
         while True:
             try:
@@ -170,11 +171,17 @@ class Session:
             f.setsampwidth(2)
             f.setframerate(RATE)
             f.writeframes(pcm)
-        result = await self.client.audio.transcriptions.create(
+        kwargs = dict(
             file=('moon.wav', wav.getvalue()), model=settings.STT_MODEL,
             language=settings.STT_LANGUAGE or None, temperature=0,
             response_format='verbose_json')
-        return reliable_transcript(result.model_dump())
+        if self.transcribing_wake:
+            kwargs['prompt'] = (
+                'Đây là câu gọi robot tên Moon. Ví dụ: Hey Moon, ê Moon, '
+                'này Moon, Moon ơi, ê Mun, này Mun.')
+        result = await self.client.audio.transcriptions.create(**kwargs)
+        dumped = result.model_dump()
+        return wake_transcript(dumped) if self.transcribing_wake else reliable_transcript(dumped)
 
     async def verify_wake(self, pcm):
         """English pass only for a likely missed Moon; never used for questions."""
@@ -187,7 +194,7 @@ class Session:
         result = await self.client.audio.transcriptions.create(
             file=('moon-wake.wav', wav.getvalue()), model=settings.STT_MODEL,
             language='en', temperature=0, response_format='verbose_json')
-        return reliable_transcript(result.model_dump())
+        return wake_transcript(result.model_dump())
 
     async def worker(self):
         while True:
@@ -204,7 +211,11 @@ class Session:
                 # network request has since recognized Moon.
                 question_context = captured_while_listening or self.continuous
                 await self.emit('processing',phase='question' if question_context else 'wake')
-                text = await self.transcribe(clip)
+                self.transcribing_wake = not question_context
+                try:
+                    text = await self.transcribe(clip)
+                finally:
+                    self.transcribing_wake = False
                 if self.paused or audio_epoch != self.audio_epoch:
                     publish_state = False
                     continue

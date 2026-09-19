@@ -122,8 +122,15 @@ def confirmed_wake_tail(primary, verification):
     # primary transcript can no longer be rescued by one English guess.
     primary_text = (primary or '').strip()
     verification_text = (verification or '').strip()
-    if not primary_text or not verification_text:
+    if not verification_text:
         return None
+
+    # A short Vietnamese pass can be blank even though the independent English
+    # pass clearly hears the complete vocative "Hey Moon". Accept only an
+    # explicit call in this fallback; a bare hallucinated "Moon" is not enough.
+    if not primary_text:
+        verify_token, verify_called = _english_wake_token(verification)
+        return '' if verify_called and verify_token in _MOON_DIRECT_CALL_ALIASES else None
 
     primary_exact = wake_tail(primary)
     verification_exact = wake_tail(verification)
@@ -159,8 +166,23 @@ def confident_wake_tail(text):
     literal = wake_tail(text)
     if literal is not None:
         return literal
-    token, called = _english_wake_token(text)
-    if called and token in _MOON_DIRECT_CALL_ALIASES:
+    normalized = unicodedata.normalize('NFC', text or '').casefold()
+    raw_words = re.findall(r'[^\W\d_]+', normalized, flags=re.UNICODE)
+    folded = [
+        ''.join(c for c in unicodedata.normalize('NFD', word)
+                if unicodedata.category(c) != 'Mn')
+        for word in raw_words
+    ]
+    call_prefixes = {'hey', 'hi', 'hay', 'he', 'e', 'nay', 'alo', 'goi', 'chao'}
+    if (len(folded) >= 2 and folded[0] in call_prefixes
+            and folded[1] in _MOON_DIRECT_CALL_ALIASES
+            and raw_words[1] not in {'món', 'muốn'}):
+        return ''
+    if (len(folded) >= 2 and folded[0] in _MOON_DIRECT_CALL_ALIASES
+            and folded[1] == 'oi' and raw_words[0] not in {'món', 'muốn'}):
+        return ''
+    if (len(folded) == 1 and folded[0] in _MOON_NARROW_ALIASES
+            and raw_words[0] not in {'môn', 'món', 'muốn'}):
         return ''
     return None
 
@@ -193,6 +215,28 @@ _MOON_EN_ALIASES = _MOON_NARROW_ALIASES | {
     # independently hear a Moon-like word.
     'mom', 'mum', 'moan', 'morn', 'move', 'man', 'noon', 'mua',
 }
+
+
+def wake_transcript(result):
+    """Transcript a very short wake phrase without question-level filtering.
+
+    Wake clips are often below one second, so Whisper may assign moderate
+    no-speech/log-probability values even when the spelling is usable. The
+    strict wake-intent matcher remains the safety gate after this function.
+    """
+    text = (result.get('text') or '').strip()
+    normalized = text.casefold()
+    if any(phrase in normalized for phrase in _STT_HALLUCINATION_PHRASES):
+        return ''
+    segments = result.get('segments') or []
+    if segments and all(
+        segment.get('no_speech_prob', 0) > .82
+        or segment.get('avg_logprob', 0) < -1.5
+        or segment.get('compression_ratio', 0) > 2.8
+        for segment in segments
+    ):
+        return ''
+    return text
 
 
 class Segmenter:

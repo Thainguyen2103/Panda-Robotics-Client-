@@ -23,6 +23,31 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
             60,
         )
 
+    async def test_wake_transcription_uses_context_prompt_and_short_clip_filter(self):
+        calls = []
+        class Result:
+            def model_dump(self):
+                return {'text': 'ê Môn', 'segments': [{
+                    'no_speech_prob': .65,
+                    'avg_logprob': -1.2,
+                    'compression_ratio': 1.1,
+                }]}
+        class Transcriptions:
+            async def create(self, **kwargs):
+                calls.append(kwargs)
+                return Result()
+        client = type('Client', (), {
+            'audio': type('Audio', (), {'transcriptions': Transcriptions()})(),
+        })()
+        session = Session(Socket(), client)
+        session.transcribing_wake = True
+        self.assertEqual(await session.transcribe(bytes(960)), 'ê Môn')
+        self.assertIn('robot tên Moon', calls[0]['prompt'])
+
+        session.transcribing_wake = False
+        self.assertEqual(await session.transcribe(bytes(960)), '')
+        self.assertNotIn('prompt', calls[1])
+
     async def test_acoustic_wake_before_stt_and_frame_reblocking(self):
         class Engine:
             frame_length = 512
@@ -186,8 +211,8 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
     async def test_likely_vietnamese_miss_requires_english_confirmation(self):
         socket = Socket()
         session = Session(socket, None)
-        session.transcribe = lambda clip: asyncio.sleep(0, result='Mun')
-        session.verify_wake = lambda clip: asyncio.sleep(0, result='Moon')
+        session.transcribe = lambda clip: asyncio.sleep(0, result='Mum')
+        session.verify_wake = lambda clip: asyncio.sleep(0, result='Hey Moon')
         worker = asyncio.create_task(session.worker())
         session.clips.put_nowait((b'audio', False, session.audio_epoch))
         await asyncio.wait_for(session.clips.join(), 2)
@@ -217,7 +242,21 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
         self.assertFalse(verification_calls)
 
-    async def test_blank_primary_cannot_become_false_wake_from_english_pass(self):
+    async def test_blank_primary_needs_explicit_call_from_english_pass(self):
+        socket = Socket()
+        session = Session(socket, None)
+        session.transcribe = lambda clip: asyncio.sleep(0, result='')
+        session.verify_wake = lambda clip: asyncio.sleep(0, result='Moon')
+        worker = asyncio.create_task(session.worker())
+        session.clips.put_nowait((b'audio', False, session.audio_epoch))
+        await asyncio.wait_for(session.clips.join(), 2)
+        worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker
+        self.assertFalse(session.listening)
+        self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 0)
+
+    async def test_blank_primary_can_use_explicit_english_hey_moon(self):
         socket = Socket()
         session = Session(socket, None)
         session.transcribe = lambda clip: asyncio.sleep(0, result='')
@@ -228,8 +267,8 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         worker.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await worker
-        self.assertFalse(session.listening)
-        self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 0)
+        self.assertTrue(session.listening)
+        self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
 
     async def test_literal_moon_wakes_without_slow_second_pass(self):
         socket = Socket()
@@ -253,7 +292,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
     async def test_wake_verification_timeout_returns_to_standby(self):
         socket = Socket()
         session = Session(socket, None)
-        session.transcribe = lambda clip: asyncio.sleep(0, result='Mun')
+        session.transcribe = lambda clip: asyncio.sleep(0, result='Mum')
         session.verify_wake = lambda clip: asyncio.sleep(1, result='Hey Moon')
         worker = asyncio.create_task(session.worker())
         with patch('server.voice_lab.settings.VOICE_WAKE_VERIFY_TIMEOUT_SEC', .01):
