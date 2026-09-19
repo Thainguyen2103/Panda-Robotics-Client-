@@ -62,6 +62,7 @@ function unlockMicrophone() {
 
 function clearPlayback() {
     playbackGeneration++;
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     decodingCount = 0;
     for (const node of playing) {
         node.onended = null;
@@ -71,6 +72,35 @@ function clearPlayback() {
     playing.clear();
     playHead = context?.currentTime || 0;
     turnComplete = false;
+}
+
+function speakBrowserFallback(text, reason) {
+    if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+        $('error').textContent = 'Fish/Gemini không có audio và trình duyệt không hỗ trợ giọng dự phòng.';
+        setState('error', 'Không phát được âm thanh');
+        if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({command: 'playback_complete'}));
+        return;
+    }
+    const utterance = new SpeechSynthesisUtterance(String(text || '').trim());
+    utterance.lang = 'vi-VN';
+    utterance.rate = .96;
+    const vietnameseVoice = window.speechSynthesis.getVoices().find(voice =>
+        String(voice.lang || '').toLowerCase().startsWith('vi'));
+    if (vietnameseVoice) utterance.voice = vietnameseVoice;
+    utterance.onstart = () => {
+        if (responseStartedAt) showLatency(`${Math.round(performance.now() - responseStartedAt)} ms tới âm thanh dự phòng`);
+        setState('speaking', 'Đang phát giọng dự phòng của trình duyệt…');
+        dispatch('speaking');
+    };
+    const finish = () => {
+        if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({command: 'playback_complete'}));
+        setState('listening', 'Moon đang nghe — cứ nói tự nhiên');
+    };
+    utterance.onend = finish;
+    utterance.onerror = finish;
+    $('error').textContent = `Fish Audio tạm lỗi (${reason || 'không có audio'}); đang dùng giọng trình duyệt cho câu này.`;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
 }
 
 function notifyPlaybackComplete() {
@@ -165,6 +195,10 @@ function handleServer(message) {
     } else if (message.event === 'fish_synthesizing') {
         setState('thinking', 'Đang tạo giọng Fish Audio…');
         dispatch('thinking');
+    } else if (message.event === 'fish_retrying') {
+        setState('thinking', 'Fish Audio chưa phản hồi — đang thử lại lần cuối…');
+    } else if (message.event === 'browser_tts_fallback') {
+        speakBrowserFallback(message.text, message.reason);
     } else if (message.event === 'speaking') {
         incomingFormat = message.format || (outputMode === 'fish' ? 'mp3' : 'pcm');
         if (responseStartedAt) showLatency(`${Math.round(performance.now() - responseStartedAt)} ms tới âm thanh`);

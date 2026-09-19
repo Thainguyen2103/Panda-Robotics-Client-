@@ -72,9 +72,67 @@ async function synthesizeFish(text, config, options = {}) {
     return audio;
 }
 
+function retryableFishError(error) {
+    const status = Number(String(error?.message || '').match(/\((\d{3})\)/)?.[1] || 0);
+    return !status || status === 408 || status === 429 || status >= 500;
+}
+
+async function synthesizeFishWithRetry(text, config, options = {}) {
+    const synthesize = options.synthesize || synthesizeFish;
+    const attempts = Math.max(1, Number(options.attempts) || 2);
+    const timeoutMs = Math.max(1000, Number(options.timeoutMs) || 15000);
+    const retryDelayMs = Math.max(0, Number(options.retryDelayMs) || 350);
+    const parentSignal = options.signal;
+    let lastError;
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        if (parentSignal?.aborted) throw Object.assign(new Error('Đã hủy Fish Audio.'), {name: 'AbortError'});
+        const controller = new AbortController();
+        const relayAbort = () => controller.abort();
+        parentSignal?.addEventListener('abort', relayAbort, {once: true});
+        let timer;
+        try {
+            const timeout = new Promise((_, reject) => {
+                timer = setTimeout(() => {
+                    controller.abort();
+                    reject(new Error(`Fish Audio không phản hồi sau ${Math.round(timeoutMs / 1000)} giây.`));
+                }, timeoutMs);
+            });
+            return await Promise.race([
+                synthesize(text, config, {signal: controller.signal}),
+                timeout,
+            ]);
+        } catch (error) {
+            if (parentSignal?.aborted) throw Object.assign(new Error('Đã hủy Fish Audio.'), {name: 'AbortError'});
+            lastError = error;
+            if (attempt >= attempts || !retryableFishError(error)) break;
+            options.onRetry?.(attempt + 1, error);
+            await new Promise((resolve, reject) => {
+                let onAbort;
+                const done = () => {
+                    parentSignal?.removeEventListener('abort', onAbort);
+                    resolve();
+                };
+                const wait = setTimeout(done, retryDelayMs);
+                onAbort = () => {
+                    clearTimeout(wait);
+                    parentSignal?.removeEventListener('abort', onAbort);
+                    reject(Object.assign(new Error('Đã hủy Fish Audio.'), {name: 'AbortError'}));
+                };
+                parentSignal?.addEventListener('abort', onAbort, {once: true});
+            });
+        } finally {
+            clearTimeout(timer);
+            parentSignal?.removeEventListener('abort', relayAbort);
+        }
+    }
+    throw lastError || new Error('Fish Audio không tạo được âm thanh.');
+}
+
 module.exports = {
     readFishConfig,
     synthesizeFish,
+    synthesizeFishWithRetry,
     FISH_TTS_URL,
     DEFAULT_FISH_MODEL,
 };

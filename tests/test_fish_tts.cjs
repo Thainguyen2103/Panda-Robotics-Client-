@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const {readFishConfig, synthesizeFish, FISH_TTS_URL} = require('../web/fish-tts');
+const {readFishConfig, synthesizeFish, synthesizeFishWithRetry, FISH_TTS_URL} = require('../web/fish-tts');
 
 (async () => {
     const config = readFishConfig({
@@ -40,6 +40,28 @@ const {readFishConfig, synthesizeFish, FISH_TTS_URL} = require('../web/fish-tts'
     await assert.rejects(() => synthesizeFish('Xin chào', config, {
         fetchImpl: async () => ({ok: false, status: 422, async text() { return 'invalid model'; }}),
     }), /Fish Audio từ chối yêu cầu \(422\): invalid model/);
+
+    let attempts = 0;
+    const retriedAudio = await synthesizeFishWithRetry('Thử lại', config, {
+        retryDelayMs: 1,
+        timeoutMs: 1000,
+        synthesize: async () => {
+            attempts++;
+            if (attempts === 1) throw new Error('network timeout');
+            return expected;
+        },
+    });
+    assert.equal(attempts, 2);
+    assert.deepEqual(retriedAudio, expected);
+
+    attempts = 0;
+    await assert.rejects(() => synthesizeFishWithRetry('Không retry 422', config, {
+        synthesize: async () => {
+            attempts++;
+            throw new Error('Fish Audio từ chối yêu cầu (422): invalid model');
+        },
+    }), /422/);
+    assert.equal(attempts, 1);
     console.log('Fish TTS tests passed');
 })().catch(error => {
     console.error(error);

@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const {WebSocket, WebSocketServer} = require('ws');
 const {GoogleGenAI, Modality, Type} = require('@google/genai');
-const {readFishConfig, synthesizeFish} = require('./fish-tts');
+const {readFishConfig, synthesizeFish, synthesizeFishWithRetry} = require('./fish-tts');
 
 const DEFAULT_MODEL = 'gemini-3.8-live';
 const DEFAULT_VOICE = 'Kore';
@@ -106,6 +106,8 @@ function attachGeminiLive(server, mqttClient, options = {}) {
         let fishFinalizeTimer;
         let failed = false;
         let lastPlaybackFallback = [];
+        let lastPlaybackText = '';
+        let browserFallbackActive = false;
 
         const cleanup = () => {
             if (closed) return;
@@ -161,6 +163,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             pendingNativeAudio = [];
             pendingNativeBytes = 0;
             lastPlaybackFallback = [];
+            lastPlaybackText = '';
         };
         const sendAudio = (chunks, format, fallbackText = '', complete = true, announce = true) => {
             if (!Array.isArray(chunks) || chunks.length === 0 || downstream.readyState !== WebSocket.OPEN) return false;
@@ -178,13 +181,22 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 return false;
             }
         };
-        const fallbackToGeminiAudio = (chunks, reason) => {
+        const fallbackToGeminiAudio = (chunks, reason, spokenText = '') => {
             const text = reason
                 ? `Fish Audio tạm lỗi (${reason}). Moon dùng giọng Gemini cho câu này.`
                 : 'Không nhận được bản chữ Fish. Moon dùng giọng Gemini cho câu này.';
             if (sendAudio(chunks, 'pcm', text)) return;
+            if (spokenText.trim()) {
+                browserFallbackActive = true;
+                sendJson({
+                    event: 'browser_tts_fallback',
+                    text: spokenText.trim(),
+                    reason: reason || 'Gemini không gửi kèm audio native',
+                });
+                return;
+            }
             resetFace();
-            sendJson({event: 'turn_error', text: 'Gemini đã trả lời nhưng không có audio có thể phát.'});
+            sendJson({event: 'turn_error', text: 'Gemini không trả về cả nội dung chữ lẫn âm thanh.'});
             sendJson({event: 'listening'});
         };
         const speakFish = async (text, fallbackAudio) => {
@@ -193,15 +205,22 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             fishAbort = new AbortController();
             sendJson({event: 'fish_synthesizing'});
             try {
-                const audio = await synthesize(text, fishConfig, {signal: fishAbort.signal});
+                const audio = await synthesizeFishWithRetry(text, fishConfig, {
+                    signal: fishAbort.signal,
+                    synthesize,
+                    attempts: 2,
+                    timeoutMs: 15000,
+                    onRetry: () => sendJson({event: 'fish_retrying'}),
+                });
                 if (closed || generation !== responseGeneration || downstream.readyState !== WebSocket.OPEN) return;
                 sentSpeaking = true;
                 lastPlaybackFallback = fallbackAudio;
+                lastPlaybackText = text;
                 sendAudio([audio], 'mp3');
                 sentSpeaking = false;
             } catch (error) {
                 if (error?.name === 'AbortError' || generation !== responseGeneration || closed) return;
-                fallbackToGeminiAudio(fallbackAudio, error?.message || 'không tạo được giọng Fish');
+                fallbackToGeminiAudio(fallbackAudio, error?.message || 'không tạo được giọng Fish', text);
             } finally {
                 if (generation === responseGeneration) fishAbort = undefined;
             }
@@ -383,6 +402,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
         downstream.on('message', (data, isBinary) => {
             if (!session || !ready) return;
             if (isBinary) {
+                if (browserFallbackActive) return;
                 if (data.length === 0 || data.length > 4096 || data.length % 2 !== 0) {
                     downstream.close(1003, 'Invalid PCM frame');
                     return;
@@ -395,13 +415,21 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             try {
                 const command = JSON.parse(data.toString()).command;
                 if (command === 'playback_complete') {
+                    browserFallbackActive = false;
                     lastPlaybackFallback = [];
+                    lastPlaybackText = '';
                     resetFace();
                     sendJson({event: 'listening'});
                 } else if (command === 'playback_failed' && outputMode === 'fish') {
                     const fallbackAudio = lastPlaybackFallback;
+                    const fallbackText = lastPlaybackText;
                     lastPlaybackFallback = [];
-                    fallbackToGeminiAudio(fallbackAudio, 'trình duyệt không phát được MP3 Fish');
+                    lastPlaybackText = '';
+                    fallbackToGeminiAudio(
+                        fallbackAudio,
+                        'trình duyệt không phát được MP3 Fish',
+                        fallbackText,
+                    );
                 } else if (command === 'audio_stream_end') {
                     callSession('sendRealtimeInput', {audioStreamEnd: true});
                 }
