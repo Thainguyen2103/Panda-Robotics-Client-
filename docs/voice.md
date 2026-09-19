@@ -41,11 +41,17 @@ hiệu chuẩn wakeword kéo dài khoảng 0,9 giây.
 
 Wakeword chỉ là cổng kích hoạt, không còn tự thu một câu rồi gửi qua pipeline cũ.
 Chế độ chờ giữ audio ngoài Gemini/Brain cho tới khi wakeword được xác nhận.
+`brain.py` không mở microphone/wakeword nền riêng; nếu không, hai pipeline sẽ
+cùng nghe và Brain có thể trả lời trong khi thẻ Live Voice vẫn đang chờ.
 
 Gemini dùng VAD tự động với ngưỡng nhạy cho hội thoại. Dashboard còn có một lớp
 dự phòng: khi đã nghe tiếng nói và gặp khoảng 0,9 giây im lặng, nó gửi tín hiệu
 kết thúc luồng audio hiện tại để Gemini chốt câu và bắt đầu trả lời; microphone
 vẫn tiếp tục dùng cho câu kế tiếp.
+
+Khi kết thúc một phiên và đổi từ Fish Voice sang Kore (hoặc ngược lại), hàng đợi
+phát và mốc thời gian AudioContext được đặt lại trước phiên mới để audio không bị
+lên lịch ở một thời điểm cũ rồi tạo cảm giác mất tiếng.
 
 ### So sánh Gemini Live và Brain Pipeline
 

@@ -35,12 +35,25 @@ const {chromium} = require('playwright');
         });
         await page.routeWebSocket('**/live/ws**', socket => {
             liveConnections++;
+            const connection = liveConnections;
+            let responded = false;
             socket.send(JSON.stringify({
-                event: 'ready', model: 'TEST live', voice: 'Kore', outputMode: 'native',
+                event: 'ready', model: 'TEST live',
+                voice: connection === 1 ? 'Fish Voice' : 'Kore',
+                outputMode: connection === 1 ? 'fish' : 'native',
             }));
             socket.onMessage(data => {
                 if (typeof data === 'string') controls.push(JSON.parse(data).command);
-                else { assert.equal(data.length, 960); liveFrames++; }
+                else {
+                    assert.equal(data.length, 960);
+                    liveFrames++;
+                    if (connection === 2 && !responded) {
+                        responded = true;
+                        socket.send(JSON.stringify({event: 'speaking', format: 'pcm'}));
+                        socket.send(Buffer.alloc(960));
+                        socket.send(JSON.stringify({event: 'turn_complete'}));
+                    }
+                }
             });
         });
 
@@ -51,6 +64,18 @@ const {chromium} = require('playwright');
             AudioContext.prototype.createOscillator = function () {
                 window.toneCount++;
                 return create.call(this);
+            };
+            window.audioStartDelays = [];
+            const createSource = AudioContext.prototype.createBufferSource;
+            AudioContext.prototype.createBufferSource = function () {
+                const audioContext = this;
+                const node = createSource.call(this);
+                const start = node.start.bind(node);
+                node.start = (when = 0, ...args) => {
+                    window.audioStartDelays.push(when - audioContext.currentTime);
+                    return start(when, ...args);
+                };
+                return node;
             };
         });
 
@@ -71,8 +96,12 @@ const {chromium} = require('playwright');
         assert.equal(await page.locator('#live-stop').isDisabled(), true);
 
         await page.locator('#live-activation').selectOption('manual');
+        await page.locator('#live-mode').selectOption('native');
         await page.locator('#live-start').click();
         await page.waitForFunction(() => document.getElementById('live-state').textContent.includes('Moon đang nghe'));
+        await page.waitForFunction(() => window.audioStartDelays.length > 0);
+        assert((await page.evaluate(() => window.audioStartDelays.at(-1))) < .2,
+            'Fish → Kore must reset the old AudioContext playback timeline');
         assert.equal(wakeConnections, 1, 'manual mode must bypass wakeword service');
         assert.equal(liveConnections, 2);
         await page.locator('#live-stop').click();

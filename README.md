@@ -7,9 +7,9 @@ màn OLED theo phong cách robot Vector (Anki).
 
 ## ✨ Tính năng nổi bật
 
-- **Voice trên dashboard**: microphone liên tục, WebRTC VAD, wakeword Moon bằng
-  Porcupine hoặc Whisper dự phòng, hiển thị STT nguyên văn để kiểm tra.
-  Chạy `start-voice.bat`; xem [hướng dẫn Voice](docs/voice.md).
+- **Live Voice trên dashboard**: bật hội thoại trực tiếp hoặc chờ wakeword Moon
+  bằng Porcupine/Whisper rồi tự chuyển sang hội thoại liên tục. Brain không còn
+  mở listener wakeword nền riêng. Xem [hướng dẫn Voice](docs/voice.md).
 - **Live Talk liên tục**: Gemini Live hiểu audio trực tiếp, hỗ trợ ngắt lời; có thể
   trả lời bằng cùng giọng Fish của Moon (mặc định) hoặc giọng Gemini Native nhanh hơn.
   API key chỉ nằm ở backend và OLED chỉ hiển thị biểu cảm do function call chọn.
@@ -29,7 +29,8 @@ màn OLED theo phong cách robot Vector (Anki).
 ## 🏗 Kiến trúc
 
 ```
- mic / mic trình duyệt ─→ voice.py (VAD + Whisper) ─→ brain.py
+ mic trình duyệt ─┬→ Gemini Live (audio trực tiếp)
+                  └→ voice_lab.py (wake/VAD/STT) ─→ brain.py
  camera / ESP32-CAM    ─→ vision.py (YuNet/SFace/FER)     │
                                                            ├─→ llm.py (Groq)
  dashboard web (OLED ảo, nút điều khiển) ←─ MQTT broker ←─┤
@@ -48,15 +49,14 @@ firmware/    panda_firmware.ino (ESP32, chạy được trên Wokwi lẫn chip t
 tools/       bench_topics.py, dev_mic_bridge.py
 ```
 
-## 🎙️ Test Voice trên dashboard (công việc hiện tại)
+## 🎙️ Test Live Voice trên dashboard
 
-Để test riêng nhận dạng giọng nói, chạy `start-voice.bat`, mở
-http://localhost:3000 và bật microphone. Chế độ này không khởi động Brain nên
-không có phản hồi LLM/TTS/OLED. Để thử hội thoại Moon hoàn chỉnh, chạy
-`start.bat`; sau lần cấp quyền đầu tiên, dashboard sẽ tự bật lại microphone.
-Cài môi trường lần đầu theo [docs/voice.md](docs/voice.md). Không cần Brain/LLM.
-Wake âm học tức thời cần model Moon `.ppn` và Picovoice key; nếu chưa có,
-dashboard dùng Whisper dự phòng và hiển thị rõ độ trễ phụ thuộc ngắt câu/mạng.
+Chạy `start.bat`, mở http://localhost:3000 và chọn **Bật trực tiếp** hoặc
+**Chờ “Hey Moon” rồi trò chuyện**. Sau khi wakeword được xác nhận, cùng microphone
+được chuyển sang Gemini Live hoặc Brain Pipeline và tiếp tục nghe nhiều lượt mà
+không cần gọi Moon lại. `start-voice.bat` chỉ phù hợp để kiểm tra transport/STT
+khi không cần Brain trả lời. Wake âm học tức thời cần model Moon `.ppn` và
+Picovoice key; nếu chưa có, dashboard dùng Whisper dự phòng.
 
 ## 🚀 Chạy thử (không cần phần cứng)
 
@@ -75,8 +75,8 @@ copy config\secrets.example.py config\secrets.py   # rồi điền key
 # Dashboard: http://localhost:3000
 ```
 
-Nói **"Moon"** rồi hỏi bất kỳ điều gì bằng tiếng Việt — OLED diễn cảm xúc,
-icon chủ đề và trả lời bằng giọng nói.
+Chọn một chế độ Live Voice rồi hỏi bằng tiếng Việt — OLED diễn cảm xúc và Moon
+trả lời bằng giọng đã chọn.
 
 ## 🔑 MQTT topics (hợp đồng giữa các module)
 

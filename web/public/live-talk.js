@@ -508,6 +508,7 @@ async function openMicrophone(token) {
     $('device').value = selected;
 
     context = new AudioContext();
+    playHead = 0;
     await context.resume();
     await context.audioWorklet.addModule('/voice-worklet.js');
     source = context.createMediaStreamSource(stream);
@@ -551,6 +552,7 @@ async function start() {
     wakeCalibrating = false;
     localNoise = .0015;
     resetGeminiTurnDetector();
+    clearPlayback();
     turnTranscript = '';
     brainWaiting = false;
     showHeard('Đang chuẩn bị…');

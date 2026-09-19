@@ -16,6 +16,13 @@ const {chromium} = require('playwright');
         await say({event: 'starting', pipeline: 'gemini'});
         await say({event: 'waiting_wake', pipeline: 'gemini'});
         assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/);
+        await page.evaluate(() => {
+            const receive = socket.listeners('mqtt_message')[0];
+            receive({topic: 'panda/cmd/face', payload: 'questioning'});
+            receive({topic: 'panda/ai/state', payload: 'thinking'});
+        });
+        assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/,
+            'legacy MQTT events must not take OLED ownership while Live Voice waits');
         await say({event: 'wake', pipeline: 'gemini'});
         assert.match(await page.locator('#oled-face').getAttribute('class'), /questioning/);
         await say({event: 'ready', pipeline: 'gemini'});
