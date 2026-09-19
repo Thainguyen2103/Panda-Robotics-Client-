@@ -4,7 +4,8 @@ import unittest
 
 from server.voice_core import (Segmenter, wake_tail, possible_moon_miss,
                                should_verify_wake, confirmed_wake_tail,
-                               reliable_transcript, safe_asr_correction)
+                               confident_wake_tail, reliable_transcript,
+                               safe_asr_correction)
 
 
 def frame(amplitude=1500):
@@ -84,6 +85,12 @@ class VoiceCoreTests(unittest.TestCase):
             self.assertEqual(confirmed_wake_tail(primary, 'Hey Moon'), '', primary)
         # A Vietnamese word without an explicit call prefix remains protected.
         self.assertIsNone(confirmed_wake_tail('trời mưa', 'Hey Moon'))
+
+    def test_confident_explicit_call_skips_slow_second_pass(self):
+        for text in ['Hey Moon', 'Moon', 'Hey múa', 'Hey mưa', 'Hi Mun']:
+            self.assertEqual(confident_wake_tail(text), '', text)
+        for text in ['trời mưa', 'đi múa', 'Hey man', 'xin chào']:
+            self.assertIsNone(confident_wake_tail(text), text)
 
     def test_one_pass_or_blank_noise_cannot_confirm_wake(self):
         self.assertIsNone(confirmed_wake_tail('', 'Hey Moon'))

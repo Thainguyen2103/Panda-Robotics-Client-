@@ -149,6 +149,22 @@ def confirmed_wake_tail(primary, verification):
     return ''
 
 
+def confident_wake_tail(text):
+    """Return a wake tail that is safe to accept without a second API call.
+
+    Literal Moon is accepted directly. A known Vietnamese STT rendering is only
+    accepted when the user explicitly starts with Hey/Hi, which avoids treating
+    ordinary words such as mưa or múa as a wakeword in a normal sentence.
+    """
+    literal = wake_tail(text)
+    if literal is not None:
+        return literal
+    token, called = _english_wake_token(text)
+    if called and token in _MOON_DIRECT_CALL_ALIASES:
+        return ''
+    return None
+
+
 def _english_wake_token(text):
     normalized = unicodedata.normalize('NFC', text or '').casefold()
     if any(word in {'môn', 'món', 'muốn'} for word in re.findall(r'\w+', normalized)):
@@ -167,6 +183,8 @@ def _english_wake_token(text):
 _MOON_NARROW_ALIASES = {
     'moon', 'mun', 'muun', 'moun', 'moom', 'moone', 'mon', 'muon', 'mune',
 }
+
+_MOON_DIRECT_CALL_ALIASES = _MOON_NARROW_ALIASES | {'mua'}
 
 _MOON_EN_ALIASES = _MOON_NARROW_ALIASES | {
     # Whisper forced to Vietnamese often writes the English sound Moon as

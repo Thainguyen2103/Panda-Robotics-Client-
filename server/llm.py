@@ -116,8 +116,9 @@ Lưu ý:
 - Tránh dùng markdown, bullet point hay ký tự đặc biệt khó đọc
 - Hãy nói tự nhiên như hội thoại thông thường
 - KHÔNG dùng dấu **, ## hay bất kỳ ký hiệu markdown nào
-- NGÔN NGỮ: tuân thủ chỉ dẫn ngôn ngữ riêng của lượt hỏi mới nhất. Không mặc
-  định dùng tiếng Việt chỉ vì các tin nhắn cũ hoặc system prompt viết tiếng Việt
+- NGÔN NGỮ: tuân thủ chỉ dẫn ngôn ngữ riêng của lượt hỏi mới nhất. Chọn ngôn
+  ngữ chính một cách tự nhiên và được giữ/dùng thuật ngữ ngoại ngữ quen thuộc
+  khi chúng rõ nghĩa hơn. Không dịch đôi toàn bộ câu trừ khi người dùng yêu cầu
 - BÙ ĐẮP LỖI NHẬN DẠNG: câu hỏi đến từ giọng nói nên có thể thiếu chữ,
   sai chính tả (vd "ngon bị nào" = "ngọn núi nào"). Hãy tự suy luận ý định
   hợp lý nhất rồi trả lời tự nhiên; KHÔNG nhắc lại phần chữ bị lỗi,
@@ -201,7 +202,7 @@ def response_language(question: str) -> str:
     if vi_score and en_score:
         # One borrowed word does not make an otherwise clear sentence mixed.
         if min(vi_score, en_score) >= 2 or abs(vi_score - en_score) <= 1:
-            return "bilingual"
+            return "adaptive"
     if en_score >= 2 and en_score > vi_score:
         return "en"
     if vi_score >= 1 and vi_score > en_score:
@@ -211,7 +212,7 @@ def response_language(question: str) -> str:
     # acronym stays ambiguous and is therefore answered bilingually.
     if not vi_score and len(words) >= 2 and normalized.isascii():
         return "en"
-    return "bilingual"
+    return "adaptive"
 
 
 def response_language_instruction(question: str) -> str:
@@ -223,9 +224,11 @@ def response_language_instruction(question: str) -> str:
     if language == "vi":
         return ("[Ngôn ngữ trả lời cho lượt mới nhất] Người dùng nói tiếng Việt. "
                 "Chỉ trả lời bằng tiếng Việt tự nhiên.")
-    return ("[Response language for the latest turn] The utterance mixes languages "
-            "or is ambiguous. Give a concise bilingual answer: Vietnamese first, "
-            "then the equivalent natural English. Do not repeat more than needed.")
+    return ("[Response language for the latest turn] Infer the dominant language "
+            "and reply naturally in that language. Code-switch only where it helps: "
+            "keep familiar English technical terms, product names, and phrases when "
+            "they are clearer than a forced translation. Do not duplicate the whole "
+            "answer in two languages unless the user explicitly asks for translation.")
 
 
 def _get_messages(user_question: str) -> list[dict]:

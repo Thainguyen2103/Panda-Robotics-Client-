@@ -16,10 +16,12 @@ class ResponseLanguageTests(unittest.TestCase):
         self.assertEqual(llm.response_language(question), 'vi')
         self.assertIn('Chỉ trả lời bằng tiếng Việt', llm.response_language_instruction(question))
 
-    def test_mixed_or_ambiguous_turn_is_bilingual(self):
+    def test_mixed_or_ambiguous_turn_is_adaptive_not_duplicated(self):
         for question in ['Bạn know who I am?', 'Ronaldo?']:
-            self.assertEqual(llm.response_language(question), 'bilingual')
-            self.assertIn('bilingual answer', llm.response_language_instruction(question))
+            self.assertEqual(llm.response_language(question), 'adaptive')
+            instruction = llm.response_language_instruction(question)
+            self.assertIn('Code-switch', instruction)
+            self.assertIn('Do not duplicate', instruction)
 
 
 if __name__ == '__main__':

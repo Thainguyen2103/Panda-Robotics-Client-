@@ -144,21 +144,22 @@ bộ Brain.
   điền `PICOVOICE_ACCESS_KEY` trong `config/secrets.py`. Có thể dùng biến môi trường
   `MOON_PPN_PATH` trỏ đến model. Đổi tên file model Panda không biến nó thành model Moon.
 - **Whisper dự phòng**: dùng ngay khi có Groq key, không cần `.ppn`. Pass
-  tiếng Việt làm nhận dạng chính. Nếu kết quả rỗng hoặc là một biến thể hẹp
-  mà Whisper hay ghi cho Moon (Mun/Mùn/Muôn), server chạy thêm pass tiếng Anh
-  trên cùng audio và chỉ wake khi pass này xác nhận token Moon. Cụm gọi rõ
-  “Hey Moon” đôi khi bị pass tiếng Việt ghi thành “Hey múa/mưa”; các dạng này
-  chỉ được chấp nhận khi pass tiếng Anh độc lập cũng xác nhận Moon. Các từ Việt
-  thật “muốn/môn/món” bị loại trước bước xác minh. Dashboard hiện kết quả
-  pass đầu trong mục chẩn đoán để tinh chỉnh theo mic/giọng thật.
+  tiếng Việt làm nhận dạng chính. `Moon` chính xác hoặc cụm gọi rõ “Hey Moon”
+  được kích hoạt ngay; các cách Whisper thường ghi thành “Hey múa/mưa” cũng
+  được nhận ngay vì có tiền tố gọi rõ. Biến thể kém chắc chắn như `Mun` đứng một
+  mình mới chạy pass tiếng Anh và bị giới hạn bốn giây, nên giao diện không thể
+  kẹt ở **Đang xác minh**. Các câu Việt bình thường như “trời mưa”, cùng các từ
+  “muốn/môn/món”, không kích hoạt Moon. Dashboard hiện kết quả pass đầu trong
+  mục chẩn đoán để tinh chỉnh theo mic/giọng thật.
 
 ### Ngôn ngữ phản hồi
 
 Brain/LLM và Gemini Live đều xét ngôn ngữ của **lượt nói mới nhất**, không lấy
 ngôn ngữ trong lịch sử làm mặc định. Câu tiếng Việt được đáp bằng tiếng Việt;
-câu tiếng Anh được đáp bằng tiếng Anh. Nếu câu nói trộn hai ngôn ngữ hoặc quá
-ngắn để xác định chắc chắn, Moon trả lời song ngữ ngắn gọn, tiếng Việt trước rồi
-tiếng Anh tương đương. Bước sửa lỗi STT chỉ sửa cách viết và không được dịch câu.
+câu tiếng Anh được đáp bằng tiếng Anh. Với câu code-switch, Moon chọn ngôn ngữ
+chính nhưng giữ hoặc dùng thuật ngữ tiếng Anh khi tự nhiên và rõ nghĩa hơn cách
+dịch gượng ép. Moon không lặp câu trả lời thành hai bản dịch trừ khi người dùng
+yêu cầu dịch. Bước sửa lỗi STT chỉ sửa cách viết và không được dịch câu.
 
 Dashboard luôn hiện chế độ thực tế. Key/model có cấu hình nhưng lỗi sẽ báo lỗi;
 không âm thầm giả vờ đang chạy Porcupine.

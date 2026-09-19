@@ -85,7 +85,7 @@ function waitFor(check, timeoutMs = 2000) {
     assert.deepEqual(connectParams.config.inputAudioTranscription, {});
     assert.match(
         connectParams.config.systemInstruction.parts[0].text,
-        /tiếng Anh hỏi thì đáp tiếng Anh/,
+        /code-switch/,
     );
     assert.equal(
         connectParams.config.realtimeInputConfig.automaticActivityDetection.silenceDurationMs,

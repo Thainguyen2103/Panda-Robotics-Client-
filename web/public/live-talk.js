@@ -362,6 +362,12 @@ function handleWakeServer(message, token) {
     } else if (message.event === 'verifying_wake') {
         if (message.text) showHeard(`Đang xác minh: ${message.text}`);
         setState('waiting', 'Đang xác minh “Hey Moon”…');
+    } else if (message.event === 'verification_timeout') {
+        showHeard(message.text
+            ? `Xác minh quá thời gian: ${message.text}`
+            : 'Xác minh wakeword quá thời gian');
+        $('error').textContent = 'Mạng xác minh wakeword chậm — hãy nói lại “Hey Moon”.';
+        setState('waiting', 'Chưa xác minh được — hãy nói lại “Hey Moon”');
     } else if (message.event === 'transcript') {
         showHeard(message.text || 'Đã nhận wakeword');
         showLatency(`wake STT ${message.latency_ms || 0} ms`);

@@ -14,7 +14,8 @@ import webrtcvad
 
 from config import settings
 from server.voice_core import (Segmenter, wake_tail, should_verify_wake,
-                               confirmed_wake_tail, reliable_transcript,
+                               confirmed_wake_tail, confident_wake_tail,
+                               reliable_transcript,
                                RATE, FRAME_BYTES, FRAME_MS)
 
 
@@ -207,16 +208,26 @@ class Session:
                 if self.paused or audio_epoch != self.audio_epoch:
                     publish_state = False
                     continue
-                # Whisper vi often writes the English name as Mun/Mùn/Muôn or
-                # returns blank. Verify only those narrow cases with an English
-                # pass; common Vietnamese words muốn/môn/món never enter here.
-                if (not self.engine and not captured_while_listening
+                # Literal Moon and an explicit Hey + known phonetic rendering
+                # wake immediately. Only less certain short forms such as a bare
+                # Mun use the slower English verification request.
+                direct_wake = (confident_wake_tail(text)
+                               if not self.engine and not question_context else None)
+                if (not self.engine and direct_wake is None
+                        and not captured_while_listening
                         and not question_context
                         and should_verify_wake(text,len(clip)/32,
                             settings.VOICE_WAKE_VERIFY_MAX_SEC,
                             settings.VOICE_WAKE_VERIFY_MAX_WORDS)):
                     await self.emit('verifying_wake', text=text)
-                    verified = await self.verify_wake(clip)
+                    try:
+                        verified = await asyncio.wait_for(
+                            self.verify_wake(clip),
+                            timeout=settings.VOICE_WAKE_VERIFY_TIMEOUT_SEC,
+                        )
+                    except asyncio.TimeoutError:
+                        await self.emit('verification_timeout', text=text)
+                        verified = ''
                     confirmed_tail = confirmed_wake_tail(text, verified)
                     if confirmed_tail is not None:
                         text = 'Moon' + (f', {confirmed_tail}' if confirmed_tail else '')
@@ -230,7 +241,7 @@ class Session:
                     continue
                 self.sequence += 1
                 # Unrelated standby ASR is diagnostic, not a user's question.
-                tail = wake_tail(text) if not self.engine else None
+                tail = confident_wake_tail(text) if not self.engine else None
                 question_clip = self.continuous or captured_while_listening or question_context
                 accepted = ((question_clip and self.listening)
                             or (tail is not None and not self.listening))
