@@ -12,6 +12,11 @@ except Exception:
 def _key(name: str) -> str:
     return _SEC.get(name, "") or os.environ.get(name, "")
 
+
+# Gemini Live native audio (dashboard Live Talk). Node cũng đọc cùng key này
+# trực tiếp từ config/secrets.py; key không bao giờ được gửi xuống trình duyệt.
+GEMINI_API_KEY = _key("GEMINI_API_KEY")
+
 # MQTT Broker Configuration
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
@@ -32,6 +37,8 @@ TOPIC_AI_TOPIC      = "panda/ai/topic"        # chủ đề câu hỏi → emoji
 TOPIC_BROWSER_AUDIO = "panda/ai/voice_audio"   # push-to-talk từ dashboard (base64 webm)
 TOPIC_BROWSER_CLIP  = "panda/ai/clip"          # clip PCM từ live-mic trình duyệt
 TOPIC_MIC_LIVE      = "panda/ai/mic_live"      # trạng thái live-mic on/off
+TOPIC_BROWSER_QUESTION = "panda/ai/question"    # text đã STT từ Moon Voice → Brain
+TOPIC_TTS_ACTIVE    = "panda/audio/tts_active"  # 1/0: chặn mic web tự nghe loa Moon
 TOPIC_CAMERA = "panda/camera"
 
 # AI Models Configuration
@@ -40,7 +47,7 @@ YOLO_MODEL   = "yolov8n-pose.pt" # pose model
 EMOTION_MODEL = "emotion-ferplus-8.onnx"
 
 # Webcam index or an ESP32-CAM MJPEG / RTSP URL.
-VISION_SOURCE = os.environ.get("PANDA_CAMERA_SOURCE", str(WEBCAM_INDEX))
+VISION_SOURCE = os.environ.get("MOON_CAMERA_SOURCE", str(WEBCAM_INDEX))
 VISION_WIDTH = 640
 VISION_HEIGHT = 480
 VISION_AI_FPS = 10
@@ -53,13 +60,24 @@ VISION_FACE_DETAILS_ENABLED = True
 VISION_FACE_DETAILS_MODEL = "face_landmarker.task"
 VISION_HEAD_NOD_DEGREES = 8.0
 VISION_HEAD_SHAKE_DEGREES = 10.0
+VISION_HEAD_TILT_DEGREES = 12.0
+VISION_HEAD_TURN_DEGREES = 16.0
+VISION_HEAD_LOOK_DEGREES = 13.0
 VISION_DRAW_SKELETON = True
 VISION_HANDS_ENABLED = True
 VISION_HANDS_MODEL = "hand_landmarker.task"
-VISION_HANDS_FPS = 5
+VISION_HANDS_FPS = 7
+VISION_HANDS_CONFIDENCE = 0.45
+VISION_HANDS_STALE_SEC = 0.9
+VISION_FINGER_STRAIGHT_DEGREES = 135.0
+VISION_FINGER_EXTENSION_RATIO = 1.05
+VISION_THUMB_STRAIGHT_DEGREES = 135.0
 VISION_OBJECTS_ENABLED = True
 VISION_OBJECTS_MODEL = "yolov8n.pt"
 VISION_OBJECTS_FPS = 1
+VISION_OBJECTS_SIZE = 480
+VISION_OBJECTS_CONFIDENCE = 0.30
+VISION_OBJECTS_STALE_SEC = 2.5
 VISION_EAR_CLOSED = 0.19
 VISION_EAR_OPEN = 0.23
 VISION_EYES_CLOSED_SEC = 1.5
@@ -67,7 +85,7 @@ VISION_EYES_CLOSED_SEC = 1.5
 VISION_CAMERA_HFOV = 60.0
 VISION_FACE_WIDTH_CM = 14.0
 # Calibration: known distance_cm * detected_face_width_px / frame_width_px.
-VISION_DISTANCE_SCALE_CM = float(os.environ.get("PANDA_DISTANCE_SCALE_CM", "0")) or None
+VISION_DISTANCE_SCALE_CM = float(os.environ.get("MOON_DISTANCE_SCALE_CM", "0")) or None
 VISION_POSE_ENABLED = True
 VISION_POSE_SIZE = 320
 VISION_DEVICE = "cpu"  # CUDA: "0"
@@ -94,6 +112,7 @@ FISH_VOICE_ID = "381620020029495883d03b63850c862f"
 
 # Model TTS: 's2.1-pro-free' = miễn phí (khuyên dùng) | 's2.1-pro' / 's2-pro' / 's1' = trả phí
 FISH_TTS_MODEL = "s2.1-pro-free"
+FISH_SENTENCE_TIMEOUT_SEC = 12.0  # Fish treo/chậm → chuyển ngay sang giọng offline
 
 # ─── DeepSeek API (LLM) ─────────────────────────────────────────────────────
 # Lấy key tại: https://platform.deepseek.com/api_keys
@@ -112,9 +131,9 @@ QUICK_MODEL = "groq/compound-mini"
 GROQ_API_KEY = _key("GROQ_API_KEY")
 
 # Ngôn ngữ nhận dạng giọng nói (STT):
-#   "vi" = tiếng Việt (KHUYẾN DỤNG cho Panda — chính xác nhất và nhanh gấp đôi,
+#   "vi" = tiếng Việt (KHUYẾN DỤNG cho Moon — chính xác nhất và nhanh gấp đôi,
 #          đã đo: 0.48s so với 1.02s của auto; auto hay đoán nhầm sang tiếng khác
-#          với clip ngắn: "Panda ơi" → "Bonne t'en la vie!")
+#          với clip ngắn: "Moon ơi" → "Bonne t'en la vie!")
 #   None = tự động phát hiện (chỉ dùng nếu cần hội thoại tiếng Anh thật sự)
 #   "en" = luôn tiếng Anh
 STT_LANGUAGE = "vi"
@@ -131,7 +150,7 @@ STT_MODEL_QUESTION = "whisper-large-v3-turbo"
 # ⚠️ CHỈ BẬT khi tín hiệu THÔ và MẠNH (giọng ≥0.3 RMS — đã tắt Enhance Voice
 # Recognition): spectral gating xóa ồn quạt mà KHÔNG nuốt giọng.
 # Nếu mic lại bị hãng bóp (giọng yếu 0.03–0.06) → trả về False kẻo nuốt giọng.
-DENOISE_BEFORE_STT = True
+DENOISE_BEFORE_STT = False
 
 # Ngưỡng năng lượng RMS tối thiểu để coi là tiếng nói (lọc ồn nền: quạt, điều hòa).
 # Tăng lên (vd 0.05) nếu môi trường quá ồn gây false-trigger; giảm (0.02) nếu nói nhỏ.
@@ -163,66 +182,21 @@ PERSON_LOST_GRACE_SEC = 10.0
 
 
 # ─── Wake-word on-device (Porcupine — tùy chọn, kiểu Anki Vector) ─────────────
-# Bắt "Panda" bằng âm học trên máy, không phụ thuộc ngôn ngữ & không cần mạng.
-# LƯU Ý: console.picovoice.ai hiện CHỈ nhận email công ty — người dùng cá nhân
-# (Gmail...) không đăng ký được. Khi đó cứ để trống: hệ thống tự dùng
-# fallback Whisper dual-pass + fuzzy matching (vẫn bắt tốt "Panda").
-# Cách kích hoạt (nếu có email công ty): xem server/wakeword.py
-PICOVOICE_ACCESS_KEY = ""
-PANDA_PPN_PATH = ""   # để trống = mặc định server/panda.ppn
+# Bắt "Moon" bằng âm học trên máy, không phụ thuộc ngôn ngữ & không cần mạng.
+# Cấu hình key trong secrets.py/môi trường và model Moon .ppn đúng nền tảng.
+# Nếu chưa có, Voice Lab dùng Whisper một lượt, khớp đúng token Moon.
+PICOVOICE_ACCESS_KEY = _key("PICOVOICE_ACCESS_KEY")
+MOON_PPN_PATH = os.environ.get("MOON_PPN_PATH", "")   # để trống = mặc định server/moon.ppn
 
 
 # ─── Wake-word ───────────────────────────────────────────────────────────────
 # Groq Whisper large-v3-turbo nhận dạng rất chính xác nên chỉ cần
 # các dạng phổ biến. Thêm vào nếu thấy bị sót trong thực tế.
-PANDA_WAKE_WORDS = [
-    # ── Chuẩn tiếng Anh & Việt ───────────────────────────────────────────
-    "panda",
-    "hey panda",
-    "panda ơi",
-    "này panda",
-    "ê panda",
-    "ơi panda",
-    "pan đa",
-    "pan đa ơi",
-    "păng đa",
-    "păng đa ơi",
-    # ── Các biến thể phiên âm tiếng Việt Whisper hay nhận nhầm ───────────
-    "hai phan ta",
-    "hai phanta",
-    "hai phan đa",
-    "hai panda",
-    "hai păng đa",
-    "hai bạn nàng",
-    "bạn nàng",
-    "ban nang",
-    "hây panda",
-    "hê panda",
-    "hây phan ta",
-    "hê phan ta",
-    "phan ta",
-    "phan da",
-    "phan đã",
-    "phanta",
-    "fanta",
-    "phan đa",
-    "fan đa",
-    "panta",
-    "pandas",
-    "ban đa",
-    "băng đa",
-    "băn đa",
-    # ── Tên thân thiện tiếng Việt ────────────────────────────────────────
-    "gấu trúc ơi",
-    "gấu trúc",
-    "bé panda ơi",
-    "bé panda",
-    "bé gấu",
-]
+MOON_WAKE_WORDS = ["moon", "hey moon", "moon ơi"]
 
 
 # Mirror cảm xúc người dùng lên OLED khi idle:
-#   False = idle TỰ CHỦ (Panda tự diễn biểu cảm, không nhại theo mặt người dùng) ← mặc định
+#   False = idle TỰ CHỦ (Moon tự diễn biểu cảm, không nhại theo mặt người dùng) ← mặc định
 #   True  = OLED nhại cảm xúc người dùng (đồng cảm trực tiếp)
 EMOTION_MIRROR = False
 
@@ -242,3 +216,15 @@ MIC_DEVICE_INDEX = None
 #   "remote" = CHỈ clip qua MQTT — khi não lên cloud, hoặc khi test đường
 #              robot bằng dev_mic_bridge (mic laptop giả lập mic robot)
 MIC_SOURCE = "auto"
+
+# Browser DSP + WebRTC VAD + STT; accepted questions can be handed to Brain.
+VOICE_VAD_MODE = 2
+VOICE_MIN_RMS = 0.003
+VOICE_WAKE_SILENCE_SEC = 0.45
+VOICE_QUESTION_SILENCE_SEC = 1.2
+VOICE_WAIT_SEC = 20.0
+VOICE_MAX_SEC = 15.0
+VOICE_WAKE_VERIFY_MAX_SEC = 3.0
+VOICE_WAKE_VERIFY_MAX_WORDS = 3
+VOICE_WAKE_VERIFY_TIMEOUT_SEC = 4.0
+WAKE_SENSITIVITY = 0.6

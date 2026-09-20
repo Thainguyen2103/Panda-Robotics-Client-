@@ -2,7 +2,9 @@
 # Cách dùng: copy file này thành config/secrets.py rồi điền key thật của bạn.
 # File secrets.py thật đã nằm trong .gitignore — KHÔNG BAO GIỜ push.
 SECRETS = {
+    "PICOVOICE_ACCESS_KEY": "", # tùy chọn: wake âm học, cần model Moon .ppn
     "FISH_AUDIO_API_KEY": "",   # TTS — lấy tại https://fish.audio
     "GROQ_API_KEY": "",         # STT + LLM — lấy tại https://console.groq.com
     "DEEPSEEK_API_KEY": "",     # tuỳ chọn (fallback LLM)
+    "GEMINI_API_KEY": "",       # Live Talk audio↔audio — Google AI Studio
 }

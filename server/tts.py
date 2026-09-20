@@ -164,10 +164,30 @@ def _normalize_tts_text(text: str) -> str:
     return _re.sub(r"\d+", lambda m: _num2vi(int(m.group(0))), text)
 
 # Cờ toàn cục: True trong lúc loa đang phát TTS.
-# voice.py dùng cờ này để KHÔNG thu âm thanh loa của chính Panda
-# (tránh vòng lặp tự kích hoạt: Panda nghe thấy chữ "Panda" trong câu chào của mình).
+# voice.py dùng cờ này để KHÔNG thu âm thanh loa của chính Moon
+# (tránh vòng lặp tự kích hoạt: Moon nghe thấy chữ "Moon" trong câu chào của mình).
 _speaking_event = threading.Event()
 _speech_end_t = 0.0   # mốc thời gian lần phát cuối kết thúc (echo guard cho clip browser)
+_activity_callback = None
+
+
+def register_activity_callback(callback):
+    """Notify the owner whenever Moon's speaker starts/stops producing TTS."""
+    global _activity_callback
+    _activity_callback = callback
+
+
+def _set_speaking(active: bool):
+    changed = _speaking_event.is_set() != active
+    if active:
+        _speaking_event.set()
+    else:
+        _speaking_event.clear()
+    if changed and _activity_callback:
+        try:
+            _activity_callback(active)
+        except Exception:
+            pass
 
 
 def is_speaking() -> bool:
@@ -199,12 +219,12 @@ def _play_blips(seq):
 
 
 def play_beep():
-    """Bíp kép tăng dần khi nhận wake-word — 'Panda nghe thấy bạn!'."""
+    """Bíp kép tăng dần khi nhận wake-word — 'Moon nghe thấy bạn!'."""
     _play_blips([(880, 0.09), (1320, 0.12)])
 
 
 def play_tick():
-    """Tick ngắn ngay trước khi Panda bắt đầu nói."""
+    """Tick ngắn ngay trước khi Moon bắt đầu nói."""
     _play_blips([(2000, 0.045)])
 
 
@@ -226,9 +246,9 @@ def _play_mp3_bytes(mp3_bytes: bytes) -> bool:
         winmm = ctypes.windll.winmm
 
         # Mở file bằng MCI
-        open_cmd  = f'open "{tmp_path}" type mpegvideo alias pandatts'
-        play_cmd  = 'play pandatts wait'       # wait = đồng bộ, chờ xong
-        close_cmd = 'close pandatts'
+        open_cmd  = f'open "{tmp_path}" type mpegvideo alias moontts'
+        play_cmd  = 'play moontts wait'       # wait = đồng bộ, chờ xong
+        close_cmd = 'close moontts'
 
         ret = winmm.mciSendStringW(open_cmd,  None, 0, None)
         if ret != 0:
@@ -276,7 +296,7 @@ def _stop_mci_playback():
     """Ngắt phát MCI đang chạy (dùng cho barge-in / stop pipeline)."""
     try:
         import ctypes
-        ctypes.windll.winmm.mciSendStringW("stop pandatts", None, 0, None)
+        ctypes.windll.winmm.mciSendStringW("stop moontts", None, 0, None)
     except Exception:
         pass
 
@@ -352,14 +372,14 @@ def speak(text: str, blocking: bool = True):
 
     def _run():
         with _tts_lock:
-            _speaking_event.set()
+            _set_speaking(True)
             try:
                 success = _speak_fish(text)
                 if not success:
                     print("⚠️ [TTS] Chuyển sang pyttsx3 fallback...")
                     _speak_fallback(text)
             finally:
-                _speaking_event.clear()
+                _set_speaking(False)
                 global _speech_end_t
                 _speech_end_t = time.time()
 
@@ -388,10 +408,16 @@ class SentencePlayer:
         player.wait(timeout=60)
     """
 
-    def __init__(self, on_play_start=None):
+    def __init__(self, on_play_start=None, on_fallback=None, synth_timeout=None):
         self._synth_q = queue.Queue()
         self._audio_q = queue.Queue()
         self._on_play_start = on_play_start
+        self._on_fallback = on_fallback
+        self._synth_timeout = float(
+            synth_timeout if synth_timeout is not None
+            else getattr(settings, "FISH_SENTENCE_TIMEOUT_SEC", 12.0)
+        )
+        self._fish_disabled = False
         self._stopped = False
         self._synth_thread = threading.Thread(target=self._synth_worker, daemon=True)
         self._play_thread  = threading.Thread(target=self._play_worker, daemon=True)
@@ -405,14 +431,38 @@ class SentencePlayer:
             if item is _SENTINEL or self._stopped:
                 self._audio_q.put(_SENTINEL)
                 break
-            audio = _synth_fish(item)
+            audio, reason = self._synth_with_timeout(item)
             if self._stopped:
                 self._audio_q.put(_SENTINEL)
                 break
-            self._audio_q.put((item, audio))   # (text, bytes|None) — None = fallback
+            self._audio_q.put((item, audio, reason))
+
+    def _synth_with_timeout(self, text):
+        """Bound a blocking Fish SDK call; one timeout disables Fish this turn."""
+        if self._fish_disabled:
+            return None, "Fish Audio đã được bỏ qua sau lần quá thời gian trước"
+        result = queue.Queue(maxsize=1)
+
+        def run():
+            try:
+                result.put((_synth_fish(text), None), block=False)
+            except Exception as exc:
+                try:
+                    result.put((None, str(exc)), block=False)
+                except queue.Full:
+                    pass
+
+        threading.Thread(target=run, daemon=True).start()
+        try:
+            audio, reason = result.get(timeout=max(.1, self._synth_timeout))
+        except queue.Empty:
+            self._fish_disabled = True
+            return None, f"Fish Audio quá {self._synth_timeout:g} giây"
+        return audio, reason or (None if audio else "Fish Audio không trả về âm thanh")
 
     def _play_worker(self):
         """Phát tuần tự các câu đã tổng hợp."""
+        global _speech_end_t
         first = True
         try:
             with _tts_lock:
@@ -422,10 +472,10 @@ class SentencePlayer:
                         break
                     if self._stopped:
                         continue   # xả hàng đợi, không phát nữa
-                    text, audio = item
+                    text, audio, reason = item
                     if first:
                         first = False
-                        _speaking_event.set()   # báo voice.py: loa đang bật
+                        _set_speaking(True)   # báo mọi nguồn mic: loa đang bật
                         if self._on_play_start:
                             try:
                                 self._on_play_start()
@@ -434,10 +484,15 @@ class SentencePlayer:
                     if audio:
                         _play_mp3_bytes(audio)
                     else:
-                        print("⚠️ [TTS] Câu này Fish Audio lỗi — dùng pyttsx3 fallback.")
+                        print(f"⚠️ [TTS] {reason or 'Fish Audio lỗi'} — dùng pyttsx3 fallback.")
+                        if self._on_fallback:
+                            try:
+                                self._on_fallback(text, reason or "Fish Audio lỗi")
+                            except Exception:
+                                pass
                         _speak_fallback(text)
         finally:
-            _speaking_event.clear()
+            _set_speaking(False)
             _speech_end_t = time.time()
 
     def push(self, sentence: str):
@@ -460,6 +515,9 @@ class SentencePlayer:
                 self._synth_q.get_nowait()
         except queue.Empty:
             pass
+        # The synth thread may be blocked inside the third-party SDK. Unblock
+        # playback immediately; the blocked daemon can finish harmlessly later.
+        self._audio_q.put(_SENTINEL)
         self._synth_q.put(_SENTINEL)
 
     def wait(self, timeout: float = None) -> bool:
@@ -471,6 +529,6 @@ class SentencePlayer:
 # ─── Test ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print("=== Test TTS Module ===")
-    speak("Xin chào! Mình là Panda, rất vui được gặp bạn!")
+    speak("Xin chào! Mình là Moon, rất vui được gặp bạn!")
     time.sleep(0.5)
     speak("Bạn có khỏe không?")

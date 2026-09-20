@@ -2,7 +2,7 @@
 Topic classifier — server/topics.py
 ====================================
 Phân loại CHỦ ĐỀ câu hỏi bằng keyword (tức thì, không latency) để OLED
-hiển thị emoji tượng trưng trong lúc Panda nghĩ & trả lời:
+hiển thị emoji tượng trưng trong lúc Moon nghĩ & trả lời:
   hỏi giờ → 🕐 | thời tiết → 🌦️ | toán → 🧮 | cảm xúc → 💗 | ...
 """
 import re
@@ -62,7 +62,7 @@ DEFAULT_TOPIC = "chat"
 TOPIC_LABELS = {
     "time": "TIME", "weather": "WEATHER", "math": "TOÁN", "emotion": "CẢM XÚC",
     "food": "ẨM THỰC", "music": "ÂM NHẠC", "place": "ĐỊA ĐIỂM",
-    "nature": "KHÁM PHÁ", "identity": "PANDA", "chat": "TRÒ CHUYỆN",
+    "nature": "KHÁM PHÁ", "identity": "MOON", "chat": "TRÒ CHUYỆN",
     "story": "TRUYỆN", "sport": "THỂ THAO", "animal": "ĐỘNG VẬT",
     "study": "HỌC TẬP", "tech": "CÔNG NGHỆ", "people": "CON NGƯỜI",
     "game": "GAME", "science": "KHOA HỌC", "history": "LỊCH SỬ",

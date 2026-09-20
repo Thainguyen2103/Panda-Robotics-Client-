@@ -1,5 +1,8 @@
 // ─── Socket.IO setup ──────────────────────────────────────────────────────────
 const socket = io();
+let liveTalkActive = false;
+let liveTalkMode = '';
+let liveTalkWaitingWake = false;
 
 const visionPanel = new VisionPanel(document);
 let lastCameraFrame = 0;
@@ -47,17 +50,15 @@ const aiUserBubble    = document.getElementById('ai-user-bubble');
 const aiUserText      = document.getElementById('ai-user-text');
 const aiThinkingBar   = document.getElementById('ai-thinking-bar');
 const aiThinkingLabel = document.getElementById('ai-thinking-label');
-const aiPandaBubble   = document.getElementById('ai-panda-bubble');
-const aiPandaText     = document.getElementById('ai-panda-text');
+const aiMoonBubble   = document.getElementById('ai-moon-bubble');
+const aiMoonText     = document.getElementById('ai-moon-text');
 const aiCursor        = document.getElementById('ai-cursor');
 const voiceStateBadge = document.getElementById('voice-state-badge');
 const voiceStateLabel = document.getElementById('voice-state-label');
-const micBtn          = document.getElementById('mic-btn');
-const micLiveBtn      = document.getElementById('mic-live-btn');
 
 // ─── OLED Face ────────────────────────────────────────────────────────────────
 const ALL_EMOTIONS = ['neutral','happy','sad','surprised','angry','love','wink','sleepy','dizzy','cool','cute'];
-const ALL_AI_MODES = ['questioning','hearing','ai-thinking','speaking'];
+const ALL_AI_MODES = ['questioning','hearing','ai-thinking','answering','speaking'];
 const IDLE_BEHAVIORS = ['idle-look-left','idle-look-right','idle-look-up',
                         'idle-curious','idle-happy','idle-squint','idle-sleepy',
                         'idle-wink','idle-cross','idle-wide','idle-shy','idle-scan',
@@ -105,16 +106,17 @@ drawFace('neutral');
 
 /**
  * setOledAiMode(mode, text)
- * mode: 'questioning' | 'hearing' | 'ai-thinking' | 'speaking' | 'neutral'
- * text: chỉ dùng cho mode 'hearing' — hiển thị transcript trên OLED
+ * mode: 'questioning' | 'hearing' | 'ai-thinking' | 'answering' | 'speaking' | 'neutral'
+ * text: dùng cho hearing/answering để hiển thị transcript/câu trả lời
  */
 function setOledAiMode(mode, text = '') {
-    oledFace.classList.remove(...ALL_EMOTIONS, ...ALL_AI_MODES, ...IDLE_BEHAVIORS);
     if (mode === 'neutral') {
-        oledFace.classList.add('neutral');
-        if (oledTopicEl) oledTopicEl.style.opacity = '0';
+        drawFace('neutral');
+        if (oledTextEl) { oledTextEl.textContent = ''; oledTextEl.scrollTop = 0; }
+        if (oledCapEl) oledCapEl.textContent = '';
         return;
     }
+    oledFace.classList.remove(...ALL_EMOTIONS, ...ALL_AI_MODES, ...IDLE_BEHAVIORS);
     oledFace.classList.add(mode);
 
     // Emoji + caption chủ đề: emoji hiện khi nghĩ+nói, caption khi nói
@@ -123,11 +125,11 @@ function setOledAiMode(mode, text = '') {
     if (oledCapEl)   oledCapEl.style.opacity   = (mode === 'speaking') ? '1' : '0';
 
     // Mode 'hearing': hiển thị text trên OLED — co chữ vừa khung, không cắt đầu/cuối
-    if (mode === 'hearing' && oledTextEl) {
+    if ((mode === 'hearing' || mode === 'answering') && oledTextEl) {
         oledTextEl.textContent = `"${text}"`;
-        const n = text.length;
-        oledTextEl.style.fontSize = n <= 18 ? '15px' : n <= 30 ? '12px' : n <= 45 ? '10px' : '9px';
-        oledTextEl.classList.toggle('long-text', n > 45);   // chỉ cuộn khi quá dài
+        oledTextEl.style.fontSize = '13px';
+        oledTextEl.classList.remove('long-text');
+        oledTextEl.scrollTop = 0;
     }
 
     // Mode 'questioning': icon là '?'
@@ -147,6 +149,7 @@ socket.on('connect', () => {
 socket.on('disconnect', () => {
     dot.className = 'dot offline';
     statusText.textContent = 'Offline';
+    if (!liveTalkActive) { hideThinking(); aiCursor.style.display = 'none'; setVoiceState('standby'); setOledAiMode('neutral'); }
     logToTerminal('Disconnected from Server', 'sys');
 });
 
@@ -158,200 +161,15 @@ function sendCommand(topic, payload) {
 
 // ─── Clear AI chat history ────────────────────────────────────────────────────
 function clearAiHistory() {
-    socket.emit('send_cmd', { topic: 'panda/ai/clear_history', payload: '1' });
     resetAiPanel();
     logToTerminal('AI history cleared', 'sys');
-}
-
-// ─── Browser Push-to-Talk (MediaStream → Socket.IO → MQTT → Groq) ────────────
-// Dùng CHÍNH mic của trình duyệt (cùng thiết bị Google Translate dùng),
-// ghi âm webm/opus rồi gửi về backend — bypass mic server bị lỗi.
-let mediaRecorder = null;
-let micChunks = [];
-
-function arrayBufferToBase64(buf) {
-    const bytes = new Uint8Array(buf);
-    let bin = '';
-    const CHUNK = 0x8000;
-    for (let i = 0; i < bytes.length; i += CHUNK) {
-        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
-    }
-    return btoa(bin);
-}
-
-function setMicUI(recording) {
-    if (!micBtn) return;
-    micBtn.classList.toggle('recording', recording);
-    micBtn.textContent = recording ? '⏹ Dừng & gửi' : '🎤 Nói qua trình duyệt';
-}
-
-async function toggleBrowserMic() {
-    // Đang thu → dừng và gửi
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-        return;
-    }
-    if (!navigator.mediaDevices || !window.MediaRecorder) {
-        logToTerminal('🎤 Trình duyệt không hỗ trợ MediaRecorder', 'sys');
-        return;
-    }
-    try {
-        // Bật DSP kiểu Google Dịch: triệt tiếng loa + khử ồn + tự động gain
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-            },
-        });
-        const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-            ? 'audio/webm;codecs=opus' : 'audio/webm';
-        mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
-        micChunks = [];
-
-        mediaRecorder.ondataavailable = (e) => {
-            if (e.data && e.data.size > 0) micChunks.push(e.data);
-        };
-
-        mediaRecorder.onstop = async () => {
-            stream.getTracks().forEach(t => t.stop());   // tắt đèn mic
-            const blob = new Blob(micChunks, { type: 'audio/webm' });
-            if (blob.size < 1024) {
-                logToTerminal('🎤 Audio quá ngắn — bỏ qua', 'sys');
-            } else {
-                const b64 = arrayBufferToBase64(await blob.arrayBuffer());
-                socket.emit('voice_audio', b64);
-                logToTerminal(`🎤 Đã gửi audio browser (${(blob.size / 1024).toFixed(1)} KB)`, 'log-voice');
-            }
-            setMicUI(false);
-        };
-
-        mediaRecorder.start();
-        setMicUI(true);
-        logToTerminal('🎤 Browser mic đang thu... nhấn nút lần nữa để gửi', 'sys');
-    } catch (e) {
-        logToTerminal(`🎤 Lỗi mic browser: ${e.name} — ${e.message}`, 'sys');
-        setMicUI(false);
-    }
-}
-
-// ─── LIVE MIC: nghe liên tục hands-free với DSP kiểu Google Dịch ─────────────
-// AudioContext 16kHz + chuỗi DSP trình duyệt (AEC+NS+AGC) → VAD năng lượng nhẹ
-// trong JS → gửi clip PCM sạch về server → Whisper 3-pass. Mượt như Google Dịch.
-let live = { on:false, ctx:null, proc:null, stream:null,
-             ambient:0, seen:0, speech:false, speechBlocks:0,
-             preroll:[], buf:[], lastSpeech:0, pending:[] };
-
-function setLiveUI(on) {
-    if (!micLiveBtn) return;
-    micLiveBtn.classList.toggle('recording', on);
-    micLiveBtn.textContent = on ? '🎙️ Đang nghe liên tục — nhấn để tắt'
-                                : '🎙️ Nghe liên tục qua trình duyệt';
-}
-
-function resetLiveVad() {
-    Object.assign(live, { ambient:0, seen:0, speech:false, speechBlocks:0,
-                          preroll:[], buf:[], lastSpeech:0, pending:[] });
-}
-
-async function toggleLiveMic() {
-    if (live.on) { stopLiveMic(); return; }
-    try {
-        live.stream = await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true },
-        });
-        const AC = window.AudioContext || window.webkitAudioContext;
-        live.ctx = new AC({ sampleRate: 16000 });
-        if (live.ctx.sampleRate !== 16000) {
-            live.ctx.close(); live.stream.getTracks().forEach(t => t.stop());
-            logToTerminal('🎙️ Trình duyệt không hỗ trợ AudioContext 16kHz', 'sys');
-            return;
-        }
-        const src = live.ctx.createMediaStreamSource(live.stream);
-        live.proc = live.ctx.createScriptProcessor(4096, 1, 1);
-        live.proc.onaudioprocess = (e) => {
-            if (live.on) liveFeed(e.inputBuffer.getChannelData(0));
-        };
-        src.connect(live.proc);
-        live.proc.connect(live.ctx.destination);
-        live.on = true;
-        resetLiveVad();
-        socket.emit('mic_live', '1');
-        setLiveUI(true);
-        logToTerminal('🎙️ LIVE MIC BẬT — Panda nghe liên tục qua DSP trình duyệt', 'sys');
-    } catch (e) {
-        logToTerminal(`🎙️ Lỗi live mic: ${e.name} — ${e.message}`, 'sys');
-    }
-}
-
-function stopLiveMic() {
-    live.on = false;
-    try {
-        if (live.proc) live.proc.disconnect();
-        if (live.ctx)  live.ctx.close();
-        if (live.stream) live.stream.getTracks().forEach(t => t.stop());
-    } catch (e) {}
-    socket.emit('mic_live', '0');
-    setLiveUI(false);
-    logToTerminal('🎙️ Live mic TẮT — trả tai về mic robot', 'sys');
-}
-
-function liveFeed(f32) {
-    for (let i = 0; i < f32.length; i++) live.pending.push(f32[i]);
-    while (live.pending.length >= 480) {          // block 30ms @16k
-        liveBlock(live.pending.splice(0, 480));
-    }
-}
-
-function liveBlock(blk) {
-    let sum = 0;
-    for (let i = 0; i < blk.length; i++) sum += blk[i] * blk[i];
-    const rms = Math.sqrt(sum / blk.length);
-
-    // 0.6s hiệu chuẩn ồn nền (giống server)
-    if (live.seen < 20) {
-        live.seen++;
-        live.ambient = (live.seen === 1) ? rms : live.ambient * 0.7 + rms * 0.3;
-        live.preroll.push(blk); if (live.preroll.length > 50) live.preroll.shift();
-        return;
-    }
-    const thr = Math.max(0.02, live.ambient * 2.5);
-    const isSpeech = rms >= thr;
-
-    if (isSpeech) {
-        if (!live.speech) { live.speech = true; live.buf = live.preroll.slice(); live.preroll = []; }
-        live.speechBlocks++;
-        live.lastSpeech = Date.now();
-        live.buf.push(blk);
-    } else {
-        live.ambient = live.ambient * 0.9 + rms * 0.1;
-        if (live.speech) {
-            live.buf.push(blk);
-            if (Date.now() - live.lastSpeech >= 1200) emitLiveClip();   // endpointer 1.2s
-        } else {
-            live.preroll.push(blk); if (live.preroll.length > 50) live.preroll.shift();
-        }
-    }
-    if (live.speech && live.buf.length > 333) emitLiveClip();           // clip ≤ 10s
-}
-
-function emitLiveClip() {
-    if (live.speechBlocks >= 8) {                                       // ≥ 0.24s giọng
-        const all = [].concat(...live.buf);
-        const i16 = new Int16Array(all.length);
-        for (let i = 0; i < all.length; i++) {
-            const v = Math.max(-1, Math.min(1, all[i]));
-            i16[i] = v < 0 ? v * 0x8000 : v * 0x7FFF;
-        }
-        socket.emit('voice_clip', arrayBufferToBase64(i16.buffer));
-    }
-    live.speech = false; live.speechBlocks = 0; live.buf = []; live.preroll = [];
 }
 
 // ─── Voice AI State helpers ───────────────────────────────────────────────────
 const VOICE_STATE_CONFIG = {
     standby:   { label: 'Standby',    emoji: '🎙️', cls: 'state-standby'   },
     listening: { label: 'Listening',  emoji: '👂', cls: 'state-listening'  },
+    transcribing: { label: 'Đang nhận diện', emoji: '🎙️', cls: 'state-listening' },
     thinking:  { label: 'Thinking',   emoji: '🧠', cls: 'state-thinking'   },
     speaking:  { label: 'Speaking',   emoji: '🔊', cls: 'state-speaking'   },
 };
@@ -372,9 +190,9 @@ function resetAiPanel() {
     aiIdleHint.style.display = 'flex';
     aiUserBubble.style.display = 'none';
     aiThinkingBar.style.display = 'none';
-    aiPandaBubble.style.display = 'none';
+    aiMoonBubble.style.display = 'none';
     aiUserText.textContent = '';
-    aiPandaText.textContent = '';
+    aiMoonText.textContent = '';
     aiCursor.style.display = 'inline';
 }
 
@@ -382,8 +200,8 @@ function showUserQuestion(text) {
     aiIdleHint.style.display = 'none';
     aiUserBubble.style.display = 'block';
     aiUserText.textContent = text;
-    aiPandaBubble.style.display = 'none';
-    aiPandaText.textContent = '';
+    aiMoonBubble.style.display = 'none';
+    aiMoonText.textContent = '';
     aiCursor.style.display = 'inline';
 }
 
@@ -396,14 +214,14 @@ function hideThinking() {
     aiThinkingBar.style.display = 'none';
 }
 
-function appendPandaChunk(chunk) {
-    aiPandaBubble.style.display = 'block';
-    aiPandaText.textContent += chunk;
+function appendMoonChunk(chunk) {
+    aiMoonBubble.style.display = 'block';
+    aiMoonText.textContent += chunk;
     // Auto scroll
-    aiPandaBubble.scrollTop = aiPandaBubble.scrollHeight;
+    aiMoonBubble.scrollTop = aiMoonBubble.scrollHeight;
 }
 
-function finalizePandaResponse() {
+function finalizeMoonResponse() {
     aiCursor.style.display = 'none';
     hideThinking();
 }
@@ -411,7 +229,15 @@ function finalizePandaResponse() {
 // ─── MQTT message handler ─────────────────────────────────────────────────────
 socket.on('mqtt_message', (data) => {
     const { topic, payload } = data;
-
+    if (liveTalkMode === 'brain' && topic === 'panda/ai/state') {
+        window.dispatchEvent(new CustomEvent('moon-brain-pipeline', {
+            detail: {event: 'state', state: payload},
+        }));
+    }
+    // Live Talk có phiên audio/LLM riêng. Trạng thái AI từ Brain cũ không được
+    // ghi đè giao diện trong lúc phiên Gemini Live đang hoạt động.
+    if (liveTalkWaitingWake && topic.startsWith('panda/ai/')) return;
+    if (liveTalkActive && liveTalkMode === 'gemini' && topic.startsWith('panda/ai/')) return;
     // ── Sensor status ─────────────────────────────────────────────────────────
     if (topic === 'panda/status') {
         try {
@@ -437,6 +263,7 @@ socket.on('mqtt_message', (data) => {
     // ── Camera feed ───────────────────────────────────────────────────────────
     } else if (topic === 'panda/camera') {
         lastCameraFrame = Date.now();
+        visionPanel.cameraFrame();
         const camImg         = document.getElementById('cam-image');
         const camPlaceholder = document.getElementById('cam-placeholder');
         camImg.src           = "data:image/jpeg;base64," + payload;
@@ -445,6 +272,7 @@ socket.on('mqtt_message', (data) => {
 
     // ── Face command ──────────────────────────────────────────────────────────
     } else if (topic === 'panda/cmd/face') {
+        if (liveTalkWaitingWake || (liveTalkActive && liveTalkMode === 'gemini')) return;
         drawFace(payload);
         logToTerminal(`RX: ${topic} → ${payload}`, 'status');
 
@@ -486,8 +314,17 @@ socket.on('mqtt_message', (data) => {
         // Đồng bộ OLED face theo AI state
         // (thinking: OLED GIỮ transcript đã nghe — mode 'hearing' — không đổi sang dots)
         if (payload === 'listening')   setOledAiMode('questioning');
-        else if (payload === 'speaking') setOledAiMode('speaking');
-        else if (payload === 'standby')  setOledAiMode('neutral');
+        else if (payload === 'thinking') setOledAiMode('ai-thinking');
+        else if (payload === 'speaking') {
+            hideThinking();
+            if (!oledFace.classList.contains('answering')) setOledAiMode('speaking');
+        }
+        else if (payload === 'standby') {
+            hideThinking(); aiCursor.style.display = 'none';
+            // Playback đã kết thúc: trả OLED về mặt mặc định ngay, đồng bộ
+            // với loa thay vì giữ câu trả lời thêm nhiều giây.
+            setOledAiMode('neutral');
+        }
         logToTerminal(`AI State: ${payload}`, 'ai-state');
 
     // ── AI thinking / stages ────────────────────────────────────────────────────────────────
@@ -498,23 +335,56 @@ socket.on('mqtt_message', (data) => {
                 case 'listening':
                     resetAiPanel();
                     aiIdleHint.style.display = 'none';
-                    showThinking('👂 Panda đang lắng nghe...');
+                    showThinking('👂 Moon đang lắng nghe...');
                     setOledAiMode('questioning');     // OLED: ? + ring
                     break;
                 case 'question':
                     showUserQuestion(msg.text);
-                    setOledAiMode('hearing', msg.text); // OLED: text transcript
+                    setOledAiMode(liveTalkActive ? 'questioning' : 'hearing', liveTalkActive ? '' : msg.text);
+                    break;
+                case 'correcting':
+                    showThinking('🧠 Moon đang kiểm tra câu vừa nghe...');
+                    break;
+                case 'question_corrected':
+                    showUserQuestion(msg.text);
+                    setOledAiMode(liveTalkActive ? 'questioning' : 'hearing', liveTalkActive ? '' : msg.text);
+                    if (liveTalkMode === 'brain') {
+                        window.dispatchEvent(new CustomEvent('moon-brain-pipeline', {
+                            detail: {
+                                event: 'corrected',
+                                text: msg.text,
+                                original: msg.original || msg.text,
+                                changed: Boolean(msg.changed),
+                            },
+                        }));
+                    }
+                    if (msg.changed) logToTerminal(`STT FIX: ${msg.original} → ${msg.text}`, 'log-voice');
                     break;
                 case 'thinking':
-                    showThinking('🧠 Panda đang suy nghĩ...');
+                    showThinking('🧠 Moon đang suy nghĩ...');
+                    setOledAiMode('ai-thinking');
                     // OLED giữ transcript đã nghe ('hearing') — dots chỉ trên dashboard
                     break;
                 case 'answering':
-                    showThinking('✍️ Panda đang soạn câu trả lời...');
+                    showThinking('✍️ Moon đang soạn câu trả lời...');
+                    setOledAiMode('ai-thinking');
                     // OLED vẫn giữ transcript
+                    break;
+                case 'answer':
+                    hideThinking();
+                    setOledAiMode(liveTalkActive ? 'speaking' : 'answering', liveTalkActive ? '' : (msg.text || ''));
                     break;
                 case 'done':
                     hideThinking();
+                    break;
+                case 'tts_fallback':
+                    showThinking('🔊 Fish Audio chậm — đang dùng giọng dự phòng...');
+                    logToTerminal(msg.text || 'Fish Audio chậm — dùng giọng dự phòng', 'sys');
+                    if (liveTalkMode === 'brain') {
+                        window.dispatchEvent(new CustomEvent('moon-brain-pipeline', {
+                            detail: {event: 'tts_fallback', text: msg.text || ''},
+                        }));
+                    }
                     break;
                 case 'idle':
                     resetAiPanel();
@@ -527,20 +397,28 @@ socket.on('mqtt_message', (data) => {
     } else if (topic === 'panda/ai/response') {
         try {
             const msg = JSON.parse(payload);
+            if (typeof msg.text !== 'string') return;
+            aiIdleHint.style.display = 'none';
+            aiMoonBubble.style.display = 'block';
             if (!msg.done) {
                 // Chunk mới đến — hiển thị stream
-                if (aiPandaText.textContent === '') {
+                if (aiMoonText.textContent === '') {
                     // Lần đầu → reset và hiện bubble
-                    aiPandaBubble.style.display = 'block';
+                    aiMoonBubble.style.display = 'block';
                     aiCursor.style.display = 'inline';
                 }
                 // Overwrite với full text (backend gửi accumulated text)
-                aiPandaText.textContent = msg.text;
+                aiMoonText.textContent = msg.text;
             } else {
                 // Done — show full text, ẩn cursor
-                aiPandaText.textContent = msg.text;
-                finalizePandaResponse();
+                aiMoonText.textContent = msg.text;
+                finalizeMoonResponse();
                 logToTerminal(`AI: ${msg.text.substring(0, 60)}...`, 'ai-response');
+                if (liveTalkMode === 'brain') {
+                    window.dispatchEvent(new CustomEvent('moon-brain-pipeline', {
+                        detail: {event: 'answer_ready'},
+                    }));
+                }
             }
         } catch(e) {}
 
@@ -553,7 +431,10 @@ socket.on('mqtt_message', (data) => {
 function logToTerminal(text, type) {
     const p = document.createElement('p');
     const time = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    p.innerHTML = `<span class="log-time">${time}</span> ${text}`;
+    const stamp = document.createElement('span');
+    stamp.className = 'log-time';
+    stamp.textContent = time;
+    p.append(stamp, document.createTextNode(` ${text}`));
 
     if (type === 'cmd')         p.className = 'log-cmd';
     else if (type === 'status') p.className = 'log-status';
@@ -571,11 +452,11 @@ function logToTerminal(text, type) {
     }
 }
 
-// ─── Autonomous idle: Panda "tự chủ" khi rảnh — nhìn quanh, tò mò, nháy mắt... ──
-// Mỗi 5–14s, nếu đang neutral, Panda tự diễn một micro-behavior rồi về lại mắt thường.
+// ─── Autonomous idle: Moon "tự chủ" khi rảnh — nhìn quanh, tò mò, nháy mắt... ──
+// Mỗi 5–14s, nếu đang neutral, Moon tự diễn một micro-behavior rồi về lại mắt thường.
 (function scheduleIdleBehavior() {
     setTimeout(() => {
-        if (oledFace.classList.contains('neutral')) {
+        if (!liveTalkActive && oledFace.classList.contains('neutral')) {
             const b = IDLE_BEHAVIORS[Math.floor(Math.random() * IDLE_BEHAVIORS.length)];
             oledFace.classList.add(b);
             setTimeout(() => oledFace.classList.remove(b), 900 + Math.random() * 900);
@@ -583,3 +464,66 @@ function logToTerminal(text, type) {
         scheduleIdleBehavior();
     }, 5000 + Math.random() * 9000);
 })();
+
+// Live Voice chỉ điều khiển trạng thái và biểu cảm OLED; không hiển thị
+// transcript/câu trả lời lên OLED như pipeline Voice cũ.
+window.addEventListener('moon-live', ({detail: msg}) => {
+    if (msg.event === 'starting') {
+        liveTalkActive = true;
+        liveTalkMode = msg.pipeline || 'gemini';
+        liveTalkWaitingWake = false;
+        hideThinking();
+        setVoiceState('listening');
+        setOledAiMode('neutral');
+        if (liveTalkMode === 'brain') socket.emit('mic_live', '1');
+        logToTerminal(liveTalkMode === 'brain'
+            ? 'LIVE: đang chuẩn bị Brain Pipeline'
+            : 'LIVE: đang chuẩn bị Gemini Native Audio', 'ai-state');
+    } else if (msg.event === 'waiting_wake') {
+        liveTalkActive = true;
+        liveTalkWaitingWake = true;
+        setVoiceState('standby');
+        setOledAiMode('neutral');
+        logToTerminal(msg.calibrating
+            ? 'LIVE: đang đo tiếng nền trước khi chờ wakeword'
+            : 'LIVE: đang chờ tên Moon', 'ai-state');
+    } else if (msg.event === 'wake') {
+        liveTalkActive = true;
+        liveTalkWaitingWake = false;
+        setVoiceState('listening');
+        setOledAiMode('questioning');
+        logToTerminal('WAKE: đã nghe tên Moon — mở Live Talk', 'log-voice');
+    } else if (msg.event === 'wake_ack') {
+        setVoiceState('speaking');
+        drawFace('happy');
+        logToTerminal('MOON: Moon nghe đây!', 'ai-response');
+    } else if (msg.event === 'brain_question') {
+        showUserQuestion(msg.text);
+        showThinking('Brain và LLM đang xử lý…');
+        setOledAiMode('ai-thinking');
+        setVoiceState('thinking');
+        logToTerminal(`VOICE CONTINUOUS: ${msg.text}`, 'log-voice');
+        socket.emit('voice_question', msg.text);
+    } else if (['ready', 'listening', 'user_speaking', 'interrupted'].includes(msg.event)) {
+        liveTalkActive = true;
+        liveTalkWaitingWake = false;
+        setVoiceState('listening');
+        if (msg.event === 'ready') setOledAiMode('neutral');
+        if (msg.event === 'listening' && msg.activatedBy === 'wakeword') setOledAiMode('neutral');
+    } else if (msg.event === 'thinking') {
+        setVoiceState('thinking');
+    } else if (msg.event === 'speaking') {
+        setVoiceState('speaking');
+    } else if (msg.event === 'expression') {
+        drawFace(ALL_EMOTIONS.includes(msg.expression) ? msg.expression : 'neutral');
+        logToTerminal(`LIVE OLED: ${msg.expression}`, 'status');
+    } else if (['stopped', 'error'].includes(msg.event)) {
+        if (liveTalkMode === 'brain') socket.emit('mic_live', '0');
+        liveTalkActive = false;
+        liveTalkMode = '';
+        liveTalkWaitingWake = false;
+        setVoiceState('standby');
+        setOledAiMode('neutral');
+        logToTerminal(msg.event === 'error' ? `LIVE lỗi: ${msg.text || 'Mất kết nối'}` : 'LIVE: đã kết thúc', 'sys');
+    }
+});

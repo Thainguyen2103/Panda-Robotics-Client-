@@ -1,14 +1,18 @@
-# 🐼 Panda Robotics — "Moon"
+# 🌙 Moon Robotics
 
 Robot bạn đồng hành hỗ trợ trẻ em học tiếng Anh — dự án PBL4, Đại học Đà Nẵng.
-Panda nghe được (wake-word "Panda" + câu hỏi tiếng Việt/Anh), nhìn được (nhận diện
+Moon nghe được (wake-word "Moon" + câu hỏi tiếng Việt/Anh), nhìn được (nhận diện
 chủ nhân + cảm xúc), trả lời bằng giọng nói tự nhiên và "diễn" toàn bộ cảm xúc lên
 màn OLED theo phong cách robot Vector (Anki).
 
 ## ✨ Tính năng nổi bật
 
-- **Giọng nói**: wake-word 3 lớp (Whisper dual-pass + cứu hộ fuzzy/phonetic), VAD
-  streaming chống ồn quạt/TV, chống hallucination, sửa lỗi ASR bằng LLM.
+- **Live Voice trên dashboard**: bật hội thoại trực tiếp hoặc chờ wakeword Moon
+  bằng Porcupine/Whisper rồi tự chuyển sang hội thoại liên tục. Brain không còn
+  mở listener wakeword nền riêng. Xem [hướng dẫn Voice](docs/voice.md).
+- **Live Talk liên tục**: Gemini Live hiểu audio trực tiếp, hỗ trợ ngắt lời; có thể
+  trả lời bằng cùng giọng Fish của Moon (mặc định) hoặc giọng Gemini Native nhanh hơn.
+  API key chỉ nằm ở backend và OLED chỉ hiển thị biểu cảm do function call chọn.
 - **Não cloud**: Groq Whisper (STT) → Groq LLM (trả lời) → Fish Audio (TTS streaming
   từng câu) — độ trễ wake→tiếng đầu tiên ~2-3s.
 - **Phân loại 24 chủ đề** (hybrid: keyword 0ms + LLM enum fallback, benchmark 15/15)
@@ -25,7 +29,8 @@ màn OLED theo phong cách robot Vector (Anki).
 ## 🏗 Kiến trúc
 
 ```
- mic / mic trình duyệt ─→ voice.py (VAD + Whisper) ─→ brain.py
+ mic trình duyệt ─┬→ Gemini Live (audio trực tiếp)
+                  └→ voice_lab.py (wake/VAD/STT) ─→ brain.py
  camera / ESP32-CAM    ─→ vision.py (YuNet/SFace/FER)     │
                                                            ├─→ llm.py (Groq)
  dashboard web (OLED ảo, nút điều khiển) ←─ MQTT broker ←─┤
@@ -44,6 +49,17 @@ firmware/    panda_firmware.ino (ESP32, chạy được trên Wokwi lẫn chip t
 tools/       bench_topics.py, dev_mic_bridge.py
 ```
 
+## 🎙️ Test Live Voice trên dashboard
+
+Chạy `start.bat`, mở http://localhost:3000 và chọn **Bật trực tiếp** hoặc
+**Chờ “Hey Moon” rồi trò chuyện**. Sau khi wakeword được xác nhận, cùng microphone
+được chuyển sang Gemini Live hoặc Brain Pipeline và tiếp tục nghe nhiều lượt mà
+không cần gọi Moon lại. `start-voice.bat` chỉ phù hợp để kiểm tra transport/STT
+khi không cần Brain trả lời. Wake âm học tức thời cần model Moon `.ppn` và
+Picovoice key; nếu chưa có, dashboard dùng Whisper dự phòng.
+Moon trả lời theo ngôn ngữ chính của lượt hỏi mới nhất và code-switch tự nhiên:
+các thuật ngữ tiếng Anh quen thuộc được giữ lại khi rõ nghĩa hơn cách dịch.
+
 ## 🚀 Chạy thử (không cần phần cứng)
 
 ```powershell
@@ -61,8 +77,8 @@ copy config\secrets.example.py config\secrets.py   # rồi điền key
 # Dashboard: http://localhost:3000
 ```
 
-Nói **"Panda"** rồi hỏi bất kỳ điều gì bằng tiếng Việt — OLED diễn cảm xúc,
-icon chủ đề và trả lời bằng giọng nói.
+Chọn một chế độ Live Voice rồi hỏi bằng tiếng Việt — OLED diễn cảm xúc và Moon
+trả lời bằng giọng đã chọn.
 
 ## 🔑 MQTT topics (hợp đồng giữa các module)
 

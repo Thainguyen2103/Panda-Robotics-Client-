@@ -1,12 +1,13 @@
-# Computer vision cho Panda
+# Computer vision cho Moon
 
 > Bản mở rộng hiện tại (08/09/2026): xem [hướng dẫn tín hiệu mới](vision-signals.md)
 > cho bàn tay 21 mốc, tổ hợp cử chỉ, hướng nhìn/mắt, khoảng cách, đồ vật và điểm biểu cảm liên tục.
 
 ## Phạm vi hiện tại
 
-Một người đứng/ngồi đối diện camera; khung hình thấy mặt, hai vai và cổ tay khi
-vẫy chào. Không cần nhìn thấy chân. Chọn khuôn mặt đang theo dõi bằng độ chồng
+Một người đứng/ngồi đối diện camera; không cần nhìn thấy chân hoặc đủ cả hai vai.
+Một cánh tay vẫn có thể nhận diện nếu thấy vai và cổ tay tương ứng; cử chỉ ngón
+tay có thể ghép với vùng người suy ra từ khuôn mặt khi pose thân bị cắt. Chọn khuôn mặt đang theo dõi bằng độ chồng
 lấp, ưu tiên mặt lớn nhất khi bắt đầu; ghép phần thân chứa tâm mặt đó.
 Đây là theo dõi hình học đơn giản, chưa phải định danh nhiều người khi họ đi
 chéo nhau hoặc che khuất nhau.
@@ -15,27 +16,38 @@ chéo nhau hoặc che khuất nhau.
 |---|---|---|
 | Phát hiện mặt | YuNet, ảnh thu nhỏ 320 px, trả tọa độ về ảnh gốc | Mặt nhỏ, quay ngang, che mặt làm giảm chất lượng |
 | Chủ nhân / khách | SFace, so khớp cosine với mẫu đã đăng ký | Chỉ một chủ nhân; không có chống giả mạo bằng ảnh/video |
-| Biểu cảm | FER+ kết hợp tín hiệu chân mày/mắt/khóe miệng từ MediaPipe, giữ nhãn ngắn khi chưa chắc | Ước lượng biểu cảm nhìn thấy, không khẳng định trạng thái tâm lý |
+| Biểu cảm | FER+ trên crop vuông không kéo giãn, kết hợp tín hiệu chân mày/mắt/mũi/môi từ MediaPipe, giữ nhãn ngắn khi chưa chắc | Ước lượng biểu cảm nhìn thấy, không khẳng định trạng thái tâm lý |
 | Vẫy tay | YOLOv8n-pose, cổ tay ở trên vai và có chuyển động đi–về, ưu tiên đo tương đối với khuỷu tay | Cần cổ tay trong hình; cử động ngón tay riêng chưa hỗ trợ |
 | Giơ tay | Cổ tay cao hơn vai qua nhiều lần đo | Một hoặc hai tay |
 | Gật/lắc đầu | Góc pitch/yaw từ ma trận mặt MediaPipe, lọc rung và kiểm tra xoay đi–về | Ngưỡng thử nghiệm 8°/10°, cần hiệu chỉnh bằng video demo thật |
+| Tư thế đầu | Giữ ổn định góc roll/yaw/pitch để nhận nghiêng, quay, nhìn lên/xuống | Cần giữ khoảng 0,25 giây; trái/phải tính theo người trong ảnh |
+| Tư thế cánh tay | Giơ, duỗi ngang, khoanh tay, chống hông từ vai/khuỷu/cổ tay còn nhìn thấy | Cử chỉ hai tay vẫn cần thấy đủ hai bên |
+| Cử chỉ ngón | MediaPipe 21 mốc: V, like, lòng bàn tay, chỉ, nắm, OK, chụm ngón, 3/4 ngón, rock, shaka | Bàn tay che khuất hoặc quá nhỏ có thể trả `unknown` |
 
-Nhãn hành động: `waving`, `hand_raised`, `both_hands_up`, `head_nod`, `head_shake`,
-`unknown`. Cử chỉ đầu được giữ 0,7 giây ở backend; dashboard giữ sự kiện tối đa
+Nhãn hành động gồm `waving`, `hand_raised`, `both_hands_up`, `arm_out`,
+`arms_out`, `arms_crossed`, `hand_on_hip`, `hands_on_hips`, `head_nod`,
+`head_shake`, `head_tilt_left/right`, `head_turn_left/right`, `head_up/down`
+và các cử chỉ ngón tay kể trên. Cử chỉ đầu được giữ 0,7 giây ở backend; dashboard giữ sự kiện tối đa
 1,8 giây để đọc. Một lần quay một hướng không đủ để kích hoạt. MediaPipe tạo
 mốc mặt chi tiết và ma trận biến đổi; gật/lắc dựa trên góc đầu, không phụ thuộc
 chỉ vào tỷ lệ mũi–miệng như bản trước. Nếu thiếu mô hình mới, hệ thống báo lỗi
 mô hình và dùng cách mốc YuNet cũ làm phương án dự phòng.
 
-Buồn/giận nhẹ cần cả FER+ xếp nhãn đó trong hai ứng viên đầu và tín hiệu mốc
-mặt phù hợp trong 5 lần suy luận liên tiếp (khoảng 1,5–2 giây). Không nhân trọng
-số hoặc chuyển một nhãn vui rõ thành buồn/giận. Dòng “Dấu hiệu mặt” mô tả tín
+Buồn/giận/chán ghét/sợ/khinh miệt nhẹ cần cả FER+ xếp nhãn đó trong hai ứng viên
+đầu và tín hiệu mốc mặt phù hợp trong khoảng 0,65 giây. Các biểu cảm rõ còn có
+thể được xác nhận bằng tổ hợp chân mày, mắt, mũi và môi; một kết quả FER+ khác
+trung tính đã đủ rõ sẽ không bị tín hiệu hình học ghi đè. Không nhân trọng số
+hoặc chuyển một nhãn FER+ rõ thành cảm xúc khác. Dòng “Dấu hiệu mặt” mô tả tín
 hiệu hình học; đó không phải một kết luận về cảm xúc. Nhãn backend giữ tối đa
 3 lần đo chưa chắc; mất mặt/đổi người xóa ngay lịch sử. Chưa có tập video gán
 nhãn để xác nhận mức cải thiện độ chính xác.
 
 Dashboard cập nhật chữ theo nhịp 250 ms, chờ nhãn ổn định, giữ ngắn khi chưa rõ.
-Các hàng có chiều cao cố định 40 px và tối đa hai dòng; số ms/% chuyển vào tooltip.
+Nhãn chính hiển thị tối đa năm khả năng có điểm hợp nhất cao nhất theo thứ tự giảm
+dần, mỗi khả năng trên một dòng, ví dụ `Vui (60%)`, `Trung tính (30%)`, rồi
+`Ngạc nhiên (10%)`. Bảng chi tiết vẫn hiển thị riêng phần trăm của đủ tám đầu ra
+FER+ và bảy mức kích hoạt hình học để chẩn đoán. Đây là độ tin cậy/độ kích hoạt
+ước lượng, không phải phép đo chắc chắn cảm xúc thật của người dùng.
 Bỏ log bản tin `panda/user_status` trùng để Activity Log không cuộn từng khung hình.
 
 ### Dữ liệu khớp cánh tay
@@ -69,7 +81,7 @@ trạng thái, danh tính, biểu cảm, cử chỉ đầu/tay và thời gian x
 phát lệnh motor theo cử chỉ. Cơ chế chào khi thấy người có sẵn của brain vẫn hoạt động.
 
 `panda/camera` là ảnh JPEG base64 **đầu ra** dành cho dashboard; không phải topic
-nhận ảnh từ ESP32. Camera mạng dùng URL qua `PANDA_CAMERA_SOURCE`.
+nhận ảnh từ ESP32. Camera mạng dùng URL qua `MOON_CAMERA_SOURCE`.
 
 ## Chạy và kiểm tra
 
@@ -89,12 +101,15 @@ Từ thư mục gốc `C:\PBL4`, dùng môi trường Python sẵn có của d�
 .\start.bat
 
 # Dùng camera mạng: thay bằng địa chỉ thiết bị của bạn
-$env:PANDA_CAMERA_SOURCE = 'http://<dia-chi-esp32>:81/stream'
+$env:MOON_CAMERA_SOURCE = 'http://<dia-chi-esp32>:81/stream'
 .\server\venv\Scripts\python.exe -m server.vision
 
 # Kiểm thử logic và lỗi
 .\server\venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
+
+Diagnostic trả thêm `hand_frames`, `object_frames`, `hand_gestures` và
+`object_labels`, tiện kiểm tra riêng trường hợp chỉ đưa bàn tay/cẳng tay vào ảnh.
 
 Các file cần ở `server/`: `face_detection_yunet_2023mar.onnx`,
 `face_recognition_sface_2021dec.onnx`, `emotion-ferplus-8.onnx`, `yolov8n-pose.pt`,
@@ -153,9 +168,9 @@ giữa các mẫu rồi mới thay file. Khởi động lại vision để nạp
 ## Kịch bản kiểm tra demo
 
 1. Để mặt và vai trong hình, đứng yên 10 giây: không xuất hiện vẫy/gật/lắc.
-2. Giơ tay giữ yên: `hand_raised`, không phải `waving`.
+2. Giơ tay giữ yên: `hand_raised`, không phải `waving`; thử lại khi chỉ để một vai và tay tương ứng trong hình.
 3. Vẫy ngang rõ 2–3 nhịp, cổ tay trên vai; lặp 10 lần mỗi tay.
-4. Nhìn thẳng rồi gật xuống–lên, lắc trái–phải; lặp riêng 10 lần mỗi cử chỉ.
+4. Nhìn thẳng rồi gật xuống–lên, lắc trái–phải; sau đó giữ nghiêng trái/phải, quay trái/phải và nhìn lên/xuống ít nhất 0,5 giây.
 5. Nói chuyện, cười, quay mặt một hướng, dịch người: đếm nhận nhầm.
 6. Đưa cổ tay khỏi hình, che mặt, rời camera: kết quả phải về `unknown`.
 7. Rút/cắm camera: dashboard báo mất camera, không giữ danh tính cũ.

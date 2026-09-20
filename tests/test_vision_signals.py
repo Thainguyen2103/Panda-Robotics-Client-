@@ -1,7 +1,8 @@
 import unittest
+import json
 from unittest.mock import patch
 import numpy as np
-from server.vision_signals import EyeState, distance_estimate, finger_gesture, combined_actions, nearby_objects
+from server.vision_signals import EyeState, distance_estimate, finger_gesture, finger_states, combined_actions, nearby_objects
 from server.vision_features import ExpressionState
 from server.vision import VisionEngine
 
@@ -64,7 +65,10 @@ class SignalTests(unittest.TestCase):
         self.assertEqual(len(result),4)
         self.assertEqual({x['channel'] for x in result},{'head','arms','left_hand','right_hand'})
         hands[0]['associated']=False
-        self.assertEqual(len(combined_actions('unknown','unknown',hands)),1)
+        result=combined_actions('unknown','unknown',hands)
+        self.assertEqual(len(result),2)
+        self.assertFalse(result[0]['associated'])
+        json.dumps(result)
 
     def test_strong_brow_expression_requires_sustained_evidence(self):
         for cues,label in (({'brow_down':.7,'eye_squint':.5},'angry'),({'brow_inner_up':.6,'mouth_frown':.4},'sad')):
@@ -97,6 +101,45 @@ class SignalTests(unittest.TestCase):
         p[1],p[2],p[3],p[4]=[-.5,-.3,0],[-.6,-.7,0],[-.7,-1.1,0],[-.8,-1.6,0]
         self.assertEqual(finger_gesture(p),'thumbs_up')
         self.assertEqual(finger_gesture(np.zeros((21,3))),'unknown')
+
+    def test_more_finger_gestures(self):
+        three=self.hand({5,9,13})
+        self.assertEqual(finger_gesture(three),'three_fingers')
+        four=self.hand({5,9,13,17})
+        self.assertEqual(finger_gesture(four),'four_fingers')
+        rock=self.hand({5,17})
+        self.assertEqual(finger_gesture(rock),'rock_sign')
+        okay=self.hand({5,9,13,17})
+        okay[4]=okay[8]+[.02,.02,0]
+        self.assertEqual(finger_gesture(okay),'ok_sign')
+        pinch=self.hand(set())
+        pinch[4]=pinch[8]+[.02,.02,0]
+        self.assertEqual(finger_gesture(pinch),'pinch')
+        love=self.hand({5,17})
+        love[1],love[2],love[3],love[4]=[-.5,-.3,0],[-.6,-.7,0],[-.7,-1.1,0],[-1.1,-1.4,0]
+        self.assertEqual(finger_gesture(love),'i_love_you')
+        down=self.hand(set())
+        down[1],down[2],down[3],down[4]=[-.5,-.3,0],[-.6,-.7,0],[-.7,-1.1,0],[-.8,-1.6,0]
+        down[:,1]*=-1
+        self.assertEqual(finger_gesture(down),'thumbs_down')
+
+    def test_slightly_curved_fingers_are_still_extended(self):
+        hand=self.hand({5,9})
+        # Bend the two fingertips while keeping them clearly farther than PIP.
+        hand[8,0]+=.45
+        hand[12,0]+=.45
+        self.assertEqual(finger_states(hand),[True,True,False,False])
+        self.assertEqual(finger_gesture(hand),'victory')
+
+    def test_face_region_associates_hands_when_pose_is_partial(self):
+        engine=VisionEngine.__new__(VisionEngine)
+        engine.pose_box=None
+        engine.face_box=(250.,50.,100.,100.)
+        region=engine._person_region_for_hands(np.zeros((480,640,3)))
+        x,y,w,h=region
+        self.assertLessEqual(x,100)
+        self.assertGreaterEqual(x+w,500)
+        self.assertEqual(y+h,480)
 
     def test_scheduler_shares_budget_and_skips_face_models_when_absent(self):
         engine=VisionEngine.__new__(VisionEngine)

@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Panda Robot Dashboard — điều khiển và giám sát robot Panda thời gian thực">
-    <title>Panda Dashboard</title>
+    <meta name="description" content="Moon Robot Dashboard — điều khiển và giám sát robot Moon thời gian thực">
+    <title>Moon Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20260902">
+    <link rel="stylesheet" href="style.css?v=20260919b">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -17,7 +17,7 @@
             <div class="header-left">
                 <div class="logo">🐼</div>
                 <div>
-                    <h1>Panda <span>Dashboard</span></h1>
+                    <h1>Moon <span>Dashboard</span></h1>
                     <p class="header-subtitle">Robot Intelligence System</p>
                 </div>
             </div>
@@ -51,7 +51,7 @@
                             <span class="label">Danh tính:</span>
                             <span class="val" id="cv-identity">Chưa rõ</span>
                         </div>
-                        <div class="status-item">
+                        <div class="status-item emotion-ranking-row">
                             <span class="label">Emotion:</span>
                             <span class="val" id="cv-emotion">N/A</span>
                         </div>
@@ -174,59 +174,83 @@
                     </div>
                 </div>
 
-                <!-- Voice Transcript box đã được tích hợp trực tiếp lên OLED Face và Panda AI Chat -->
-
-
-                <!-- ✨ PANDA AI CHAT PANEL (NEW) -->
-                <div class="visual-group ai-chat-group">
-                    <h3><span class="panda-icon-h3">🐼</span> Panda AI</h3>
-
-                    <div class="ai-chat-panel" id="ai-chat-panel">
-
-                        <!-- Trạng thái mặc định: chờ wake-word -->
+                <div class="visual-group live-talk-group">
+                    <div class="live-talk-heading">
+                        <div>
+                            <p class="live-talk-kicker">MOON LIVE VOICE</p>
+                            <h3><i data-lucide="audio-lines"></i> Live Talk</h3>
+                        </div>
+                        <span class="live-talk-badge" id="live-badge" data-state="idle">Chưa chạy</span>
+                    </div>
+                    <p class="live-talk-description" id="live-description">
+                        Gemini nghe và hiểu âm thanh trực tiếp, không dùng dịch vụ STT riêng.
+                        Fish Audio giữ đúng giọng Moon; phản hồi chậm hơn một chút và có dùng quota Fish. OLED chỉ hiển thị biểu cảm.
+                    </p>
+                    <div class="live-talk-orb" id="live-orb" data-state="idle" aria-hidden="true">
+                        <span></span><span></span><span></span>
+                        <div class="live-talk-core"><i data-lucide="mic"></i></div>
+                    </div>
+                    <p class="live-talk-state" id="live-state" role="status">Sẵn sàng kết nối</p>
+                    <meter id="live-level" min="0" max="0.2" value="0" aria-label="Mức âm lượng Live Talk"></meter>
+                    <div class="live-talk-meta">
+                        <span id="live-model">gemini-3.8-live · Fish Voice</span>
+                        <span id="live-duration">00:00</span>
+                    </div>
+                    <div class="live-talk-result" aria-live="polite">
+                        <span>Nhận diện gần nhất</span>
+                        <strong id="live-heard">Chưa có dữ liệu</strong>
+                        <span id="live-corrected-label" hidden>Sau khi Brain kiểm tra</span>
+                        <strong id="live-corrected" hidden>Chưa hiệu chỉnh</strong>
+                        <span id="live-latency">Độ trễ: —</span>
+                    </div>
+                    <div class="ai-chat-panel live-talk-chat" id="ai-chat-panel">
                         <div class="ai-idle-hint" id="ai-idle-hint">
                             <div class="ai-idle-icon">🎙️</div>
-                            <p>Nói <strong>"Panda..."</strong> để bắt đầu hội thoại</p>
-                            <p class="ai-idle-sub">Sau 3 giây im lặng, Panda sẽ trả lời</p>
+                            <p>Bật trực tiếp hoặc chọn <strong>“Chờ Hey Moon”</strong></p>
+                            <p class="ai-idle-sub">Sau khi được kích hoạt, Moon sẽ trò chuyện liên tục cho đến khi bạn bấm kết thúc.</p>
                         </div>
-
-                        <!-- Bubble câu hỏi người dùng -->
                         <div class="ai-bubble user-bubble" id="ai-user-bubble" style="display:none">
-                            <div class="bubble-label"><i data-lucide="user"></i> Bạn hỏi</div>
+                            <div class="bubble-label"><i data-lucide="user"></i> Bạn đã nói</div>
                             <div class="bubble-text" id="ai-user-text"></div>
                         </div>
-
-                        <!-- Thinking indicator -->
                         <div class="ai-thinking" id="ai-thinking-bar" style="display:none">
-                            <div class="thinking-dots">
-                                <span></span><span></span><span></span>
-                            </div>
-                            <span class="thinking-label" id="ai-thinking-label">Panda đang suy nghĩ...</span>
+                            <div class="thinking-dots"><span></span><span></span><span></span></div>
+                            <span class="thinking-label" id="ai-thinking-label">Moon đang suy nghĩ...</span>
                         </div>
-
-                        <!-- Bubble câu trả lời Panda -->
-                        <div class="ai-bubble panda-bubble" id="ai-panda-bubble" style="display:none">
-                            <div class="bubble-label"><span>🐼</span> Panda trả lời</div>
-                            <div class="bubble-text" id="ai-panda-text"></div>
+                        <div class="ai-bubble moon-bubble" id="ai-moon-bubble" style="display:none">
+                            <div class="bubble-label"><span>🐼</span> Moon trả lời</div>
+                            <div class="bubble-text" id="ai-moon-text"></div>
                             <div class="bubble-cursor" id="ai-cursor">▋</div>
                         </div>
-
                     </div>
-
-                    <!-- Browser push-to-talk: dùng mic của trình duyệt (cùng mic Google Translate) -->
-                    <button class="btn-browser-mic" id="mic-btn" onclick="toggleBrowserMic()">
-                        🎤 Nói qua trình duyệt
-                    </button>
-
-                    <!-- Live mic: nghe liên tục với DSP AEC+NS+AGC kiểu Google Dịch -->
-                    <button class="btn-browser-mic" id="mic-live-btn" onclick="toggleLiveMic()">
-                        🎙️ Nghe liên tục qua trình duyệt
-                    </button>
-
-                    <!-- History button -->
-                    <button class="btn-clear-history" id="btn-clear-history" onclick="clearAiHistory()">
-                        <i data-lucide="trash-2"></i> Xóa lịch sử
-                    </button>
+                    <label class="live-talk-select-label" for="live-activation">Cách kích hoạt</label>
+                    <select id="live-activation" aria-label="Cách kích hoạt Live Talk">
+                        <option value="manual" selected>Bật trực tiếp</option>
+                        <option value="wakeword">Chờ “Hey Moon” rồi trò chuyện</option>
+                    </select>
+                    <label class="live-talk-select-label" for="live-pipeline">Hệ thống xử lý</label>
+                    <select id="live-pipeline" aria-label="Hệ thống xử lý hội thoại">
+                        <option value="gemini" selected>Gemini Live — audio native</option>
+                        <option value="brain">Brain Pipeline — STT → LLM → Fish</option>
+                    </select>
+                    <label class="live-talk-select-label" for="live-mode">Giọng trả lời</label>
+                    <select id="live-mode" aria-label="Giọng trả lời Live Talk">
+                        <option value="fish" selected>Fish Voice — cùng giọng Moon (dùng quota Fish)</option>
+                        <option value="native">Gemini Native — nhanh hơn (Kore)</option>
+                    </select>
+                    <label class="live-talk-select-label" for="live-device">Microphone</label>
+                    <select id="live-device" aria-label="Microphone Live Talk">
+                        <option value="">Microphone mặc định</option>
+                    </select>
+                    <div class="live-talk-actions">
+                        <button class="btn-live-talk" id="live-start"><i data-lucide="radio"></i> Bắt đầu Live Talk</button>
+                        <button class="btn-live-talk btn-live-stop" id="live-stop" disabled><i data-lucide="square"></i> Kết thúc</button>
+                    </div>
+                    <p class="live-talk-error" id="live-error" role="alert"></p>
+                    <details class="live-talk-setup">
+                        <summary>Cách thêm API key</summary>
+                          <p>Thêm <code>"GEMINI_API_KEY": "..."</code> và <code>"FISH_AUDIO_API_KEY": "..."</code> vào <code>config/secrets.py</code>, rồi chạy lại <code>start.bat</code>. Key chỉ được đọc ở backend.</p>
+                    </details>
                 </div>
             </section>
 
@@ -252,7 +276,7 @@
                         <div class="status-item"><span class="label">Khoảng cách ~:</span><span class="val" id="cv-distance">Chưa rõ</span></div>
                         <div class="status-item"><span class="label">Đồ vật:</span><span class="val" id="cv-objects">Chưa rõ</span></div>
                         <p class="vision-note">* Khoảng cách chưa hiệu chuẩn. Hướng nhìn và chớp mắt là ước lượng.</p>
-                        <details class="vision-scores"><summary>Điểm FER+ liên tục</summary><p class="vision-note">Điểm mô hình, không phải xác suất cảm xúc thật.</p><div class="vision-score"><span>Trung tính</span><progress max="1" value="0" id="cv-prob-neutral" aria-label="Trung tính"></progress><span id="cv-score-neutral">—</span></div><div class="vision-score"><span>Vui</span><progress max="1" value="0" id="cv-prob-happy" aria-label="Vui"></progress><span id="cv-score-happy">—</span></div><div class="vision-score"><span>Ngạc nhiên</span><progress max="1" value="0" id="cv-prob-surprised" aria-label="Ngạc nhiên"></progress><span id="cv-score-surprised">—</span></div><div class="vision-score"><span>Buồn</span><progress max="1" value="0" id="cv-prob-sad" aria-label="Buồn"></progress><span id="cv-score-sad">—</span></div><div class="vision-score"><span>Giận</span><progress max="1" value="0" id="cv-prob-angry" aria-label="Giận"></progress><span id="cv-score-angry">—</span></div><div class="vision-score"><span>Chán ghét</span><progress max="1" value="0" id="cv-prob-disgust" aria-label="Chán ghét"></progress><span id="cv-score-disgust">—</span></div><div class="vision-score"><span>Sợ</span><progress max="1" value="0" id="cv-prob-fear" aria-label="Sợ"></progress><span id="cv-score-fear">—</span></div><div class="vision-score"><span>Khinh miệt</span><progress max="1" value="0" id="cv-prob-contempt" aria-label="Khinh miệt"></progress><span id="cv-score-contempt">—</span></div><p class="vision-note">Mức kích hoạt từ mốc mặt (độc lập, không cộng thành 1)</p><div class="vision-score"><span>Cười</span><progress max="1" value="0" id="cv-intensity-happy" aria-label="Tín hiệu Cười"></progress><span id="cv-intensity-score-happy">—</span></div><div class="vision-score"><span>Ngạc nhiên</span><progress max="1" value="0" id="cv-intensity-surprised" aria-label="Tín hiệu Ngạc nhiên"></progress><span id="cv-intensity-score-surprised">—</span></div><div class="vision-score"><span>Buồn</span><progress max="1" value="0" id="cv-intensity-sad" aria-label="Tín hiệu Buồn"></progress><span id="cv-intensity-score-sad">—</span></div><div class="vision-score"><span>Giận</span><progress max="1" value="0" id="cv-intensity-angry" aria-label="Tín hiệu Giận"></progress><span id="cv-intensity-score-angry">—</span></div></details>
+                        <details class="vision-scores"><summary>Điểm FER+ liên tục</summary><p class="vision-note">Điểm mô hình, không phải xác suất cảm xúc thật.</p><div class="vision-score"><span>Trung tính</span><progress max="1" value="0" id="cv-prob-neutral" aria-label="Trung tính"></progress><span id="cv-score-neutral">—</span></div><div class="vision-score"><span>Vui</span><progress max="1" value="0" id="cv-prob-happy" aria-label="Vui"></progress><span id="cv-score-happy">—</span></div><div class="vision-score"><span>Ngạc nhiên</span><progress max="1" value="0" id="cv-prob-surprised" aria-label="Ngạc nhiên"></progress><span id="cv-score-surprised">—</span></div><div class="vision-score"><span>Buồn</span><progress max="1" value="0" id="cv-prob-sad" aria-label="Buồn"></progress><span id="cv-score-sad">—</span></div><div class="vision-score"><span>Giận</span><progress max="1" value="0" id="cv-prob-angry" aria-label="Giận"></progress><span id="cv-score-angry">—</span></div><div class="vision-score"><span>Chán ghét</span><progress max="1" value="0" id="cv-prob-disgust" aria-label="Chán ghét"></progress><span id="cv-score-disgust">—</span></div><div class="vision-score"><span>Sợ</span><progress max="1" value="0" id="cv-prob-fear" aria-label="Sợ"></progress><span id="cv-score-fear">—</span></div><div class="vision-score"><span>Khinh miệt</span><progress max="1" value="0" id="cv-prob-contempt" aria-label="Khinh miệt"></progress><span id="cv-score-contempt">—</span></div><p class="vision-note">Mức kích hoạt từ mốc mặt (độc lập, không cộng thành 1)</p><div class="vision-score"><span>Cười</span><progress max="1" value="0" id="cv-intensity-happy" aria-label="Tín hiệu Cười"></progress><span id="cv-intensity-score-happy">—</span></div><div class="vision-score"><span>Ngạc nhiên</span><progress max="1" value="0" id="cv-intensity-surprised" aria-label="Tín hiệu Ngạc nhiên"></progress><span id="cv-intensity-score-surprised">—</span></div><div class="vision-score"><span>Buồn</span><progress max="1" value="0" id="cv-intensity-sad" aria-label="Tín hiệu Buồn"></progress><span id="cv-intensity-score-sad">—</span></div><div class="vision-score"><span>Giận</span><progress max="1" value="0" id="cv-intensity-angry" aria-label="Tín hiệu Giận"></progress><span id="cv-intensity-score-angry">—</span></div><div class="vision-score"><span>Chán ghét</span><progress max="1" value="0" id="cv-intensity-disgust" aria-label="Tín hiệu Chán ghét"></progress><span id="cv-intensity-score-disgust">—</span></div><div class="vision-score"><span>Sợ</span><progress max="1" value="0" id="cv-intensity-fear" aria-label="Tín hiệu Sợ"></progress><span id="cv-intensity-score-fear">—</span></div><div class="vision-score"><span>Khinh miệt</span><progress max="1" value="0" id="cv-intensity-contempt" aria-label="Tín hiệu Khinh miệt"></progress><span id="cv-intensity-score-contempt">—</span></div></details>
                 </div></div>
 
                 <div class="log-section">
@@ -266,8 +290,9 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="vision-ui.js?v=20260908a"></script>
-    <script src="app.js?v=20260908a"></script>
+    <script src="vision-ui.js?v=20260914e"></script>
+    <script src="app.js?v=20260919e"></script>
+    <script src="live-talk.js?v=20260919e"></script>
     <script>
         lucide.createIcons();
     </script>

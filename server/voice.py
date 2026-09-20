@@ -1,10 +1,10 @@
 """
-Voice (STT) module — Robot Panda
+Voice (STT) module — Robot Moon
 =================================
 Pipeline nhận dạng giọng nói kiểu Anki Vector:
   Microphone (VAD năng lượng) → đoạn thoại ngắn → Groq Whisper → transcript
     → bộ lọc chống hallucination
-      → phát hiện wake-word "Panda" → callback lên brain.py
+      → phát hiện wake-word "Moon" → callback lên brain.py
 
 Thiết kế tối ưu độ trễ:
   - Ghi âm 16kHz mono int16, block 30ms → phát hiện đầu/cuối câu gần như tức thì
@@ -56,7 +56,7 @@ try:
 except Exception:
     mqtt_bridge = None
 
-# ─── Cờ TTS đang phát — để mic KHÔNG thu tiếng loa của chính Panda ───────────
+# ─── Cờ TTS đang phát — để mic KHÔNG thu tiếng loa của chính Moon ───────────
 try:
     from server.tts import is_speaking as _tts_speaking
 except Exception:
@@ -88,9 +88,6 @@ try:
 except ImportError:
     _nr = None
     print("⚠️  [VOICE] noisereduce chưa cài — bỏ qua khử ồn. pip install noisereduce")
-# Prompt mớm chính tả tên riêng cho pass vi: khi âm mơ hồ, Whisper ưu tiên viết
-# "Panda" thay vì bịa "và hẹn gặp lại" / "bạn nàng"...
-WAKE_STT_PROMPT   = getattr(settings, "WAKE_STT_PROMPT", "Xin chào Panda, hôm nay trời đẹp quá.")
 WAKE_SILENCE_SEC  = getattr(settings, "WAKE_SILENCE_SEC", 1.2)   # im lặng kết thúc clip standby
 QUESTION_SILENCE_SEC = getattr(settings, "QUESTION_SILENCE_SEC", 3.0)
 QUESTION_MAX_SEC  = getattr(settings, "QUESTION_MAX_SEC", 20.0)
@@ -130,6 +127,8 @@ _paused_event = threading.Event()    # set = tạm dừng vòng lặp nghe (khi 
 _abort_event  = threading.Event()    # set = ngắt bản ghi âm hiện tại ngay lập tức
 _external_mic = threading.Event()    # set = mic trình duyệt đang nghe liên tục → loop server nghỉ
 _mic_lock     = threading.Lock()     # chỉ 1 luồng được mở mic tại 1 thời điểm
+_standby_stream_lock = threading.Lock()
+_standby_stream = None               # stream VAD standby; dừng hẳn khi pipeline chiếm mic
 _device_cache = None                 # (index, name) — cache sau lần dò đầu tiên
 
 _on_transcript_cbs = []
@@ -137,13 +136,7 @@ _on_wake_word_cbs  = []
 _on_wake_rescue_cbs = []   # sửa lỗi ASR để cứu wake khi bản thô trượt
 _wake_exec = ThreadPoolExecutor(max_workers=2)   # transcribe nền — tai không ngừng nghe
 
-WAKE_WORDS = sorted(getattr(settings, "PANDA_WAKE_WORDS", ["panda"]),
-                    key=len, reverse=True)   # dài nhất trước để ưu tiên khớp đầy đủ
-
-
-# ─── Khớp wake-word KHÔNG PHỤ THUỘC DẤU (phonetic-normalized) ────────────────
-# Whisper vi-mode hay Việt hóa từ mượn Anh: "Panda" → "bạn nàng", "ban nang"...
-# Chuẩn hóa bỏ dấu thanh để mọi biến thể cùng khớp về một dạng.
+# Compatibility normalizer used by the legacy Brain ASR helper.
 def _strip_diacritics(s: str) -> str:
     """lower + bỏ dấu thanh + đ→d + nén khoảng trắng."""
     s = unicodedata.normalize("NFD", s.lower())
@@ -151,19 +144,6 @@ def _strip_diacritics(s: str) -> str:
     s = s.replace("đ", "d")
     s = re.sub(r"[^\w\s]", " ", s)
     return re.sub(r"\s+", " ", s).strip()
-
-
-# Biến thể bổ sung mà Whisper vi-mode sinh ra cho "Panda" (đo thực tế)
-_EXTRA_WAKE_VARIANTS = [
-    "bạn nàng", "ban nang", "ban nang", "bạn nàng ơi",
-    "pang da", "pang đa",
-]
-
-WAKE_WORDS_NORM = sorted(
-    {_strip_diacritics(w) for w in WAKE_WORDS}
-    | {_strip_diacritics(w) for w in _EXTRA_WAKE_VARIANTS},
-    key=len, reverse=True,
-)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -358,8 +338,8 @@ def _record_until_silence(silence_sec: float = 2.0,
                     if yield_on_pause and _paused_event.is_set() and not got_speech:
                         return None
 
-                    # Loa Panda đang phát TTS → clip sẽ bị bẩn bởi tiếng của chính
-                    # Panda (gây tự kích wake-word) → hủy bản ghi này
+                    # Loa Moon đang phát TTS → clip sẽ bị bẩn bởi tiếng của chính
+                    # Moon (gây tự kích wake-word) → hủy bản ghi này
                     if _tts_speaking():
                         return None
 
@@ -439,7 +419,7 @@ def _record_until_silence(silence_sec: float = 2.0,
 _UNSET = object()   # sentinel: language không được truyền → dùng STT_LANGUAGE
 
 
-def transcribe_bytes(data: bytes, filename: str = "panda_clip.wav",
+def transcribe_bytes(data: bytes, filename: str = "moon_clip.wav",
                      language=_UNSET, prompt: str = None,
                      model: str = None) -> str:
     """
@@ -460,7 +440,7 @@ def transcribe_bytes(data: bytes, filename: str = "panda_clip.wav",
 
         kwargs = {
             "model": model or STT_MODEL,
-            "file": (filename, open(tmp_path, "rb")),
+            "file": (filename, data),
             "temperature": 0.0,
             "response_format": "text",
         }
@@ -527,35 +507,13 @@ def _transcribe(audio: bytes, model: str = None) -> str:
     """PCM int16 16kHz mono → khử ồn → WAV → Groq (1 pass, theo STT_LANGUAGE)."""
     if not audio:
         return ""
-    return transcribe_bytes(_wrap_wav(_denoise_pcm(audio)), "panda_clip.wav", model=model)
+    return transcribe_bytes(_wrap_wav(_denoise_pcm(audio)), "moon_clip.wav", model=model)
 
 
 def _transcribe_dual(audio: bytes) -> str:
-    """
-    Chạy 2 pass SONG SONG (vi + en) cho clip standby — mô phỏng cách Anki Vector
-    tách wake-word khỏi ASR đa ngôn ngữ:
-      - pass vi: chính xác cho câu lệnh tiếng Việt
-      - pass en: giữ nguyên từ mượn tiếng Anh như "Panda"
-    Ưu tiên transcript bắt được wake-word; nếu không, trả về pass vi.
-    Độ trễ ≈ max(2 pass) chứ không cộng dồn (chạy concurrent).
-    """
-    wav = _wrap_wav(_denoise_pcm(audio))
-    # LƯỜI HÓA để tiết kiệm quota Groq free-tier (tránh throttling gây trễ):
-    # pass vi rẻ nhất chạy trước; bắt được wake → trả ngay (1 call).
-    # Chỉ khi hụt mới mở 2 pass còn lại song song.
-    t_vi = transcribe_bytes(wav, "clip_vi.wav", "vi")
-    if _contains_wake_word(t_vi):
-        return t_vi
-    with ThreadPoolExecutor(max_workers=2) as ex:
-        f_en = ex.submit(transcribe_bytes, wav, "clip_en.wav", "en")
-        f_vp = ex.submit(transcribe_bytes, wav, "clip_vp.wav", "vi", WAKE_STT_PROMPT)
-        t_en = f_en.result()
-        t_vp = f_vp.result()
-    for t in (t_vp, t_en):
-        if _contains_wake_word(t):
-            print(f"🌐 [VOICE] Wake-word bắt từ pass dự phòng: \"{t}\"")
-            return t
-    return t_vi or t_vp or t_en
+    """Compatibility entry point: one STT request, no prompted wake retries."""
+    # One request only: prompted retries can invent the wakeword in noise.
+    return _transcribe(audio)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -617,19 +575,9 @@ def _levenshtein(a: str, b: str) -> int:
 
 
 def _contains_wake_word(text: str) -> bool:
-    """
-    Kiểm tra transcript có wake-word "Panda" (hoặc biến thể) không.
-    Khớp phonetic KHÔNG PHỤ THUỘC DẤU: "bạn nàng" / "Păng Đa" / "PHAN TA" đều khớp.
-    """
-    if not text:
-        return False
-    norm = _strip_diacritics(text)
-    if any(wake in norm for wake in WAKE_WORDS_NORM):
-        return True
-    # Fuzzy: Whisper đôi khi nghe "Panda" thành "Anna"/"Amanda"/"panna"...
-    # → token dài ≥4 ký tự, cách "panda" ≤ 2 phép sửa thì vẫn nhận.
-    return any(len(tok) >= 4 and _levenshtein(tok, "panda") <= 2
-               for tok in norm.split())
+    """Match the complete name Moon, without fuzzy or accent folding."""
+    from server.voice_core import wake_tail
+    return wake_tail(text or "") is not None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -654,22 +602,55 @@ def pause_listening():
     """Tạm dừng vòng lặp nghe (khi AI đang listening/thinking/speaking)."""
     _paused_event.set()
     _abort_event.set()      # ngắt cả bản ghi âm đang chạy
+    # Không chỉ bỏ qua callback: phải nhả thiết bị để
+    # listen_for_question() có thể mở mic mà không tranh stream standby.
+    _stop_standby_stream()
 
 
 def resume_listening():
     """Tiếp tục nghe (khi AI quay về standby)."""
     _abort_event.clear()
     _paused_event.clear()
+    if not _external_mic.is_set():
+        _start_standby_stream()
+
+
+def _stop_standby_stream():
+    with _standby_stream_lock:
+        if _standby_stream is not None:
+            try:
+                if _standby_stream.active:
+                    _standby_stream.stop()
+            except Exception as e:
+                print(f"⚠️  [VOICE] Không dừng được stream standby: {e}")
+
+
+def _start_standby_stream():
+    with _standby_stream_lock:
+        if _standby_stream is not None:
+            try:
+                if not _standby_stream.active:
+                    _standby_stream.start()
+            except Exception as e:
+                print(f"⚠️  [VOICE] Không khởi động lại được stream standby: {e}")
 
 
 def set_external_mic(on: bool):
     """Bật/tắt chế độ mic trình duyệt liên tục → vòng lặp server nhường đường."""
     if on:
         _external_mic.set()
+        _stop_standby_stream()
         print("🎙️ [VOICE] Mic trình duyệt liên tục BẬT — loop server tạm nghỉ.")
     else:
         _external_mic.clear()
+        if not _paused_event.is_set():
+            _start_standby_stream()
         print("🎙️ [VOICE] Mic trình duyệt TẮT — loop server nghe lại.")
+
+
+def external_mic_active() -> bool:
+    """True khi dashboard đang sở hữu microphone."""
+    return _external_mic.is_set()
 
 
 def _publish_voice_log(text: str):
@@ -687,7 +668,7 @@ def continuous_listen_loop():
         → nếu có wake-word → callback wake-word.
 
     Giống Vector: sau mỗi câu trả lời robot quay về vòng lặp này ngay,
-    luôn sẵn sàng nghe "Panda".
+    luôn sẵn sàng nghe "Moon".
     """
     if sd is None or groq_client is None:
         print("❌ [VOICE] Thiếu sounddevice hoặc Groq — không thể nghe.")
@@ -698,7 +679,7 @@ def continuous_listen_loop():
         while True:
             time.sleep(1)
 
-    print("👂 [VOICE] Vòng lặp nghe liên tục bắt đầu. Nói \"Panda\" để gọi mình!")
+    print("👂 [VOICE] Vòng lặp nghe liên tục bắt đầu. Nói \"Moon\" để gọi mình!")
     dev = _select_input_device()
     while dev is None:
         time.sleep(2)
@@ -730,7 +711,7 @@ def continuous_listen_loop():
                     except Exception as e:
                         print(f"❌ [VOICE] Lỗi callback wake-word: {e}")
             elif _on_wake_rescue_cbs:
-                # Cứu hộ: sửa lỗi chính tả rồi thử lại wake (vd 'Hai bạn nàng' → 'Hey Panda')
+                # Cứu hộ: sửa lỗi chính tả rồi thử lại wake (vd 'Hai bạn nàng' → 'Hey Moon')
                 for rc in _on_wake_rescue_cbs:
                     try:
                         fixed = rc(text)
@@ -749,8 +730,11 @@ def continuous_listen_loop():
     min_blocks  = int(MIN_SPEECH_SEC * 1000 / BLOCK_MS)
     preroll_max = int(1.5 * 1000 / BLOCK_MS)
 
+    global _standby_stream
     with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="int16",
-                        device=dev[0], blocksize=BLOCK_FRAMES, callback=_cb):
+                        device=dev[0], blocksize=BLOCK_FRAMES, callback=_cb) as stream:
+        with _standby_stream_lock:
+            _standby_stream = stream
         # ── warm-up 0.4s + hiệu chuẩn ồn nền 0.6–1s — MỘT lần duy nhất ──
         # Theo THỜI GIAN (không theo số block quiet) → không bao giờ treo
         # kể cả khi phòng ồn hơn 0.10 RMS; lấy trung vị chống outlier giọng nói.
@@ -775,51 +759,56 @@ def continuous_listen_loop():
         clip, peak, speech_blocks = [], 0.0, 0
         last_speech, speech_start = 0.0, 0.0
 
-        while True:
-            # AI bận / mic ngoài / TTS phát → xả hàng đợi & reset (chống tự kích)
-            if _paused_event.is_set() or _external_mic.is_set() or _tts_speaking():
-                while not q.empty():
-                    try:
-                        q.get_nowait()
-                    except queue.Empty:
-                        break
-                state, clip, peak, speech_blocks = "idle", [], 0.0, 0
-                preroll.clear()
-                time.sleep(0.1)
-                continue
-
-            try:
-                data = q.get(timeout=1.0)
-            except queue.Empty:
-                continue
-
-            now = time.time()
-            rms = _rms_of_block(data)
-            rel = peak * 0.55 if state == "speech" else 0.0
-            is_sp = (rms >= threshold_base and rms >= rel
-                     and _spectral_flatness(data) < SPEECH_FLAT_MAX)
-
-            if state == "idle":
-                if is_sp:
-                    state = "speech"
-                    clip = list(preroll) + [data]
-                    peak, speech_blocks = rms, 1
-                    last_speech = speech_start = now
-                else:
-                    ambient = ambient * 0.9 + rms * 0.1   # thích nghi liên tục
-                    threshold_base = max(VAD_NOISE_FLOOR, ambient * VAD_AMBIENT_MULT)
-                    preroll.append(data)
-            else:
-                clip.append(data)
-                if is_sp:
-                    peak = max(peak, rms)
-                    speech_blocks += 1
-                    last_speech = now
-                if (state == "speech" and now - last_speech >= WAKE_SILENCE_SEC) \
-                        or (state == "speech" and now - speech_start > 8.0):
-                    if speech_blocks >= min_blocks:
-                        _emit_clip(b"".join(clip))   # nền — không chặn tai
+        try:
+            while True:
+                # AI bận / mic ngoài / TTS phát → xả hàng đợi & reset (chống tự kích)
+                if _paused_event.is_set() or _external_mic.is_set() or _tts_speaking():
+                    while not q.empty():
+                        try:
+                            q.get_nowait()
+                        except queue.Empty:
+                            break
                     state, clip, peak, speech_blocks = "idle", [], 0.0, 0
+                    preroll.clear()
+                    time.sleep(0.1)
+                    continue
+
+                try:
+                    data = q.get(timeout=1.0)
+                except queue.Empty:
+                    continue
+
+                now = time.time()
+                rms = _rms_of_block(data)
+                rel = peak * 0.55 if state == "speech" else 0.0
+                is_sp = (rms >= threshold_base and rms >= rel
+                         and _spectral_flatness(data) < SPEECH_FLAT_MAX)
+
+                if state == "idle":
+                    if is_sp:
+                        state = "speech"
+                        clip = list(preroll) + [data]
+                        peak, speech_blocks = rms, 1
+                        last_speech = speech_start = now
+                    else:
+                        ambient = ambient * 0.9 + rms * 0.1   # thích nghi liên tục
+                        threshold_base = max(VAD_NOISE_FLOOR, ambient * VAD_AMBIENT_MULT)
+                        preroll.append(data)
+                else:
+                    clip.append(data)
+                    if is_sp:
+                        peak = max(peak, rms)
+                        speech_blocks += 1
+                        last_speech = now
+                    if (state == "speech" and now - last_speech >= WAKE_SILENCE_SEC) \
+                            or (state == "speech" and now - speech_start > 8.0):
+                        if speech_blocks >= min_blocks:
+                            _emit_clip(b"".join(clip))   # nền — không chặn tai
+                        state, clip, peak, speech_blocks = "idle", [], 0.0, 0
+        finally:
+            with _standby_stream_lock:
+                if _standby_stream is stream:
+                    _standby_stream = None
 
 
 def listen_for_question() -> str | None:

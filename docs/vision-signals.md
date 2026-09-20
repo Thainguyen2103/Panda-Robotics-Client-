@@ -41,14 +41,22 @@ MediaPipe Hand Landmarker trả tối đa 2 bàn tay, mỗi tay 21 mốc x/y/z, 
 handedness. Điểm handedness không phải độ tin cậy của từng khớp. Skeleton
 ngón tay được vẽ trên camera, song song skeleton cánh tay.
 
-Quy tắc ban đầu: `victory` (hai ngón V), `thumbs_up` (like), `open_palm`,
-`pointing`, `fist`. Cần hai lần nhận cùng nhãn trên cùng tay. Đây chưa phải
+Các quy tắc: `victory` (hai ngón V), `thumbs_up` (like), `open_palm`,
+`pointing`, `fist`, `ok_sign`, `pinch`, `three_fingers`, `four_fingers`,
+`rock_sign`, `shaka`, `thumbs_down`, `i_love_you`. Cần hai lần nhận cùng nhãn trên cùng tay. Đây chưa phải
 mô hình học hành động tổng quát; một số hướng bàn tay hoặc ngón bị che sẽ
 trả `unknown`. Giơ V là cử chỉ V, không có nghĩa chắc chắn là đang chào.
 
-`hands[]`: `side`, `associated`, `confidence`, `gesture`, `landmarks`, `timestamp`.
-Ghép bàn tay với người đang theo dõi bằng cổ tay pose hoặc vùng thân. Khi
-không ghép được, vẫn xuất mốc bàn tay nhưng không đưa vào hành động của người.
+`hands[]`: `side`, `associated`, `confidence`, `gesture`, `gesture_candidate`,
+`stability`, `extended_fingers`, `center`, `landmarks`, `timestamp`. Dashboard
+hiện “đã thấy bàn tay” ngay cả khi hình học chưa phân loại được cử chỉ, và hiện
+“đang xác nhận” trong mẫu đầu tiên trước khi nhãn ổn định.
+Ghép bàn tay với người đang theo dõi bằng cổ tay pose hoặc vùng thân. Nếu pose
+thân bị cắt nhưng còn mặt, hệ thống dùng vùng mở rộng quanh mặt làm gợi ý ghép.
+Vùng này không tạo khớp cánh tay giả. Khi không ghép được, hệ thống vẫn xuất mốc
+và cử chỉ bàn tay với `associated=false`. Điều này cho phép nhận riêng bàn tay/
+cẳng tay khi thân người nằm ngoài ảnh; phía điều khiển robot phải kiểm tra cờ
+này nếu chỉ muốn phản ứng với người đang theo dõi.
 Phân biệt nhiều người/che khuất/đổi tay nhanh còn có thể ghép nhầm.
 
 `actions[]` chứa đồng thời các kênh, ví dụ:
@@ -101,16 +109,24 @@ rộng khung hình đang xử lý (mặc định 640), rồi chạy:
 ```
 
 Ví dụ trên trả `VISION_DISTANCE_SCALE_CM = 15`. Điền vào settings hoặc đặt
-`$env:PANDA_DISTANCE_SCALE_CM = '15'` trước khởi động. Công thức là
+`$env:MOON_DISTANCE_SCALE_CM = '15'` trước khởi động. Công thức là
 `distance_cm = scale * frame_width / face_width`. Làm lại khi đổi zoom/camera
 hoặc người. Số ví dụ không phải kết quả đo camera của bạn.
 
 ## Đồ vật
 
-YOLOv8n dùng `server/yolov8n.pt`, xuất `objects[]` gồm nhãn, điểm, box chuẩn hóa,
-timestamp và `near_hands`. Ly/chai/sách/điện thoại được dịch trên dashboard.
+YOLOv8n dùng `server/yolov8n.pt`, hỗ trợ 80 lớp COCO và xuất `objects[]` gồm nhãn, điểm, box chuẩn hóa,
+timestamp và `near_hands`. Các lớp vật thể được dịch sang tiếng Việt trên dashboard.
 “Gần tay” chỉ dựa vào lân cận hình học 2D, không khẳng định đang cầm/nắm.
 Không thấy đồ vật không có nghĩa đồ vật không tồn tại.
+
+Mặc định nhánh vật thể dùng ảnh 480 px và ngưỡng 0,30 để tăng khả năng thấy vật
+nhỏ so với cấu hình 320 px/0,45 trước đây. Có thể chỉnh
+`VISION_OBJECTS_SIZE` và `VISION_OBJECTS_CONFIDENCE` trong settings. Kích thước
+lớn hơn làm tăng thời gian CPU; ngưỡng thấp hơn có thể tăng nhận nhầm. Dashboard
+đã có tên tiếng Việt cho đủ 80 lớp, trừ `person` vì người được xử lý ở kênh riêng.
+Mỗi nhãn hiện thêm số lượng và confidence lớn nhất của nhóm. Dashboard giữ lần
+thấy cuối trong 3 giây để detection ngắn không biến mất trước nhịp vẽ giao diện.
 
 ## Tần suất và dữ liệu cũ
 
@@ -119,7 +135,7 @@ nặng phụ (danh tính, FER, pose, hands hoặc objects), chọn theo mức tr
 tần suất cấu hình. `secondary_stage` cho biết nhánh được chạy; các FPS là trần,
 không phải tốc độ bảo đảm. Không tính rate chớp mắt theo FPS cấu hình.
 
-Pose quá 0,75 giây, hands quá 0,6 giây, objects quá 1,5 giây sẽ bị xóa. Kết quả
+Pose quá 0,75 giây, hands quá 0,9 giây, objects quá 2,5 giây sẽ bị xóa. Kết quả
 mất camera/AI quá hạn xóa toàn bộ dữ liệu; UI mất bản tin >4 giây cũng xóa.
 Timestamp là đồng hồ đơn điệu của tiến trình sản xuất; không so trực tiếp
 với đồng hồ hệ thống trên máy khác.

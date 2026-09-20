@@ -24,6 +24,8 @@ import os
 import sys
 import time
 import threading
+import re
+import unicodedata
 from datetime import datetime
 
 # Fix Windows terminal encoding (giống brain.py) — tránh crash khi in emoji/Việt
@@ -97,14 +99,14 @@ def _init_client():
 
 _init_client()
 
-# ─── System Prompt — Tính cách Panda ──────────────────────────────────────────
-SYSTEM_PROMPT = """Bạn là Panda — một robot thông minh, đáng yêu và thân thiện.
+# ─── System Prompt — Tính cách Moon ──────────────────────────────────────────
+SYSTEM_PROMPT = """Bạn là Moon — một robot thông minh, đáng yêu và thân thiện.
 Bạn được tạo ra bởi nhóm sinh viên đại học Đà Nẵng trong dự án PBL4.
 
 Tính cách của bạn:
 - Thông minh nhưng dễ gần, hay dùng emoji khi phù hợp 🐼
 - Trả lời bằng tiếng Việt tự nhiên, ngắn gọn và súc tích
-- Thỉnh thoảng tự xưng là "Panda" thay vì "tôi"
+- Thỉnh thoảng tự xưng là "Moon" thay vì "tôi"
 - Luôn tích cực và khuyến khích người dùng
 - Nếu không biết điều gì, thành thật nói không biết thay vì bịa đặt
 - Khi được hỏi về cảm xúc hoặc cảm nhận, hãy trả lời như một người bạn thật sự
@@ -114,8 +116,9 @@ Lưu ý:
 - Tránh dùng markdown, bullet point hay ký tự đặc biệt khó đọc
 - Hãy nói tự nhiên như hội thoại thông thường
 - KHÔNG dùng dấu **, ## hay bất kỳ ký hiệu markdown nào
-- NGÔN NGỮ: trả lời bằng đúng ngôn ngữ người dùng đang dùng
-  (hỏi tiếng Việt → đáp tiếng Việt; hỏi tiếng Anh → đáp tiếng Anh)
+- NGÔN NGỮ: tuân thủ chỉ dẫn ngôn ngữ riêng của lượt hỏi mới nhất. Chọn ngôn
+  ngữ chính một cách tự nhiên và được giữ/dùng thuật ngữ ngoại ngữ quen thuộc
+  khi chúng rõ nghĩa hơn. Không dịch đôi toàn bộ câu trừ khi người dùng yêu cầu
 - BÙ ĐẮP LỖI NHẬN DẠNG: câu hỏi đến từ giọng nói nên có thể thiếu chữ,
   sai chính tả (vd "ngon bị nào" = "ngọn núi nào"). Hãy tự suy luận ý định
   hợp lý nhất rồi trả lời tự nhiên; KHÔNG nhắc lại phần chữ bị lỗi,
@@ -172,6 +175,62 @@ _history_lock = threading.Lock()
 MAX_HISTORY = 10
 
 
+_VIETNAMESE_MARKERS = {
+    "ai", "bao", "bạn", "biết", "bây", "cho", "chào", "chưa", "có",
+    "của", "đang", "đâu", "được", "gì", "giờ", "hãy", "hôm", "không",
+    "là", "mình", "muốn", "nào", "nay", "nhiêu", "ơi", "sao", "thế",
+    "tại", "tôi", "và", "với", "xin",
+}
+_ENGLISH_MARKERS = {
+    "am", "are", "can", "could", "did", "do", "does", "hello", "hey",
+    "how", "i", "is", "know", "me", "my", "please", "should", "tell",
+    "the", "today", "what", "when", "where", "who", "why", "would", "you",
+    "your",
+}
+_VIETNAMESE_DISTINCTIVE = set("ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ")
+
+
+def response_language(question: str) -> str:
+    """Classify only the latest spoken turn for response routing."""
+    normalized = unicodedata.normalize("NFC", question or "").casefold()
+    words = re.findall(r"[^\W\d_]+", normalized, flags=re.UNICODE)
+    vi_score = sum(word in _VIETNAMESE_MARKERS for word in words)
+    en_score = sum(word in _ENGLISH_MARKERS for word in words)
+    if any(char in _VIETNAMESE_DISTINCTIVE for char in normalized):
+        vi_score += 2
+
+    if vi_score and en_score:
+        # One borrowed word does not make an otherwise clear sentence mixed.
+        if min(vi_score, en_score) >= 2 or abs(vi_score - en_score) <= 1:
+            return "adaptive"
+    if en_score >= 2 and en_score > vi_score:
+        return "en"
+    if vi_score >= 1 and vi_score > en_score:
+        return "vi"
+    # A multi-word ASCII utterance with no Vietnamese evidence is normally an
+    # English sentence (for example "Explain quantum physics"). A lone name or
+    # acronym stays ambiguous and is therefore answered bilingually.
+    if not vi_score and len(words) >= 2 and normalized.isascii():
+        return "en"
+    return "adaptive"
+
+
+def response_language_instruction(question: str) -> str:
+    language = response_language(question)
+    if language == "en":
+        return ("[Response language for the latest turn] The user spoke English. "
+                "Reply only in natural English, even if conversation history or "
+                "other instructions are written in Vietnamese.")
+    if language == "vi":
+        return ("[Ngôn ngữ trả lời cho lượt mới nhất] Người dùng nói tiếng Việt. "
+                "Chỉ trả lời bằng tiếng Việt tự nhiên.")
+    return ("[Response language for the latest turn] Infer the dominant language "
+            "and reply naturally in that language. Code-switch only where it helps: "
+            "keep familiar English technical terms, product names, and phrases when "
+            "they are clearer than a forced translation. Do not duplicate the whole "
+            "answer in two languages unless the user explicitly asks for translation.")
+
+
 def _get_messages(user_question: str) -> list[dict]:
     with _history_lock:
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -182,6 +241,7 @@ def _get_messages(user_question: str) -> list[dict]:
             ctx += " | " + wx
         messages.append({"role": "system", "content": ctx})
         messages.extend(_conversation_history[-MAX_HISTORY * 2:])
+        messages.append({"role": "system", "content": response_language_instruction(user_question)})
         messages.append({"role": "user", "content": user_question})
     return messages
 
@@ -228,7 +288,7 @@ def chat(
         Câu trả lời đầy đủ (str).
     """
     if not _client:
-        error_msg = "Xin lỗi, Panda chưa kết nối được với não bộ AI. Vui lòng kiểm tra API key."
+        error_msg = "Xin lỗi, Moon chưa kết nối được với não bộ AI. Vui lòng kiểm tra API key."
         if on_done:
             on_done(error_msg)
         return error_msg
@@ -300,7 +360,7 @@ def chat(
         return full_response
 
     except Exception as e:
-        error_msg = "Xin lỗi, Panda gặp sự cố khi suy nghĩ. Bạn thử hỏi lại nhé!"
+        error_msg = "Xin lỗi, Moon gặp sự cố khi suy nghĩ. Bạn thử hỏi lại nhé!"
         print(f"❌ [LLM] Lỗi: {e}")
         if on_done:
             on_done(error_msg)
@@ -361,5 +421,5 @@ if __name__ == "__main__":
     def on_done(full_text):
         print(f"\n\n✅ Done! ({len(full_text)} chars)")
 
-    chat("Panda ơi, hôm nay bạn cảm thấy thế nào?",
+    chat("Moon ơi, hôm nay bạn cảm thấy thế nào?",
          on_thinking=on_thinking, on_chunk=on_chunk, on_done=on_done)

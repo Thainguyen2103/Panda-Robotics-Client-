@@ -1,10 +1,10 @@
 """
-Brain — Bộ não trung tâm của Robot Panda
+Brain — Bộ não trung tâm của Robot Moon
 =========================================
 Pipeline chính:
   Người nói
     → voice.py (VAD + Groq STT) → transcript text
-      → Phát hiện wake-word "Panda"
+      → Phát hiện wake-word "Moon"
         → Nghe câu hỏi (nếu cần)
           → llm.py (DeepSeek/Groq) → stream câu trả lời
             → tts.py (Fish Audio) → phát âm thanh
@@ -41,14 +41,27 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import settings
 from server import mqtt_bridge
 from server.vision import start_vision
+from server import voice
 from server.voice import (register_callbacks, continuous_listen_loop,
                           listen_for_question, pause_listening, resume_listening,
                           transcribe_bytes, _is_hallucination, _contains_wake_word,
                           STT_MODEL_QUESTION, _levenshtein, _strip_diacritics)
+from server.voice_core import safe_asr_correction
 from server.tts import speak, SentencePlayer
 from server import tts   # module object — cho tts.play_beep()/play_tick()
 from server import llm
 from server.topics import classify_topic, TOPIC_LABELS
+
+
+# Mic trình duyệt chạy ở process riêng nên không thấy trực tiếp cờ
+# tts.is_speaking(). Đồng bộ trạng thái loa qua MQTT để Voice Lab loại toàn bộ
+# audio của chính Moon, kể cả câu chào tự động khi vừa mở dashboard.
+tts.register_activity_callback(
+    lambda active: mqtt_bridge.publish(
+        settings.TOPIC_TTS_ACTIVE, "1" if active else "0", retain=True
+    )
+)
+mqtt_bridge.publish(settings.TOPIC_TTS_ACTIVE, "0", retain=True)
 
 # ─── Hằng số timeout ─────────────────────────────────────────────────────────
 LLM_TIMEOUT_SEC = 30.0   # Nếu LLM không trả lời sau 30s → tự về standby
@@ -75,7 +88,7 @@ last_reported_status = {"emotion": None, "action": None}
 
 # ─── Voice / AI state ─────────────────────────────────────────────────────────
 # "standby"   — liên tục nghe, chờ wake-word
-# "listening" — đã nghe thấy "Panda", đang thu câu hỏi
+# "listening" — đã nghe thấy "Moon", đang thu câu hỏi
 # "thinking"  — đang gọi LLM
 # "speaking"  — TTS đang phát
 voice_ai_state = "standby"
@@ -111,7 +124,7 @@ def handle_state_entry(state: str):
             mqtt_bridge.publish(settings.TOPIC_MOVE, "forward")
             mqtt_bridge.publish(settings.TOPIC_ARM,  "wave")
             mqtt_bridge.publish(settings.TOPIC_TEXT, "XIN CHAO!")
-            speak("Xin chào bạn! Mình là Panda!")
+            speak("Xin chào bạn! Mình là Moon!")
             time.sleep(2)
             mqtt_bridge.publish(settings.TOPIC_MOVE, "stop")
             change_state("IDLE")
@@ -200,7 +213,7 @@ def on_vision_update(person_detected: bool, emotion: str, action: str):
             return
 
         # Mirror cảm xúc người dùng lên OLED — MẶC ĐỊNH TẮT để idle TỰ CHỦ
-        # (Panda tự diễn biểu cảm; bật lại bằng EMOTION_MIRROR=True trong settings)
+        # (Moon tự diễn biểu cảm; bật lại bằng EMOTION_MIRROR=True trong settings)
         if (getattr(settings, "EMOTION_MIRROR", False)
                 and current_state == "IDLE" and voice_ai_state == "standby"):
             face_map = {
@@ -237,19 +250,21 @@ def _set_voice_ai_state(state: str):
     print(f"🐼 [BRAIN] AI state → {state}")
 
     # Pause/resume vòng lặp nghe để tránh 2 luồng mở mic cùng lúc
-    # và tránh Panda tự nghe thấy giọng mình nói
+    # và tránh Moon tự nghe thấy giọng mình nói
     if state == "standby":
         resume_listening()
     else:
         pause_listening()
 
 
-def _publish_thinking(stage: str, text: str = ""):
+def _publish_thinking(stage: str, text: str = "", **details):
     """Publish trạng thái xử lý AI lên dashboard (chat panel)."""
-    mqtt_bridge.publish(settings.TOPIC_AI_THINKING, json.dumps({
+    message = {
         "stage": stage,
         "text":  text,
-    }))
+    }
+    message.update(details)
+    mqtt_bridge.publish(settings.TOPIC_AI_THINKING, json.dumps(message))
 
 
 def _topic_caption(tid: str, question: str) -> str:
@@ -277,12 +292,12 @@ def _correct_asr(text: str) -> str:
     fixed = llm.quick(
         "Khôi phục câu gốc người dùng đã nói, từ bản chép giọng nói bị lỗi dưới đây. "
         "Hãy dựa vào PHÁT ÂM gần đúng để suy đoán câu đúng chính tả. "
-        "Giữ nguyên tên riêng như 'Panda' nếu có. Chỉ trả về câu khôi phục.\n" +
+        "Giữ nguyên tên riêng như 'Moon' nếu có. Chỉ trả về câu khôi phục.\n" +
         "Ví dụ:\n"
         "- 'Hơ tiếp hôm nay như thế nào?' → 'Thời tiết hôm nay như thế nào?'\n"
         "- 'bây giờ là mẹ giờ' → 'Bây giờ là mấy giờ?'\n"
         "- 'ngon bị nào cao nhất thế giới' → 'Ngọn núi nào cao nhất thế giới?'\n"
-        "- 'hai bạn nàng' / 'hey tanda' → 'Hey Panda'\n"
+        "- 'hai bạn nàng' / 'hey tanda' → 'Hey Moon'\n"
         "Câu cần sửa: " + text)
     fixed = (fixed or "").strip().strip('"').strip()
     if not fixed:
@@ -304,8 +319,13 @@ def _correct_and_classify(text: str):
     """HYBRID tiết kiệm trễ: 1 call compound-mini vừa sửa lỗi chính tả vừa
     phân loại chủ đề → (topic_id | None, câu đã sửa)."""
     r = llm.quick(
-        "Bạn là bộ sửa lỗi + phân loại cho trợ lý giọng nói tiếng Việt.\n"
-        "Chọn 1 chủ đề phù hợp nhất và sửa lỗi chính tả câu chép từ giọng nói.\n"
+        "Bạn là bộ sửa lỗi + phân loại cho trợ lý giọng nói Việt/Anh.\n"
+        "Hãy suy luận thầm theo ngữ cảnh rồi chọn 1 chủ đề phù hợp nhất và sửa lỗi "
+        "chính tả câu chép từ giọng nói. Chỉ sửa từ nghe nhầm/gần âm và dấu câu; "
+        "không thêm ý, không trả lời câu hỏi, giữ nguyên tên riêng, chữ viết tắt, "
+        "con số, đơn vị và mã sản phẩm. Tuyệt đối giữ nguyên ngôn ngữ người dùng, "
+        "không dịch tiếng Anh sang tiếng Việt hoặc ngược lại; giữ nguyên thuật ngữ "
+        "code-switching tự nhiên. Nếu không chắc thì giữ nguyên từ gốc.\n"
         f"Danh sách chủ đề: {_TOPIC_ENUM}\n"
         "Ví dụ:\n"
         "- 'Hơ tiếp hôm nay như thế nào?' → weather|Thời tiết hôm nay như thế nào?\n"
@@ -321,9 +341,7 @@ def _correct_and_classify(text: str):
     fixed = fixed.strip().strip('"')
     if tid not in _TOPIC_ENUM.split(","):
         tid = None
-    if not fixed or abs(len(fixed) - len(text)) > max(8, len(text) // 2):
-        fixed = text
-    return tid, fixed
+    return tid, safe_asr_correction(text, fixed)
 
 
 _EMOTIONS = ("happy", "sad", "surprised", "angry", "love", "wink",
@@ -347,7 +365,7 @@ def _classify_emotion(question: str, answer: str):
     return None
 
 
-def _publish_answer_caption(answer: str):
+def _publish_answer_caption(answer: str, is_active=lambda: True):
     """Sau khi LLM trả lời: tóm tắt trọng tâm thành nhãn ≤12 ký tự (1+1=2, Everest...)
     và cập nhật live lên OLED trong lúc TTS vẫn đang đọc."""
     cap = llm.quick(
@@ -356,7 +374,7 @@ def _publish_answer_caption(answer: str):
         "Câu trả lời: " + answer[:400])
     cap = (cap or "").strip().strip("\"'`*. ")
     cap = _EMOJI_RE.sub("", cap).strip()   # caption neon không kèm emoji màu
-    if 0 < len(cap) <= 12:
+    if is_active() and 0 < len(cap) <= 12:
         mqtt_bridge.publish(settings.TOPIC_AI_TOPIC, json.dumps({
             "id": _current_topic[0], "cap": cap,
         }))
@@ -364,11 +382,11 @@ def _publish_answer_caption(answer: str):
 
 def _extract_inline_question(trigger_text: str) -> str | None:
     """
-    Nếu user nói "Panda hôm nay thời tiết thế nào" trong 1 câu →
+    Nếu user nói "Moon hôm nay thời tiết thế nào" trong 1 câu →
     trích xuất phần sau wake-word làm câu hỏi luôn, không cần nghe lại.
     """
     lower = trigger_text.lower()
-    wake_list = getattr(settings, "PANDA_WAKE_WORDS", ["panda"])
+    wake_list = getattr(settings, "MOON_WAKE_WORDS", ["moon"])
     # Sắp xếp từ dài nhất đến ngắn nhất để ưu tiên cụm từ đầy đủ (VD: "hai phan ta" trước "phan ta")
     sorted_wakes = sorted(wake_list, key=len, reverse=True)
 
@@ -387,7 +405,7 @@ def _extract_inline_question(trigger_text: str) -> str | None:
 
 def _handle_wake_word(trigger_text: str):
     """
-    Pipeline đầy đủ khi phát hiện wake-word "Panda":
+    Pipeline đầy đủ khi phát hiện wake-word "Moon":
 
     1. Nghe câu hỏi (hoặc dùng inline nếu có)
     2. Gửi lên LLM → stream câu trả lời lên dashboard
@@ -408,6 +426,8 @@ def _handle_wake_word(trigger_text: str):
     print(f"🐼 [BRAIN] Wake-word! Trigger: \"{trigger_text}\"")
 
     player = None   # SentencePlayer — tạo trước LLM, cleanup trong finally
+    session_cancelled = threading.Event()
+    callback_lock = threading.Lock()
     _t_wake = time.time()   # đồng hồ bấm giờ từng chặng (soi trễ)
     try:
         # Ack kiểu Anki Vector: bíp kép + buzz + face vui báo "tôi nghe thấy bạn gọi"
@@ -417,7 +437,7 @@ def _handle_wake_word(trigger_text: str):
         mqtt_bridge.publish(settings.TOPIC_BUZZ, "off")
         mqtt_bridge.publish(settings.TOPIC_FACE, "happy")
         # ── BƯỚC 1: Lấy câu hỏi ──────────────────────────────────────────────
-        _publish_thinking("listening", "Panda đang lắng nghe...")
+        _publish_thinking("listening", "Moon đang lắng nghe...")
         mqtt_bridge.publish(settings.TOPIC_FACE, "questioning")  # ? + spinning ring
 
         question = _extract_inline_question(trigger_text)
@@ -433,14 +453,28 @@ def _handle_wake_word(trigger_text: str):
             _publish_thinking("idle")
             return   # finally sẽ reset state
 
+        # Hiển thị ngay kết quả STT. Các bước phân loại/sửa nhẹ phía sau
+        # không được làm người dùng chờ mới thấy Moon đã nghe gì.
+        raw_question = question
+        _publish_thinking("question", raw_question)
+        print(f"❓ [BRAIN] Câu nghe được: \"{raw_question}\"")
+
         # ASR post-editing + phân loại chủ đề HYBRID:
         # keyword bắt được → dùng ngay (0ms); hụt → LLM chọn (gộp chung call sửa lỗi)
-        kw = classify_topic(question)
-        llm_topic, question = _correct_and_classify(question)
+        kw = classify_topic(raw_question)
+        _publish_thinking("correcting", "Moon đang kiểm tra chính tả và ngữ cảnh...")
+        llm_topic, question = _correct_and_classify(raw_question)
+        _publish_thinking(
+            "question_corrected",
+            question,
+            original=raw_question,
+            changed=question != raw_question,
+        )
+        if question != raw_question:
+            print(f"✍️ [BRAIN] Hiệu chỉnh STT: \"{raw_question}\" → \"{question}\"")
         print(f"⏱ [BRAIN] wake→câu hỏi sẵn sàng: {time.time()-_t_wake:.1f}s")
 
         # ── BƯỚC 2: Hiển thị câu hỏi người dùng lên màn hình LED ─────────────
-        _publish_thinking("question", question)
         # Chủ đề câu hỏi → OLED hiện icon + caption dữ liệu thật khi trả lời
         _tid = kw if kw != "chat" else (llm_topic or "chat")
         _current_topic[0] = _tid
@@ -452,72 +486,107 @@ def _handle_wake_word(trigger_text: str):
 
         # ── BƯỚC 3: Chuyển sang chế độ suy nghĩ ──────────────────────────────
         # OLED GIỮ transcript đã nghe (mode 'hearing') trong suốt lúc thinking —
-        # người dùng thấy Panda "đọc lại" những gì đã nghe; dots thinking chỉ
+        # người dùng thấy Moon "đọc lại" những gì đã nghe; dots thinking chỉ
         # hiện trên dashboard (không publish face ai-thinking nữa).
         _set_voice_ai_state("thinking")
-        _publish_thinking("thinking", "Panda đang suy nghĩ...")
+        _publish_thinking("thinking", "Moon đang suy nghĩ...")
 
         response_chunks  = []
         llm_done_event   = threading.Event()
         full_response    = [""]  # list để có thể ghi từ closure
+        speech_started   = [False]
 
         # ── TTS streaming theo câu: câu nào xong trước đọc trước (Vector-like) ──
         def _on_speech_start():
-            """Audio đầu tiên bắt đầu vang lên → tick + chuyển state speaking."""
-            print(f"⏱ [BRAIN] wake→tiếng đầu tiên: {time.time()-_t_wake:.1f}s")
-            tts.play_tick()
-            _set_voice_ai_state("speaking")
-            mqtt_bridge.publish(settings.TOPIC_FACE, "speaking")  # equalizer bars
+            """Audio đầu tiên bắt đầu vang lên → đồng bộ OLED và speaking."""
+            with callback_lock:
+                if session_cancelled.is_set():
+                    return
+                print(f"⏱ [BRAIN] wake→tiếng đầu tiên: {time.time()-_t_wake:.1f}s")
+                tts.play_tick()
+                _set_voice_ai_state("speaking")
+                speech_started[0] = True
+                # Chỉ hiện câu trả lời trên OLED khi audio thực sự bắt đầu,
+                # không hiện sớm trong lúc Fish Audio còn đang tổng hợp.
+                oled_answer = full_response[0].strip() or first_spoken_sentence[0]
+                if oled_answer:
+                    _publish_thinking("answer", oled_answer)
 
-        player = SentencePlayer(on_play_start=_on_speech_start)
+        def _on_tts_fallback(_text: str, reason: str):
+            _publish_thinking(
+                "tts_fallback",
+                f"Fish Audio chậm hoặc lỗi ({reason}); Moon đang dùng giọng dự phòng.",
+            )
+
+        player = SentencePlayer(
+            on_play_start=_on_speech_start,
+            on_fallback=_on_tts_fallback,
+        )
         sentence_buffer = [""]
+        first_spoken_sentence = [""]
 
         def _push_sentence(raw: str):
             """Làm sạch markdown + emoji rồi đẩy 1 câu vào hàng đợi TTS."""
             s = re.sub(r"[*_#`>]+", "", raw)
             s = _EMOJI_RE.sub("", s).strip()
             if s:
+                if not first_spoken_sentence[0]:
+                    first_spoken_sentence[0] = s
                 player.push(s)
 
         def on_thinking(stage: str):
-            if stage == "thinking":
-                _publish_thinking("thinking", "Panda đang suy nghĩ...")
-                print("🧠 [BRAIN] LLM thinking...")
-            elif stage == "answering":
-                _publish_thinking("answering", "Panda đang soạn câu trả lời...")
-                print("✍️  [BRAIN] LLM answering...")
+            with callback_lock:
+                if session_cancelled.is_set():
+                    return
+                if stage == "thinking":
+                    _publish_thinking("thinking", "Moon đang suy nghĩ...")
+                    print("🧠 [BRAIN] LLM thinking...")
+                elif stage == "answering":
+                    _publish_thinking("answering", "Moon đang soạn câu trả lời...")
+                    print("✍️  [BRAIN] LLM answering...")
 
         def on_chunk(chunk: str):
             """Stream từng token lên dashboard + tách câu đẩy sang TTS ngay."""
-            response_chunks.append(chunk)
-            partial = "".join(response_chunks)
-            mqtt_bridge.publish(settings.TOPIC_AI_RESPONSE, json.dumps({
-                "done": False,
-                "text": partial,
-            }))
-            # Tách câu tại dấu kết thúc (. ! ? …) — câu xong trước đọc trước
-            sentence_buffer[0] += chunk
-            parts = re.split(r"(?<=[.!?…])\s+", sentence_buffer[0])
-            if len(parts) > 1:
-                for part in parts[:-1]:
-                    _push_sentence(part)
-                sentence_buffer[0] = parts[-1]
+            with callback_lock:
+                if session_cancelled.is_set():
+                    return
+                response_chunks.append(chunk)
+                partial = "".join(response_chunks)
+                mqtt_bridge.publish(settings.TOPIC_AI_RESPONSE, json.dumps({
+                    "done": False,
+                    "text": partial,
+                }))
+                # Tách câu tại dấu kết thúc (. ! ? …) — câu xong trước đọc trước
+                sentence_buffer[0] += chunk
+                parts = re.split(r"(?<=[.!?…])\s+", sentence_buffer[0])
+                if len(parts) > 1:
+                    for part in parts[:-1]:
+                        _push_sentence(part)
+                    sentence_buffer[0] = parts[-1]
 
         def on_done(text: str):
             """LLM hoàn thành — lưu full text, flush câu cuối và signal."""
-            full_response[0] = text
-            mqtt_bridge.publish(settings.TOPIC_AI_RESPONSE, json.dumps({
-                "done": True,
-                "text": text,
-            }))
-            _publish_thinking("done")
-            _push_sentence(sentence_buffer[0])   # phần cuối không có dấu kết thúc
-            sentence_buffer[0] = ""
-            player.finish()
-            # Caption = trọng tâm câu TRẢ LỜI (1+1=2, Everest...) — chạy nền
-            threading.Thread(target=_publish_answer_caption,
-                             args=(text,), daemon=True).start()
-            llm_done_event.set()
+            with callback_lock:
+                if session_cancelled.is_set():
+                    return
+                full_response[0] = text
+                mqtt_bridge.publish(settings.TOPIC_AI_RESPONSE, json.dumps({
+                    "done": True,
+                    "text": text,
+                }))
+                _publish_thinking("done")
+                if speech_started[0]:
+                    # Audio câu đầu đã chạy trước khi LLM hoàn tất: cập nhật
+                    # OLED từ preview sang toàn bộ câu trả lời ngay trong lúc nói.
+                    _publish_thinking("answer", text)
+                _push_sentence(sentence_buffer[0])   # phần cuối không có dấu kết thúc
+                sentence_buffer[0] = ""
+                player.finish()
+                # Caption = trọng tâm câu TRẢ LỜI (1+1=2, Everest...) — chạy nền
+                threading.Thread(target=_publish_answer_caption,
+                                 args=(text, lambda: not session_cancelled.is_set()),
+                                 daemon=True).start()
+                llm_done_event.set()
 
         # Chạy LLM trong thread riêng (non-blocking) với timeout
         llm_thread = llm.chat_async(
@@ -531,6 +600,8 @@ def _handle_wake_word(trigger_text: str):
         finished = llm_done_event.wait(timeout=LLM_TIMEOUT_SEC)
         if not finished:
             print(f"⚠️  [BRAIN] LLM timeout sau {LLM_TIMEOUT_SEC}s!")
+            with callback_lock:
+                session_cancelled.set()
             player.stop()
             return   # finally reset state
 
@@ -547,13 +618,6 @@ def _handle_wake_word(trigger_text: str):
             print("⚠️  [BRAIN] TTS không kết thúc đúng hạn — ngắt phát.")
             player.stop()
 
-        # ── BƯỚC 5: Biểu cảm kết thúc — Panda "có hồn" theo ngữ cảnh hội thoại ──
-        emo = _classify_emotion(question, answer)
-        if emo and emo != "neutral":
-            print(f"💫 [BRAIN] Biểu cảm kết thúc: {emo}")
-            mqtt_bridge.publish(settings.TOPIC_FACE, emo)
-            time.sleep(1.8)   # giữ cảm xúc 1.8s rồi finally trả về neutral
-
         print("✅ [BRAIN] Hoàn thành pipeline Voice → LLM → TTS.")
 
     except Exception as e:
@@ -563,6 +627,8 @@ def _handle_wake_word(trigger_text: str):
         _publish_thinking("idle")
 
     finally:
+        with callback_lock:
+            session_cancelled.set()
         if player:
             player.stop()   # an toàn gọi nhiều lần — no-op nếu đã phát xong
         # Luôn trả về standby, dù pipeline thành công hay lỗi/timeout
@@ -676,11 +742,22 @@ def on_mic_live(client, userdata, msg):
     voice.set_external_mic(on)
 
 
+def on_browser_question(client, userdata, msg):
+    """Route text already transcribed by Moon Voice through the full pipeline."""
+    try:
+        question = msg.payload.decode("utf-8",errors="strict").strip()
+    except Exception:
+        return
+    if not question or len(question) > 1000:
+        return
+    threading.Thread(target=_handle_wake_word,args=(f"Moon, {question}",),daemon=True).start()
+
+
 def on_browser_clip(client, userdata, msg):
     """Clip PCM sạch (DSP trình duyệt) từ live-mic → route như transcript standby."""
     if voice_ai_state != "standby":
         return
-    # Echo guard: bỏ clip tới trong lúc Panda đang nói / vừa nói xong (<1s)
+    # Echo guard: bỏ clip tới trong lúc Moon đang nói / vừa nói xong (<1s)
     if tts.is_speaking() or (time.time() - tts.speech_end_time()) < 1.0:
         return
     threading.Thread(target=_process_browser_clip, args=(msg.payload,), daemon=True).start()
@@ -739,7 +816,7 @@ def voice_listening_thread():
 
 def main():
     print("🧠 [BRAIN] ═══════════════════════════════")
-    print("🧠 [BRAIN]  Robot Panda — Khởi động não bộ")
+    print("🧠 [BRAIN]  Robot Moon — Khởi động não bộ")
     print("🧠 [BRAIN] ═══════════════════════════════")
     print(f"🧠 [BRAIN]  Pipeline: Voice (Groq) → LLM (DeepSeek) → TTS (Fish Audio)")
     print()
@@ -757,24 +834,13 @@ def main():
     mqtt_bridge.client.message_callback_add(settings.TOPIC_BROWSER_CLIP, on_browser_clip)
     mqtt_bridge.client.subscribe(settings.TOPIC_MIC_LIVE)
     mqtt_bridge.client.message_callback_add(settings.TOPIC_MIC_LIVE, on_mic_live)
+    mqtt_bridge.client.subscribe(settings.TOPIC_BROWSER_QUESTION)
+    mqtt_bridge.client.message_callback_add(settings.TOPIC_BROWSER_QUESTION, on_browser_question)
 
-    # Thread nghe giọng nói
-    v_thread = threading.Thread(target=voice_listening_thread, daemon=True)
-    v_thread.start()
-    print("✅ [BRAIN] Voice thread đang chạy.")
-
-    # Wake-word on-device (Porcupine) nếu đã cấu hình — đúng kiểu Anki Vector:
-    # KWS local bắt "Panda" mọi ngôn ngữ, ASR cloud xử lý phần còn lại.
-    from server import wakeword
-    if wakeword.available():
-        threading.Thread(target=wakeword.run_loop, kwargs=dict(
-            on_wake=lambda: threading.Thread(
-                target=_handle_wake_word, args=("Panda",), daemon=True).start(),
-            should_listen=lambda: voice_ai_state == "standby",
-        ), daemon=True).start()
-        print("✅ [BRAIN] Porcupine wake-word on-device đang chạy.")
-    else:
-        print("ℹ️  [BRAIN] Chưa cấu hình Porcupine — dùng wake-word Whisper dual-pass.")
+    # Dashboard Live Voice là chủ sở hữu duy nhất của microphone: hoặc bật trực
+    # tiếp, hoặc chờ "Hey Moon" rồi chuyển cùng stream sang hội thoại liên tục.
+    # Listener nền cũ sẽ tạo hai pipeline song song và làm giao diện bị kẹt.
+    print("ℹ️  [BRAIN] Wakeword nền đã tắt — Live Voice quản lý microphone.")
 
     # Vision (blocking — chạy trên main thread)
     print("✅ [BRAIN] Khởi động Vision module...")
