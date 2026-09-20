@@ -408,10 +408,16 @@ class SentencePlayer:
         player.wait(timeout=60)
     """
 
-    def __init__(self, on_play_start=None):
+    def __init__(self, on_play_start=None, on_fallback=None, synth_timeout=None):
         self._synth_q = queue.Queue()
         self._audio_q = queue.Queue()
         self._on_play_start = on_play_start
+        self._on_fallback = on_fallback
+        self._synth_timeout = float(
+            synth_timeout if synth_timeout is not None
+            else getattr(settings, "FISH_SENTENCE_TIMEOUT_SEC", 12.0)
+        )
+        self._fish_disabled = False
         self._stopped = False
         self._synth_thread = threading.Thread(target=self._synth_worker, daemon=True)
         self._play_thread  = threading.Thread(target=self._play_worker, daemon=True)
@@ -425,11 +431,34 @@ class SentencePlayer:
             if item is _SENTINEL or self._stopped:
                 self._audio_q.put(_SENTINEL)
                 break
-            audio = _synth_fish(item)
+            audio, reason = self._synth_with_timeout(item)
             if self._stopped:
                 self._audio_q.put(_SENTINEL)
                 break
-            self._audio_q.put((item, audio))   # (text, bytes|None) — None = fallback
+            self._audio_q.put((item, audio, reason))
+
+    def _synth_with_timeout(self, text):
+        """Bound a blocking Fish SDK call; one timeout disables Fish this turn."""
+        if self._fish_disabled:
+            return None, "Fish Audio đã được bỏ qua sau lần quá thời gian trước"
+        result = queue.Queue(maxsize=1)
+
+        def run():
+            try:
+                result.put((_synth_fish(text), None), block=False)
+            except Exception as exc:
+                try:
+                    result.put((None, str(exc)), block=False)
+                except queue.Full:
+                    pass
+
+        threading.Thread(target=run, daemon=True).start()
+        try:
+            audio, reason = result.get(timeout=max(.1, self._synth_timeout))
+        except queue.Empty:
+            self._fish_disabled = True
+            return None, f"Fish Audio quá {self._synth_timeout:g} giây"
+        return audio, reason or (None if audio else "Fish Audio không trả về âm thanh")
 
     def _play_worker(self):
         """Phát tuần tự các câu đã tổng hợp."""
@@ -443,7 +472,7 @@ class SentencePlayer:
                         break
                     if self._stopped:
                         continue   # xả hàng đợi, không phát nữa
-                    text, audio = item
+                    text, audio, reason = item
                     if first:
                         first = False
                         _set_speaking(True)   # báo mọi nguồn mic: loa đang bật
@@ -455,7 +484,12 @@ class SentencePlayer:
                     if audio:
                         _play_mp3_bytes(audio)
                     else:
-                        print("⚠️ [TTS] Câu này Fish Audio lỗi — dùng pyttsx3 fallback.")
+                        print(f"⚠️ [TTS] {reason or 'Fish Audio lỗi'} — dùng pyttsx3 fallback.")
+                        if self._on_fallback:
+                            try:
+                                self._on_fallback(text, reason or "Fish Audio lỗi")
+                            except Exception:
+                                pass
                         _speak_fallback(text)
         finally:
             _set_speaking(False)
@@ -481,6 +515,9 @@ class SentencePlayer:
                 self._synth_q.get_nowait()
         except queue.Empty:
             pass
+        # The synth thread may be blocked inside the third-party SDK. Unblock
+        # playback immediately; the blocked daemon can finish harmlessly later.
+        self._audio_q.put(_SENTINEL)
         self._synth_q.put(_SENTINEL)
 
     def wait(self, timeout: float = None) -> bool:

@@ -512,7 +512,16 @@ def _handle_wake_word(trigger_text: str):
                 if oled_answer:
                     _publish_thinking("answer", oled_answer)
 
-        player = SentencePlayer(on_play_start=_on_speech_start)
+        def _on_tts_fallback(_text: str, reason: str):
+            _publish_thinking(
+                "tts_fallback",
+                f"Fish Audio chậm hoặc lỗi ({reason}); Moon đang dùng giọng dự phòng.",
+            )
+
+        player = SentencePlayer(
+            on_play_start=_on_speech_start,
+            on_fallback=_on_tts_fallback,
+        )
         sentence_buffer = [""]
         first_spoken_sentence = [""]
 

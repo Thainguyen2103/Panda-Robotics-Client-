@@ -377,6 +377,15 @@ socket.on('mqtt_message', (data) => {
                 case 'done':
                     hideThinking();
                     break;
+                case 'tts_fallback':
+                    showThinking('🔊 Fish Audio chậm — đang dùng giọng dự phòng...');
+                    logToTerminal(msg.text || 'Fish Audio chậm — dùng giọng dự phòng', 'sys');
+                    if (liveTalkMode === 'brain') {
+                        window.dispatchEvent(new CustomEvent('moon-brain-pipeline', {
+                            detail: {event: 'tts_fallback', text: msg.text || ''},
+                        }));
+                    }
+                    break;
                 case 'idle':
                     resetAiPanel();
                     setOledAiMode('neutral');         // OLED: quay về mắt
@@ -405,6 +414,11 @@ socket.on('mqtt_message', (data) => {
                 aiMoonText.textContent = msg.text;
                 finalizeMoonResponse();
                 logToTerminal(`AI: ${msg.text.substring(0, 60)}...`, 'ai-response');
+                if (liveTalkMode === 'brain') {
+                    window.dispatchEvent(new CustomEvent('moon-brain-pipeline', {
+                        detail: {event: 'answer_ready'},
+                    }));
+                }
             }
         } catch(e) {}
 
@@ -479,6 +493,10 @@ window.addEventListener('moon-live', ({detail: msg}) => {
         setVoiceState('listening');
         setOledAiMode('questioning');
         logToTerminal('WAKE: đã nhận “Hey Moon” — mở Live Talk', 'log-voice');
+    } else if (msg.event === 'wake_ack') {
+        setVoiceState('speaking');
+        drawFace('happy');
+        logToTerminal('MOON: Moon nghe đây!', 'ai-response');
     } else if (msg.event === 'brain_question') {
         showUserQuestion(msg.text);
         showThinking('Brain và LLM đang xử lý…');
@@ -491,6 +509,7 @@ window.addEventListener('moon-live', ({detail: msg}) => {
         liveTalkWaitingWake = false;
         setVoiceState('listening');
         if (msg.event === 'ready') setOledAiMode('neutral');
+        if (msg.event === 'listening' && msg.activatedBy === 'wakeword') setOledAiMode('neutral');
     } else if (msg.event === 'thinking') {
         setVoiceState('thinking');
     } else if (msg.event === 'speaking') {

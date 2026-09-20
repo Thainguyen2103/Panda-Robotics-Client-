@@ -14,6 +14,22 @@ const {chromium} = require('playwright');
         let wakeScheduled = false;
         page.on('pageerror', error => errors.push(error.message));
 
+        await page.addInitScript(() => {
+            window.wakeAckTexts = [];
+            window.speechSynthesis.speak = utterance => {
+                window.wakeAckTexts.push(utterance.text);
+                queueMicrotask(() => {
+                    utterance.onstart?.();
+                    utterance.onend?.();
+                });
+            };
+        });
+        await page.route('**/api/live-ack', route => route.fulfill({
+            status: 503,
+            contentType: 'application/json',
+            body: JSON.stringify({error: 'test fallback'}),
+        }));
+
         await page.routeWebSocket('**/voice/ws', socket => {
             wakeConnections++;
             socket.send(JSON.stringify({
@@ -91,6 +107,7 @@ const {chromium} = require('playwright');
         assert(wakeFrames > 0);
         assert(liveFrames > 0);
         assert.equal(await page.evaluate(() => window.toneCount), 2);
+        assert.deepEqual(await page.evaluate(() => window.wakeAckTexts), ['Moon nghe đây!']);
         await page.locator('#live-stop').click();
         assert.equal(await page.locator('#live-start').isEnabled(), true);
         assert.equal(await page.locator('#live-stop').isDisabled(), true);

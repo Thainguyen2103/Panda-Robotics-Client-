@@ -112,6 +112,7 @@ FISH_VOICE_ID = "381620020029495883d03b63850c862f"
 
 # Model TTS: 's2.1-pro-free' = miễn phí (khuyên dùng) | 's2.1-pro' / 's2-pro' / 's1' = trả phí
 FISH_TTS_MODEL = "s2.1-pro-free"
+FISH_SENTENCE_TIMEOUT_SEC = 12.0  # Fish treo/chậm → chuyển ngay sang giọng offline
 
 # ─── DeepSeek API (LLM) ─────────────────────────────────────────────────────
 # Lấy key tại: https://platform.deepseek.com/api_keys

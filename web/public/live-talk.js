@@ -60,6 +60,69 @@ function wakeTick() {
     tone.stop(now + .09);
 }
 
+function speakWakeAcknowledgementFallback(token) {
+    return new Promise(resolve => {
+        if (token !== generation || !('speechSynthesis' in window)
+                || typeof SpeechSynthesisUtterance === 'undefined') {
+            resolve();
+            return;
+        }
+        const utterance = new SpeechSynthesisUtterance('Moon nghe đây!');
+        utterance.lang = 'vi-VN';
+        utterance.rate = .98;
+        const vietnameseVoice = window.speechSynthesis.getVoices().find(voice =>
+            String(voice.lang || '').toLowerCase().startsWith('vi'));
+        if (vietnameseVoice) utterance.voice = vietnameseVoice;
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeout);
+            resolve();
+        };
+        const timeout = setTimeout(finish, 3200);
+        utterance.onend = finish;
+        utterance.onerror = finish;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+    });
+}
+
+async function playWakeAcknowledgement(token) {
+    if (token !== generation || !context) return;
+    setState('speaking', 'Moon đã nghe — đang phản hồi…');
+    dispatch('wake_ack');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4500);
+    try {
+        const response = await fetch('/api/live-ack', {
+            cache: 'force-cache',
+            signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const encoded = await response.arrayBuffer();
+        const buffer = await context.decodeAudioData(encoded.slice(0));
+        if (token !== generation || !context) return;
+        await new Promise(resolve => {
+            const node = context.createBufferSource();
+            node.buffer = buffer;
+            node.connect(context.destination);
+            const finish = () => {
+                node.onended = null;
+                try { node.disconnect(); } catch (_) {}
+                resolve();
+            };
+            node.onended = finish;
+            node.start(context.currentTime + .035);
+            setTimeout(finish, Math.max(1000, buffer.duration * 1000 + 500));
+        });
+    } catch (_) {
+        await speakWakeAcknowledgementFallback(token);
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
 function resetGeminiTurnDetector() {
     localSpeech = false;
     localSilenceFrames = 0;
@@ -438,6 +501,8 @@ async function promoteWakeToLive(token) {
         phase = 'live';
         await connectSocket(token);
         if (token !== generation) return;
+        await playWakeAcknowledgement(token);
+        if (token !== generation) return;
         promotingWake = false;
         wakeTick();
         setState('listening', pipeline === 'brain'
@@ -529,7 +594,8 @@ async function openMicrophone(token) {
         for (let i = 0; i < pcm.length; i++) energy += (pcm[i] / 32768) ** 2;
         const rms = Math.sqrt(energy / Math.max(1, pcm.length));
         $('level').value = rms;
-        if (!ready || !ws || ws.readyState !== WebSocket.OPEN) return;
+        // Không gửi tiếng chuông/lời xác nhận của Moon ngược lại vào hội thoại.
+        if (!ready || promotingWake || !ws || ws.readyState !== WebSocket.OPEN) return;
         if (ws.bufferedAmount > 65536) return;
         ws.send(event.data);
         detectGeminiTurnEnd(rms);
@@ -580,6 +646,9 @@ async function start() {
             $('duration').textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
         }, 1000);
         if (phase === 'wake') {
+            // Chuẩn bị sẵn câu xác nhận trong lúc chờ wakeword; không làm tốn
+            // quota Fish nếu người dùng chỉ dùng chế độ bật trực tiếp.
+            void fetch('/api/live-ack', {cache: 'force-cache'}).catch(() => {});
             setState(wakeCalibrating ? 'connecting' : 'waiting', wakeCalibrating
                 ? 'Đang đo tiếng nền — hãy giữ im lặng'
                 : 'Sẵn sàng — hãy nói “Hey Moon”');
@@ -693,6 +762,10 @@ window.addEventListener('moon-brain-pipeline', ({detail}) => {
             : 'Brain xác nhận câu STT — đang hỏi LLM…');
     } else if (detail.event === 'state' && detail.state === 'thinking') {
         setState('thinking', 'Brain và LLM đang xử lý…');
+    } else if (detail.event === 'answer_ready' && $('orb').dataset.state !== 'speaking') {
+        setState('thinking', 'Đã có câu trả lời — đang tạo giọng Fish…');
+    } else if (detail.event === 'tts_fallback') {
+        setState('speaking', 'Fish Audio chậm — Moon đang trả lời bằng giọng dự phòng…');
     } else if (detail.event === 'state' && detail.state === 'speaking') {
         if (responseStartedAt) showLatency(`${Math.round(performance.now() - responseStartedAt)} ms tới âm thanh`);
         setState('speaking', 'Moon đang trả lời bằng Brain + Fish…');
