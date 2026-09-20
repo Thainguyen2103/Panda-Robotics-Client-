@@ -159,31 +159,61 @@ def confirmed_wake_tail(primary, verification):
 def confident_wake_tail(text):
     """Return a wake tail that is safe to accept without a second API call.
 
-    Literal Moon is accepted directly. A known Vietnamese STT rendering is only
-    accepted when the user explicitly starts with Hey/Hi, which avoids treating
-    ordinary words such as mưa or múa as a wakeword in a normal sentence.
+    Literal Moon is accepted directly. Vietnamese STT renderings are accepted
+    when the utterance is clearly a name call (bare, repeated, or with a vocative
+    marker), while ordinary phrases such as "môn học" remain protected.
     """
     literal = wake_tail(text)
     if literal is not None:
         return literal
-    normalized = unicodedata.normalize('NFC', text or '').casefold()
-    raw_words = re.findall(r'[^\W\d_]+', normalized, flags=re.UNICODE)
+    original = unicodedata.normalize('NFC', text or '')
+    normalized = original.casefold()
+    word_matches = list(re.finditer(r'[^\W\d_]+', normalized, flags=re.UNICODE))
+    raw_words = [match.group(0) for match in word_matches]
     folded = [
         ''.join(c for c in unicodedata.normalize('NFD', word)
                 if unicodedata.category(c) != 'Mn')
         for word in raw_words
     ]
     call_prefixes = {'hey', 'hi', 'hay', 'he', 'e', 'nay', 'alo', 'goi', 'chao'}
+    call_fillers = call_prefixes | {'oi'}
+    ambiguous_vietnamese = {'môn', 'món'}
+
+    # Whisper tiếng Việt thường ghi tên Moon thành “Môn”. Nếu cả câu chỉ gồm
+    # tên gọi và các hô ngữ ("Môn", "Môn ơi", "Môn, này Môn") thì đó là lời
+    # đánh thức rõ ràng. Những cụm mang nghĩa thật như "môn học", "món ngon"
+    # vẫn không lọt qua nhánh này.
+    name_indexes = [
+        index for index, word in enumerate(folded)
+        if word in _MOON_DIRECT_CALL_ALIASES and raw_words[index] != 'muốn'
+    ]
+    if name_indexes and all(
+            word in _MOON_DIRECT_CALL_ALIASES or word in call_fillers
+            for word in folded):
+        return ''
+
+    def tail_after(index, skip_oi=False):
+        end = word_matches[index].end()
+        if skip_oi and index + 1 < len(folded) and folded[index + 1] == 'oi':
+            end = word_matches[index + 1].end()
+        tail = original[end:].lstrip(" ,.!?:;—-")
+        return tail.strip()
+
     if (len(folded) >= 2 and folded[0] in call_prefixes
             and folded[1] in _MOON_DIRECT_CALL_ALIASES
-            and raw_words[1] not in {'món', 'muốn'}):
-        return ''
+            and raw_words[1] != 'muốn'):
+        return tail_after(1, skip_oi=True)
     if (len(folded) >= 2 and folded[0] in _MOON_DIRECT_CALL_ALIASES
-            and folded[1] == 'oi' and raw_words[0] not in {'món', 'muốn'}):
-        return ''
+            and folded[1] == 'oi' and raw_words[0] != 'muốn'):
+        return tail_after(0, skip_oi=True)
     if (len(folded) == 1 and folded[0] in _MOON_NARROW_ALIASES
-            and raw_words[0] not in {'môn', 'món', 'muốn'}):
+            and raw_words[0] != 'muốn'):
         return ''
+    # Các cách ghi không mang nghĩa tiếng Việt như Mun/Muun có thể kèm luôn
+    # câu hỏi. Riêng Môn/Món cần hô ngữ rõ ràng để tránh bật vì "môn học".
+    if (folded and folded[0] in _MOON_DIRECT_CALL_ALIASES
+            and raw_words[0] not in ambiguous_vietnamese | {'muốn'}):
+        return tail_after(0, skip_oi=True)
     return None
 
 

@@ -486,13 +486,13 @@ window.addEventListener('moon-live', ({detail: msg}) => {
         setOledAiMode('neutral');
         logToTerminal(msg.calibrating
             ? 'LIVE: đang đo tiếng nền trước khi chờ wakeword'
-            : 'LIVE: đang chờ “Hey Moon”', 'ai-state');
+            : 'LIVE: đang chờ tên Moon', 'ai-state');
     } else if (msg.event === 'wake') {
         liveTalkActive = true;
         liveTalkWaitingWake = false;
         setVoiceState('listening');
         setOledAiMode('questioning');
-        logToTerminal('WAKE: đã nhận “Hey Moon” — mở Live Talk', 'log-voice');
+        logToTerminal('WAKE: đã nghe tên Moon — mở Live Talk', 'log-voice');
     } else if (msg.event === 'wake_ack') {
         setVoiceState('speaking');
         drawFace('happy');

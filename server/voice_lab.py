@@ -177,8 +177,9 @@ class Session:
             response_format='verbose_json')
         if self.transcribing_wake:
             kwargs['prompt'] = (
-                'Đây là câu gọi robot tên Moon. Ví dụ: Hey Moon, ê Moon, '
-                'này Moon, Moon ơi, ê Mun, này Mun.')
+                'Đây là câu gọi robot tên Moon (tên riêng). Chỉ cần người nói gọi tên '
+                'Moon là đánh thức. Ví dụ: Moon, Môn, Mun, Hey Moon, ê Moon, '
+                'này Moon, Moon ơi, ê Mun, này Môn.')
         result = await self.client.audio.transcriptions.create(**kwargs)
         dumped = result.model_dump()
         return wake_transcript(dumped) if self.transcribing_wake else reliable_transcript(dumped)

@@ -89,10 +89,16 @@ class VoiceCoreTests(unittest.TestCase):
     def test_confident_explicit_call_skips_slow_second_pass(self):
         for text in [
                 'Hey Moon', 'Moon', 'Hey múa', 'Hey mưa', 'Hi Mun',
-                'ê Môn', 'này Mun', 'Moon ơi', 'Mun ơi', 'alo Moon']:
+                'ê Môn', 'này Mun', 'Moon ơi', 'Mun ơi', 'alo Moon',
+                'Môn', 'Món', 'Môn, này Môn, này Môn.']:
             self.assertEqual(confident_wake_tail(text), '', text)
         for text in ['trời mưa', 'đi múa', 'môn học', 'món ngon', 'Hey man', 'xin chào']:
             self.assertIsNone(confident_wake_tail(text), text)
+
+    def test_name_variant_can_include_question_when_called_explicitly(self):
+        self.assertEqual(confident_wake_tail('Này Môn, mấy giờ rồi?'), 'mấy giờ rồi?')
+        self.assertEqual(confident_wake_tail('Mun, thời tiết hôm nay?'), 'thời tiết hôm nay?')
+        self.assertEqual(confident_wake_tail('Này Môn, NASA là gì?'), 'NASA là gì?')
 
     def test_one_pass_or_blank_noise_cannot_confirm_wake(self):
         self.assertEqual(confirmed_wake_tail('', 'Hey Moon'), '')

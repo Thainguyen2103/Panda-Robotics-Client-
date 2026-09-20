@@ -410,11 +410,11 @@ function handleWakeServer(message, token) {
         ready = true;
         wakeCalibrating = Boolean(message.calibrating);
         setState(wakeCalibrating ? 'connecting' : 'waiting', wakeCalibrating
-            ? 'Đang đo tiếng nền — hãy giữ im lặng' : 'Đang chờ bạn nói “Hey Moon”');
+            ? 'Đang đo tiếng nền — hãy giữ im lặng' : 'Đang chờ bạn gọi tên “Moon”');
         $('model').textContent = `Wakeword · ${message.engine || 'Whisper'}`;
     } else if (message.event === 'calibrated' || message.event === 'resumed') {
         wakeCalibrating = false;
-        setState('waiting', 'Sẵn sàng — hãy nói “Hey Moon”');
+        setState('waiting', 'Sẵn sàng — chỉ cần gọi “Moon”, “Môn” hoặc “Mun”');
     } else if (message.event === 'recalibrating') {
         wakeCalibrating = true;
         setState('connecting', 'Tiếng nền thay đổi — hãy giữ im lặng để đo lại');
@@ -424,22 +424,22 @@ function handleWakeServer(message, token) {
         setState('waiting', 'Đang kiểm tra từ khóa…');
     } else if (message.event === 'verifying_wake') {
         if (message.text) showHeard(`Đang xác minh: ${message.text}`);
-        setState('waiting', 'Đang xác minh “Hey Moon”…');
+        setState('waiting', 'Đang xác minh tên Moon…');
     } else if (message.event === 'verification_timeout') {
         showHeard(message.text
             ? `Xác minh quá thời gian: ${message.text}`
             : 'Xác minh wakeword quá thời gian');
-        $('error').textContent = 'Mạng xác minh wakeword chậm — hãy nói lại “Hey Moon”.';
-        setState('waiting', 'Chưa xác minh được — hãy nói lại “Hey Moon”');
+        $('error').textContent = 'Mạng xác minh wakeword chậm — hãy gọi lại tên Moon.';
+        setState('waiting', 'Chưa xác minh được — hãy gọi lại tên Moon');
     } else if (message.event === 'transcript') {
         showHeard(message.text || 'Đã nhận wakeword');
         showLatency(`wake STT ${message.latency_ms || 0} ms`);
     } else if (message.event === 'ignored') {
         showHeard(message.text ? `Chưa khớp wakeword: ${message.text}` : 'Chưa nghe rõ wakeword');
         showLatency(`wake STT ${message.latency_ms || 0} ms`);
-        if (!promotingWake) setState('waiting', 'Chưa nhận đúng — hãy nói lại “Hey Moon”');
+        if (!promotingWake) setState('waiting', 'Chưa nghe thấy tên Moon — hãy gọi lại');
     } else if (message.event === 'state') {
-        if (!promotingWake) setState('waiting', 'Đang chờ bạn nói “Hey Moon”');
+        if (!promotingWake) setState('waiting', 'Đang chờ bạn gọi tên Moon');
     } else if (message.event === 'wake') {
         void promoteWakeToLive(token);
     } else if (message.event === 'error') {
@@ -482,8 +482,8 @@ async function promoteWakeToLive(token) {
     wakeCalibrating = false;
     ready = false;
     wakeTick();
-    setState('connecting', 'Đã nghe “Hey Moon” — đang mở hội thoại trực tiếp…');
-    showHeard('Đã nhận wakeword “Hey Moon”');
+    setState('connecting', 'Đã nghe tên Moon — đang mở hội thoại trực tiếp…');
+    showHeard('Đã nhận ra tên Moon');
     showLatency('đang kết nối hội thoại');
     dispatch('wake');
 
@@ -651,7 +651,7 @@ async function start() {
             void fetch('/api/live-ack', {cache: 'force-cache'}).catch(() => {});
             setState(wakeCalibrating ? 'connecting' : 'waiting', wakeCalibrating
                 ? 'Đang đo tiếng nền — hãy giữ im lặng'
-                : 'Sẵn sàng — hãy nói “Hey Moon”');
+                : 'Sẵn sàng — chỉ cần gọi tên Moon');
             dispatch('waiting_wake', {calibrating: wakeCalibrating});
         } else {
             setState('listening', pipeline === 'brain'
@@ -721,7 +721,7 @@ function updatePipelineUi() {
     if (brain) $('mode').value = 'fish';
     $('mode').disabled = brain || active || starting;
     const activationText = activation === 'wakeword'
-        ? ' Moon chỉ mở hội thoại sau khi nghe “Hey Moon”.'
+        ? ' Moon chỉ mở hội thoại sau khi nghe tên mình hoặc cách phát âm gần giống.'
         : ' Hội thoại bắt đầu ngay khi bạn bấm nút.';
     $('description').textContent = (brain
         ? 'Groq STT chuyển câu nói cho Brain và LLM hiện tại; Fish Audio trả lời liên tục.'
@@ -731,11 +731,11 @@ function updatePipelineUi() {
         ? 'Brain · Groq STT · LLM · Fish'
         : `gemini-3.8-live · ${$('mode').value === 'fish' ? 'Fish Voice' : 'Kore'}`;
     $('start').innerHTML = activation === 'wakeword'
-        ? '<i data-lucide="ear"></i> Bắt đầu chờ “Hey Moon”'
+        ? '<i data-lucide="ear"></i> Bắt đầu chờ tên Moon'
         : '<i data-lucide="radio"></i> Bắt đầu Live Talk';
     if (window.lucide) lucide.createIcons();
     if (!active && !starting) $('state').textContent = activation === 'wakeword'
-        ? 'Sẵn sàng chờ wakeword “Hey Moon”'
+        ? 'Sẵn sàng chờ bạn gọi tên Moon'
         : (brain ? 'Sẵn sàng kết nối Brain Live' : 'Sẵn sàng kết nối Gemini Live');
     showHeard('Chưa có dữ liệu');
     showCorrected('', false);

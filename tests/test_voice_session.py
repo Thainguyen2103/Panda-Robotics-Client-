@@ -320,7 +320,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sum(m['event'] == 'recalibrating' for m in socket.messages), 1)
         self.assertEqual(session.segmenter.calibration_frames, 40)
 
-    async def test_real_vietnamese_words_do_not_enter_wake_verification(self):
+    async def test_bare_mon_is_treated_as_the_robot_name_without_verification(self):
         socket = Socket()
         session = Session(socket, None)
         session.transcribe = lambda clip: asyncio.sleep(0, result='môn')
@@ -338,7 +338,22 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         with contextlib.suppress(asyncio.CancelledError):
             await worker
         self.assertFalse(verification_calls)
+        self.assertTrue(session.listening)
+        self.assertEqual(sum(m['event'] == 'wake' for m in socket.messages), 1)
+
+    async def test_real_vietnamese_phrase_does_not_trigger_wake(self):
+        socket = Socket()
+        session = Session(socket, None)
+        session.transcribe = lambda clip: asyncio.sleep(0, result='môn học')
+        session.verify_wake = lambda clip: asyncio.sleep(0, result='Hey Moon')
+        worker = asyncio.create_task(session.worker())
+        session.clips.put_nowait((b'audio', False, session.audio_epoch))
+        await asyncio.wait_for(session.clips.join(), 2)
+        worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker
         self.assertFalse(session.listening)
+        self.assertFalse(any(m['event'] == 'wake' for m in socket.messages))
 
     async def test_no_wake_no_question(self):
         _, messages = await self.run_clips(['Tôi muốn ăn món ngon.'])
