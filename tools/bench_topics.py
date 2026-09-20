@@ -1,4 +1,4 @@
-# tools/bench_topics.py — benchmark độ chính xác phân loại chủ đề hybrid
+﻿# tools/bench_topics.py — benchmark độ chính xác phân loại chủ đề hybrid
 import sys
 import io
 
@@ -23,7 +23,7 @@ CASES = [
     ("Hơi tiếc hôn ngang như thế nào?", "weather"),   # nhiễu ASR của 'thời tiết hôm nay'
     ("Kể chuyện cười đi", "story"),
     ("Máy tính lượng tử hoạt động ra sao?", "tech|science"),
-    ("Buồn quá Panda ơi", "emotion"),
+    ("Buồn quá Moon ơi", "emotion"),
 ]
 
 ok = 0

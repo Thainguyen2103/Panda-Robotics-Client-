@@ -1,4 +1,4 @@
-# Computer vision cho Panda
+﻿# Computer vision cho Moon
 
 ## Phạm vi hiện tại
 
@@ -33,7 +33,7 @@ nhãn để xác nhận mức cải thiện độ chính xác.
 
 Dashboard cập nhật chữ theo nhịp 250 ms, chờ nhãn ổn định, giữ ngắn khi chưa rõ.
 Các hàng có chiều cao cố định 40 px và tối đa hai dòng; số ms/% chuyển vào tooltip.
-Bỏ log bản tin `panda/user_status` trùng để Activity Log không cuộn từng khung hình.
+Bỏ log bản tin `moon/user_status` trùng để Activity Log không cuộn từng khung hình.
 
 ### Dữ liệu khớp cánh tay
 
@@ -62,12 +62,12 @@ cánh tay; chưa có 21 khớp bàn tay/ngón tay.
   thiết bị thực tế trước khi triển khai.
 
 Giữ callback ba tham số của `brain.py`; công bố đầy đủ kết quả qua
-`panda/vision/status` và topic tương thích `panda/user_status`. Dashboard nhận
+`moon/vision/status` và topic tương thích `moon/user_status`. Dashboard nhận
 trạng thái, danh tính, biểu cảm, cử chỉ đầu/tay và thời gian xử lý. Vision không
 phát lệnh motor theo cử chỉ. Cơ chế chào khi thấy người có sẵn của brain vẫn hoạt động.
 
-`panda/camera` là ảnh JPEG base64 **đầu ra** dành cho dashboard; không phải topic
-nhận ảnh từ ESP32. Camera mạng dùng URL qua `PANDA_CAMERA_SOURCE`.
+`moon/camera` là ảnh JPEG base64 **đầu ra** dành cho dashboard; không phải topic
+nhận ảnh từ ESP32. Camera mạng dùng URL qua `MOON_CAMERA_SOURCE`.
 
 ## Chạy và kiểm tra
 
@@ -87,7 +87,7 @@ Từ thư mục gốc `C:\PBL4`, dùng môi trường Python sẵn có của d�
 .\start.bat
 
 # Dùng camera mạng: thay bằng địa chỉ thiết bị của bạn
-$env:PANDA_CAMERA_SOURCE = 'http://<dia-chi-esp32>:81/stream'
+$env:MOON_CAMERA_SOURCE = 'http://<dia-chi-esp32>:81/stream'
 .\server\venv\Scripts\python.exe -m server.vision
 
 # Kiểm thử logic và lỗi

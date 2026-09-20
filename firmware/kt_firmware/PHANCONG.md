@@ -1,4 +1,4 @@
-# Phân công phần Firmware nhúng — Khoa & Thắng
+﻿# Phân công phần Firmware nhúng — Khoa & Thắng
 
 > Bổ sung chi tiết cho bảng "Lộ trình theo tuần" trong [PROJECT.md](PROJECT.md) — file đó
 > chỉ ghi ai làm gì tuần nào (tag `-Thắng` / `-Khoa & Thắng`), file này giải thích **vì sao
@@ -30,7 +30,7 @@ giới HEAD/BODY ở trên.
 
 ## 2. Quy ước đặt tên file — để git ít conflict, dễ biết ai đụng gì
 
-Trong `Panda-Robotics-Client-/firmware/kt_firmware/src/`:
+Trong `Moon-Robotics-Client-/firmware/kt_firmware/src/`:
 
 - File đã có (Khoa): `main.cpp`, `pins.h`, `display.*`, `input.*`, `network.*`, `audio_i2s.*`.
 - File Thắng sẽ tạo mới: `motor.h`/`motor.cpp` (điều khiển L298N/TB6612FNG + PWM),
@@ -47,8 +47,8 @@ Trong `Panda-Robotics-Client-/firmware/kt_firmware/src/`:
 phân công:
 
 ```bash
-git clone https://github.com/Thainguyen2103/Panda-Robotics-Client-.git
-cd Panda-Robotics-Client-
+git clone https://github.com/Thainguyen2103/Moon-Robotics-Client-.git
+cd Moon-Robotics-Client-
 git checkout develop && git pull origin develop
 git checkout -b feature/thang-motor-control      # Thắng
 git checkout -b feature/khoa-<task>              # Khoa (đã có nhánh feature/khoa-w3-i2s-module)

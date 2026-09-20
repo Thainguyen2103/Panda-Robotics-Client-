@@ -1,4 +1,4 @@
-# config/settings.py
+﻿# config/settings.py
 import os
 
 # ─── API keys: nạp từ config/secrets.py (KHÔNG push) hoặc biến môi trường ────
@@ -17,22 +17,22 @@ MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 
 # Topics (theo Phụ lục B đề cương)
-TOPIC_MOVE   = "panda/cmd/move"
-TOPIC_ARM    = "panda/cmd/arm"
-TOPIC_FACE   = "panda/cmd/face"
-TOPIC_TEXT   = "panda/cmd/text"
-TOPIC_BUZZ   = "panda/cmd/buzz"
-TOPIC_STATUS = "panda/status"
-TOPIC_VOICE_LOG     = "panda/log/voice"
-TOPIC_VOICE_PARTIAL = "panda/log/voice_partial"
-TOPIC_AI_THINKING   = "panda/ai/thinking"
-TOPIC_AI_RESPONSE   = "panda/ai/response"
-TOPIC_AI_STATE      = "panda/ai/state"
-TOPIC_AI_TOPIC      = "panda/ai/topic"        # chủ đề câu hỏi → emoji OLED
-TOPIC_BROWSER_AUDIO = "panda/ai/voice_audio"   # push-to-talk từ dashboard (base64 webm)
-TOPIC_BROWSER_CLIP  = "panda/ai/clip"          # clip PCM từ live-mic trình duyệt
-TOPIC_MIC_LIVE      = "panda/ai/mic_live"      # trạng thái live-mic on/off
-TOPIC_CAMERA = "panda/camera"
+TOPIC_MOVE   = "moon/cmd/move"
+TOPIC_ARM    = "moon/cmd/arm"
+TOPIC_FACE   = "moon/cmd/face"
+TOPIC_TEXT   = "moon/cmd/text"
+TOPIC_BUZZ   = "moon/cmd/buzz"
+TOPIC_STATUS = "moon/status"
+TOPIC_VOICE_LOG     = "moon/log/voice"
+TOPIC_VOICE_PARTIAL = "moon/log/voice_partial"
+TOPIC_AI_THINKING   = "moon/ai/thinking"
+TOPIC_AI_RESPONSE   = "moon/ai/response"
+TOPIC_AI_STATE      = "moon/ai/state"
+TOPIC_AI_TOPIC      = "moon/ai/topic"        # chủ đề câu hỏi → emoji OLED
+TOPIC_BROWSER_AUDIO = "moon/ai/voice_audio"   # push-to-talk từ dashboard (base64 webm)
+TOPIC_BROWSER_CLIP  = "moon/ai/clip"          # clip PCM từ live-mic trình duyệt
+TOPIC_MIC_LIVE      = "moon/ai/mic_live"      # trạng thái live-mic on/off
+TOPIC_CAMERA = "moon/camera"
 
 # AI Models Configuration
 WEBCAM_INDEX = 0
@@ -40,7 +40,7 @@ YOLO_MODEL   = "yolov8n-pose.pt" # pose model
 EMOTION_MODEL = "emotion-ferplus-8.onnx"
 
 # Webcam index or an ESP32-CAM MJPEG / RTSP URL.
-VISION_SOURCE = os.environ.get("PANDA_CAMERA_SOURCE", str(WEBCAM_INDEX))
+VISION_SOURCE = os.environ.get("MOON_CAMERA_SOURCE", str(WEBCAM_INDEX))
 VISION_WIDTH = 640
 VISION_HEIGHT = 480
 VISION_AI_FPS = 10
@@ -65,7 +65,7 @@ VISION_EMOTION_THRESHOLD = 0.55
 VISION_EMOTION_MARGIN = 0.15
 VISION_MIN_FACE_SIZE = 60
 VISION_KEYPOINT_THRESHOLD = 0.5
-TOPIC_VISION_STATUS = "panda/vision/status"
+TOPIC_VISION_STATUS = "moon/vision/status"
 
 # Other constants
 FPS_LIMIT = 15
@@ -98,9 +98,9 @@ QUICK_MODEL = "groq/compound-mini"
 GROQ_API_KEY = _key("GROQ_API_KEY")
 
 # Ngôn ngữ nhận dạng giọng nói (STT):
-#   "vi" = tiếng Việt (KHUYẾN DỤNG cho Panda — chính xác nhất và nhanh gấp đôi,
+#   "vi" = tiếng Việt (KHUYẾN DỤNG cho Moon — chính xác nhất và nhanh gấp đôi,
 #          đã đo: 0.48s so với 1.02s của auto; auto hay đoán nhầm sang tiếng khác
-#          với clip ngắn: "Panda ơi" → "Bonne t'en la vie!")
+#          với clip ngắn: "Moon ơi" → "Bonne t'en la vie!")
 #   None = tự động phát hiện (chỉ dùng nếu cần hội thoại tiếng Anh thật sự)
 #   "en" = luôn tiếng Anh
 STT_LANGUAGE = "vi"
@@ -149,26 +149,26 @@ PERSON_LOST_GRACE_SEC = 10.0
 
 
 # ─── Wake-word on-device (Porcupine — tùy chọn, kiểu Anki Vector) ─────────────
-# Bắt "Panda" bằng âm học trên máy, không phụ thuộc ngôn ngữ & không cần mạng.
+# Bắt "Moon" bằng âm học trên máy, không phụ thuộc ngôn ngữ & không cần mạng.
 # LƯU Ý: console.picovoice.ai hiện CHỈ nhận email công ty — người dùng cá nhân
 # (Gmail...) không đăng ký được. Khi đó cứ để trống: hệ thống tự dùng
-# fallback Whisper dual-pass + fuzzy matching (vẫn bắt tốt "Panda").
+# fallback Whisper dual-pass + fuzzy matching (vẫn bắt tốt "Moon").
 # Cách kích hoạt (nếu có email công ty): xem server/wakeword.py
 PICOVOICE_ACCESS_KEY = ""
-PANDA_PPN_PATH = ""   # để trống = mặc định server/panda.ppn
+MOON_PPN_PATH = ""   # để trống = mặc định server/moon.ppn
 
 
 # ─── Wake-word ───────────────────────────────────────────────────────────────
 # Groq Whisper large-v3-turbo nhận dạng rất chính xác nên chỉ cần
 # các dạng phổ biến. Thêm vào nếu thấy bị sót trong thực tế.
-PANDA_WAKE_WORDS = [
+MOON_WAKE_WORDS = [
     # ── Chuẩn tiếng Anh & Việt ───────────────────────────────────────────
-    "panda",
-    "hey panda",
-    "panda ơi",
-    "này panda",
-    "ê panda",
-    "ơi panda",
+    "moon",
+    "hey moon",
+    "moon ơi",
+    "này moon",
+    "ê moon",
+    "ơi moon",
     "pan đa",
     "pan đa ơi",
     "păng đa",
@@ -177,13 +177,13 @@ PANDA_WAKE_WORDS = [
     "hai phan ta",
     "hai phanta",
     "hai phan đa",
-    "hai panda",
+    "hai moon",
     "hai păng đa",
     "hai bạn nàng",
     "bạn nàng",
     "ban nang",
-    "hây panda",
-    "hê panda",
+    "hây moon",
+    "hê moon",
     "hây phan ta",
     "hê phan ta",
     "phan ta",
@@ -194,21 +194,21 @@ PANDA_WAKE_WORDS = [
     "phan đa",
     "fan đa",
     "panta",
-    "pandas",
+    "moons",
     "ban đa",
     "băng đa",
     "băn đa",
     # ── Tên thân thiện tiếng Việt ────────────────────────────────────────
     "gấu trúc ơi",
     "gấu trúc",
-    "bé panda ơi",
-    "bé panda",
+    "bé moon ơi",
+    "bé moon",
     "bé gấu",
 ]
 
 
 # Mirror cảm xúc người dùng lên OLED khi idle:
-#   False = idle TỰ CHỦ (Panda tự diễn biểu cảm, không nhại theo mặt người dùng) ← mặc định
+#   False = idle TỰ CHỦ (Moon tự diễn biểu cảm, không nhại theo mặt người dùng) ← mặc định
 #   True  = OLED nhại cảm xúc người dùng (đồng cảm trực tiếp)
 EMOTION_MIRROR = False
 

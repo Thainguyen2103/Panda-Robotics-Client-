@@ -1,5 +1,16 @@
+﻿"""
+--------------------------------------------------------------------------------
+TÀI LIỆU HƯỚNG DẪN CODE: rag_engine.py (Bộ máy tìm kiếm kiến thức RAG)
+--------------------------------------------------------------------------------
+Nhiệm vụ: Đóng vai trò là 'Sách giáo khoa' của robot. Giúp LLM không bao giờ bịa đặt kiến thức chuyên ngành.
+
+[CẤU TRÚC CHÍNH]
+1. Load dữ liệu: Đọc file data.json chứa bài học tiếng Anh / tiếng Nhật.
+2. search(): Thuật toán tìm kiếm (Scoring). Chia nhỏ câu hỏi thành từ khóa, bỏ đi các từ vô nghĩa (stop_words), và đối chiếu để tìm ra 2 bài học có điểm cao nhất.
+3. format_context_for_prompt(): Đóng gói bài học tìm được để nhét vào Prompt cho LLM đọc hiểu dễ nhất.
+"""
 # ==============================================================================
-# rag_engine.py — Bộ máy Cascading RAG 3 Tầng (3-Tier Filtering) cho Robot Panda
+# rag_engine.py — Bộ máy Cascading RAG 3 Tầng (3-Tier Filtering) cho Robot Moon
 # Hỗ trợ học Tiếng Nhật - Tiếng Anh - Tiếng Việt cho trẻ em 7-10 tuổi
 # ==============================================================================
 
@@ -11,7 +22,7 @@ import math
 import unicodedata
 from typing import List, Dict, Any, Optional, Tuple
 
-# Cấu hình UTF-8 cho Windows Terminal
+# Cấu hình UTF-8 cho Windows Terminal để in tiếng Việt chuẩn
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -23,17 +34,24 @@ if sys.stderr and hasattr(sys.stderr, "reconfigure"):
     except Exception:
         pass
 
+# Đường dẫn tĩnh trỏ đến file data.json nằm cùng thư mục với file này
 DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data.json")
 
 
 def strip_accents(text: str) -> str:
-    """Bỏ dấu tiếng Việt để tìm kiếm không dấu (ví dụ: 'con meo' -> 'con mèo')"""
+    """
+    Hàm bỏ dấu tiếng Việt để tìm kiếm mờ (Fuzzy Search).
+    Ví dụ: 'con mèo' -> 'con meo' để lỡ người dùng nói ngọng STT nhận sai vẫn tìm ra.
+    """
+    # Tách các dấu thanh (huyền, sắc, hỏi, ngã, nặng) ra khỏi chữ cái
     text = unicodedata.normalize('NFD', text)
+    # Xóa toàn bộ các dấu thanh đó đi
     text = re.sub(r'[\u0300-\u036f]', '', text)
+    # Xử lý riêng chữ đ/Đ thành d/D vì nó không phải dấu thanh
     return text.replace('đ', 'd').replace('Đ', 'D')
 
 
-class PandaRAG:
+class MoonRAG:
     """
     Kiến trúc RAG Lọc 3 Tầng (3-Tier Cascading Filter / Multi-Stage Retrieval):
     --------------------------------------------------------------------------
@@ -54,18 +72,22 @@ class PandaRAG:
     """
 
     def __init__(self, data_file: str = DATA_PATH):
+        # Lưu đường dẫn file dữ liệu
         self.data_file = data_file
+        # Biến chứa toàn bộ sách giáo khoa (dạng mảng các Dictionary)
         self.knowledge_base: List[Dict[str, Any]] = []
+        # Tự động nạp dữ liệu khi khởi tạo class
         self.load_data()
 
     def load_data(self) -> None:
-        """Đọc cơ sở dữ liệu từ file data.json"""
+        """Đọc cơ sở dữ liệu từ file data.json đưa vào RAM"""
         if not os.path.exists(self.data_file):
             print(f"⚠️ [RAG] Không tìm thấy file dữ liệu: {self.data_file}")
             self.knowledge_base = []
             return
 
         try:
+            # Đọc file với bảng mã utf-8
             with open(self.data_file, "r", encoding="utf-8") as f:
                 self.knowledge_base = json.load(f)
             print(f"✅ [RAG] Đã nạp thành công {len(self.knowledge_base)} bài học vào bộ nhớ.")
@@ -74,20 +96,28 @@ class PandaRAG:
             self.knowledge_base = []
 
     def _normalize(self, text: str) -> str:
-        """Chuẩn hóa chuỗi văn bản (chữ thường, bỏ dấu câu thừa)"""
+        """Hàm dọn dẹp văn bản cơ bản: Viết thường, xóa dấu câu thừa, xóa khoảng trắng thừa"""
+        # Đưa về chữ in thường và xóa khoảng trắng hai đầu
         text = text.lower().strip()
+        # Thay thế các dấu chấm, phẩy, chấm hỏi, ngoặc... thành khoảng trắng
         text = re.sub(r"[!?,.:;\"\'\(\)\[\]/\\-]", " ", text)
+        # Tách ra và gom lại để xóa các khoảng trống dư thừa ở giữa
         return " ".join(text.split())
 
     def _clean_query(self, query: str) -> str:
-        """Loại bỏ tên robot / wake-word (Panda ơi, này Panda) để tránh nhầm sang bài học Gấu trúc Panda"""
+        """
+        Loại bỏ tên gọi robot (Moon ơi, này Moon) khỏi câu hỏi 
+        để không bị nhầm lẫn với bài học về con gấu trúc thực tế.
+        """
         q = query.lower()
-        # Nếu bé hỏi rõ về con gấu trúc thì giữ lại
+        # Ngoại lệ: Nếu câu hỏi thực sự hỏi về gấu trúc (con gấu trúc, loài gấu trúc) thì giữ nguyên
         if any(w in q for w in ["con gấu trúc", "loài gấu trúc", "gấu trúc tiếng", "gấu trúc ăn gì"]):
             return query
-        # Bỏ các từ xưng hô chào robot ở đầu hoặc cuối câu
-        q_clean = re.sub(r"\b(panda ơi|ơi panda|này panda|ê panda|hey panda|panda)\b", "", q, flags=re.IGNORECASE)
+        
+        # Biểu thức chính quy: Cắt bỏ các cụm từ gọi tên robot ở đầu hoặc cuối câu
+        q_clean = re.sub(r"\b(moon ơi|ơi moon|này moon|ê moon|hey moon|moon)\b", "", q, flags=re.IGNORECASE)
         q_clean = q_clean.strip()
+        # Trả về câu đã làm sạch (nếu câu sau khi cắt vẫn còn nghĩa, >= 2 ký tự)
         return q_clean if len(q_clean) >= 2 else query
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -95,18 +125,21 @@ class PandaRAG:
     # ══════════════════════════════════════════════════════════════════════════
     def _tier1_exact_filter(self, query: str) -> List[Dict[str, Any]]:
         """
-        Khớp trực tiếp Chữ Hán (Kanji), từ khóa chuẩn và từ vựng chính xác.
-        Nếu bé nói trúng từ khóa -> Ngắt sớm (Early Exit) lập tức!
+        Tầng 1: Khớp trực tiếp 1-1. Nhanh và chính xác nhất.
+        Nếu bé nói trúng y chang chữ Hán hoặc từ vựng tiếng Anh -> Trả về luôn!
         """
+        # Dọn dẹp câu hỏi
         clean_q = self._clean_query(query)
         q_norm = self._normalize(clean_q)
+        # Chuyển câu hỏi thành mảng các từ đơn (tập hợp set để truy vấn nhanh)
         q_tokens = set(q_norm.split())
 
         matches = []
         for item in self.knowledge_base:
-            # 1. Khớp chữ Hán (Kanji) trực tiếp
+            # 1. Khớp chữ Hán (Kanji): Quét từng ký tự Kanji xem có lọt vào câu hỏi không
             kanji = item.get("kanji", "")
             if kanji and any(k_char in query for k_char in kanji if k_char.strip()):
+                # Trúng Kanji thì cho điểm tuyệt đối 10.0
                 matches.append((10.0, item))
                 continue
 
@@ -115,6 +148,7 @@ class PandaRAG:
             exact_hit = False
             for kw in keywords:
                 kw_norm = self._normalize(kw)
+                # Kiểm tra xem từ khóa có nằm y hệt trong câu không
                 if kw_norm == q_norm or f" {kw_norm} " in f" {q_norm} ":
                     matches.append((9.0, item))
                     exact_hit = True
@@ -122,14 +156,17 @@ class PandaRAG:
             if exact_hit:
                 continue
 
-            # 3. Khớp tên tiếng Anh hoặc Romaji dạng nguyên từ (ví dụ 'cat', 'dog', 'neko')
+            # 3. Khớp tên tiếng Anh hoặc Romaji dạng nguyên từ (Ví dụ: 'cat', 'inu')
             en = self._normalize(item.get("english", ""))
             romaji = self._normalize(item.get("japanese_romaji", ""))
             if (en and en in q_tokens) or (romaji and romaji in q_tokens):
                 matches.append((8.0, item))
 
+        # Nếu có kết quả ở Tầng 1
         if matches:
+            # Sắp xếp theo điểm số từ cao xuống thấp
             matches.sort(key=lambda x: x[0], reverse=True)
+            # Lấy tối đa 2 bài học tốt nhất
             return [m[1] for m in matches[:2]]
         return []
 
@@ -138,9 +175,11 @@ class PandaRAG:
     # ══════════════════════════════════════════════════════════════════════════
     def _tier2_lexical_filter(self, query: str) -> List[Dict[str, Any]]:
         """
-        Xử lý tiếng Việt không dấu ('con meo', 'qua tao'), đảo từ, từ ghép.
+        Tầng 2: Xử lý tiếng Việt không dấu, viết tắt, hoặc từ lóng.
+        Ví dụ: STT nghe nhầm thành 'con meo' thay vì 'con mèo'.
         """
         q_norm = self._normalize(query)
+        # Tạo thêm một bản sao không dấu của câu hỏi
         q_unacc = strip_accents(q_norm)
         q_tokens = set(q_norm.split())
         q_unacc_tokens = set(q_unacc.split())
@@ -149,35 +188,37 @@ class PandaRAG:
         for item in self.knowledge_base:
             score = 0.0
 
-            # 1. Khớp cụm từ trong keywords list (ưu tiên cụm từ dài hơn)
+            # 1. Quét cụm từ trong keywords list (kể cả không dấu)
             for kw in item.get("keywords", []):
                 kw_norm = self._normalize(kw)
                 kw_unacc = strip_accents(kw_norm)
 
-                # Bỏ qua từ đơn 'cho' nếu câu là 'chỉ cho', 'nói cho'
+                # Ngoại lệ: Bỏ qua từ 'cho' (trong con chó) nếu câu hỏi là 'chỉ cho', 'nói cho'
                 if kw_unacc == "cho" and ("chi cho" in q_unacc or "noi cho" in q_unacc or "do cho" in q_unacc):
                     continue
 
                 if f" {kw_unacc} " in f" {q_unacc} ":
-                    # Trọng số theo độ dài cụm từ: cụm 2-3 từ ('qua tao', 'con meo') điểm cao hơn từ đơn ('cho')
+                    # Cụm từ dài ('con meo') được điểm cao hơn cụm từ ngắn ('meo')
                     score += 5.0 + len(kw_unacc.split()) * 3.0
                     break
 
-            # 2. Đối soát tên tiếng Việt có dấu & không dấu
+            # 2. Khớp thẳng tên bài học bằng tiếng Việt (có dấu và không dấu)
             vi = self._normalize(item.get("vietnamese", ""))
             vi_unacc = strip_accents(vi)
 
             if vi in q_norm or vi_unacc in q_unacc:
                 score += 8.0
+            # Nếu tên bài học có chứa các từ khóa nằm rải rác trong câu hỏi
             elif any(len(t) > 2 and t in q_unacc_tokens for t in vi_unacc.split()):
                 score += 2.0
 
-            # 3. Đối soát tên chủ đề
+            # 3. Khớp theo chủ đề (Ví dụ: hỏi về 'động vật' -> lấy bài học nhóm động vật)
             topic_unacc = strip_accents(self._normalize(item.get("topic", "")))
             common_topic = q_unacc_tokens.intersection(set(topic_unacc.split()))
             if common_topic:
                 score += len(common_topic) * 1.0
 
+            # Chỉ đưa vào danh sách nếu điểm số vượt ngưỡng an toàn (4.0)
             if score >= 4.0:
                 scored_items.append((score, item))
 
@@ -191,25 +232,23 @@ class PandaRAG:
     # ══════════════════════════════════════════════════════════════════════════
     def _tier3_semantic_filter(self, query: str) -> List[Dict[str, Any]]:
         """
-        Dành cho câu hỏi đố vui hoặc miêu tả gián tiếp, ví dụ:
-        - "con gì thích bắt chuột" -> mèo
-        - "loài vật có chiếc vòi rất dài" -> voi
-        - "thứ gì màu vàng chiếu sáng trên trời" -> mặt trời
-        Quét sâu qua fun_fact, quiz, example để tìm tương đồng ý niệm.
+        Tầng 3: Dành cho câu hỏi đố vui hoặc miêu tả. Không hề có từ khóa trực tiếp.
+        Ví dụ: "con gì thích bắt chuột" -> mèo
         """
         q_norm = self._normalize(query)
         q_unacc = strip_accents(q_norm)
         q_words = set(q_unacc.split())
 
-        # Loại bỏ các hư từ tiếng Việt thông dụng để tập trung vào từ mang ý nghĩa
+        # Loại bỏ các 'hư từ' (stop_words) vô nghĩa để tập trung vào 'thực từ' (ví dụ: bắt, chuột)
         stopwords = {"la", "gi", "the", "nao", "sao", "cho", "minh", "hoi", "ban", "oi", "con", "cai", "be", "biet", "khong"}
         content_words = q_words - stopwords
+        # Nếu cắt xong mà không còn gì, thì lấy lại nguyên câu cũ
         if not content_words:
             content_words = q_words
 
         scored_items = []
         for item in self.knowledge_base:
-            # Gom toàn bộ ngữ cảnh tri thức của mục đó
+            # Gom toàn bộ chữ từ các trường fact, quiz, example của bài học đó
             fact_unacc = strip_accents(self._normalize(item.get("fun_fact", "")))
             quiz_unacc = strip_accents(self._normalize(item.get("quiz", "")))
             ex_vi_unacc = strip_accents(self._normalize(item.get("example_vi", "")))
@@ -217,9 +256,10 @@ class PandaRAG:
             doc_text = f"{fact_unacc} {quiz_unacc} {ex_vi_unacc}"
             doc_words = set(doc_text.split())
 
-            # Tính độ trùng khớp ý niệm (Jaccard Overlap)
+            # Tính độ giao nhau của 2 tập hợp chữ (Jaccard Similarity)
             matched_words = content_words.intersection(doc_words)
             if matched_words:
+                # Công thức tính điểm tương đồng: Số từ giống nhau / Căn bậc 2(Độ dài A * Độ dài B)
                 semantic_score = len(matched_words) / math.sqrt(len(content_words) * len(doc_words) + 1)
                 scored_items.append((semantic_score, item))
 
@@ -233,37 +273,39 @@ class PandaRAG:
     # ══════════════════════════════════════════════════════════════════════════
     def search(self, query: str, top_k: int = 2) -> List[Dict[str, Any]]:
         """
-        Điều phối tìm kiếm lần lượt qua 3 tầng:
-        Tầng 1 (Trúng từ khóa) -> Trả về ngay (0ms)
-        -> nếu không có -> Tầng 2 (Khớp từ mờ/không dấu) -> Trả về (~1ms)
-        -> nếu không có -> Tầng 3 (Quét sâu ý niệm ngữ nghĩa) (~5ms)
+        Hàm chính được gọi từ bên ngoài. Nó sẽ cho chạy lần lượt qua 3 Tầng:
+        Tầng 1 (Trúng từ khóa) -> Nếu có thì trả về ngay (Siêu tốc 0ms).
+        -> Nếu không có -> Chạy Tầng 2 (Fuzzy) -> Trả về (~1ms).
+        -> Nếu Tầng 2 cũng không có -> Chạy Tầng 3 (Quét sâu) (~5ms).
         """
         if not self.knowledge_base or not query.strip():
             return []
 
-        # Làm sạch tên robot (wake-word) khỏi câu hỏi để tránh nhiễu
+        # Tách chữ "Moon" ra khỏi câu hỏi
         clean_query = self._clean_query(query)
 
-        # Tầng 1: Đơn giản (Exact / Kanji Match)
+        # Chạy Tầng 1
         t1_results = self._tier1_exact_filter(clean_query)
         if t1_results:
             return t1_results[:top_k]
 
-        # Tầng 2: Vừa (Fuzzy & Lexical Match)
+        # Chạy Tầng 2
         t2_results = self._tier2_lexical_filter(clean_query)
         if t2_results:
             return t2_results[:top_k]
 
-        # Tầng 3: Phức tạp (Semantic Concept Search)
+        # Chạy Tầng 3
         t3_results = self._tier3_semantic_filter(clean_query)
         if t3_results:
             return t3_results[:top_k]
 
+        # Nếu không có bài học nào khớp, trả về mảng rỗng
         return []
 
     def format_context_for_prompt(self, items: List[Dict[str, Any]]) -> str:
         """
-        Tạo khối văn bản [TÀI LIỆU BÀI HỌC] dễ hiểu để nạp vào prompt cho LLM.
+        Sau khi tìm được bài học, hàm này đóng gói mảng JSON thành
+        đoạn văn bản Text dễ đọc để nạp vào Prompt cho Ollama đọc.
         """
         if not items:
             return ""
@@ -273,6 +315,7 @@ class PandaRAG:
             "Hãy sử dụng các thông tin chính xác dưới đây để giải thích và chơi cùng bé:"
         ]
 
+        # Lặp qua từng bài học để định dạng
         for idx, item in enumerate(items, 1):
             context_lines.append(
                 f"\nBài học {idx}: {item.get('vietnamese')} ({item.get('topic')})\n"
@@ -288,28 +331,29 @@ class PandaRAG:
             )
 
         context_lines.append("=== [HẾT TÀI LIỆU BÀI HỌC] ===\n")
+        # Nối tất cả mảng thành 1 chuỗi lớn
         return "\n".join(context_lines)
 
 
-# ─── Chạy thử kiểm chứng 3 Tầng Lọc ──────────────────────────────────────────
+# ─── Script chạy thử nghiệm độc lập (Tự động chạy khi gọi thẳng file này) ────
 if __name__ == "__main__":
-    rag = PandaRAG()
+    rag = MoonRAG()
 
     print("\n--- KIỂM TRA HỆ THỐNG LỌC 3 TẦNG (3-TIER RAG) ---")
 
-    # Test 1: Đi vào Tầng 1 (Chính xác từ khóa / Kanji)
-    q1 = "Panda ơi con mèo tiếng Nhật đọc sao?"
+    # Test 1: Khớp chính xác (Moon ơi -> bị xóa. Con mèo -> Exact Match)
+    q1 = "Moon ơi con mèo tiếng Nhật đọc sao?"
     res1 = rag.search(q1)
     print(f"\n1️⃣ Test Tầng 1 (Exact Match): \"{q1}\"")
     print(f"-> Kết quả: {res1[0]['vietnamese']} | Kanji: {res1[0]['kanji']} | English: {res1[0]['english']}")
 
-    # Test 2: Đi vào Tầng 2 (Tiếng Việt không dấu / đảo từ)
-    q2 = "chi cho be tu qua tao di panda"
+    # Test 2: Khớp tiếng Việt không dấu, viết dính chùm
+    q2 = "chi cho be tu qua tao di moon"
     res2 = rag.search(q2)
     print(f"\n2️⃣ Test Tầng 2 (Lexical Unaccented): \"{q2}\"")
     print(f"-> Kết quả: {res2[0]['vietnamese']} | Kanji: {res2[0]['kanji']} | English: {res2[0]['english']}")
 
-    # Test 3: Đi vào Tầng 3 (Câu hỏi đố vui gián tiếp, không nêu tên từ)
+    # Test 3: Hỏi gián tiếp, đố vui
     q3 = "con gi co chiec voi rat dai thich an mia"
     res3 = rag.search(q3)
     print(f"\n3️⃣ Test Tầng 3 (Semantic Concept Match): \"{q3}\"")

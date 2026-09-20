@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Panda Robot Dashboard — điều khiển và giám sát robot Panda thời gian thực">
-    <title>Panda Dashboard</title>
+    <meta name="description" content="Moon Robot Dashboard — điều khiển và giám sát robot Moon thời gian thực">
+    <title>Moon Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
             <div class="header-left">
                 <div class="logo">🐼</div>
                 <div>
-                    <h1>Panda <span>Dashboard</span></h1>
+                    <h1>Moon <span>Dashboard</span></h1>
                     <p class="header-subtitle">Robot Intelligence System</p>
                 </div>
             </div>
@@ -72,43 +72,43 @@
                 <div class="control-group">
                     <h3>Movement</h3>
                     <div class="d-pad">
-                        <button id="btn-forward" onclick="sendCommand('panda/cmd/move', 'forward')">↑</button>
+                        <button id="btn-forward" onclick="sendCommand('moon/cmd/move', 'forward')">↑</button>
                         <div class="d-pad-middle">
-                            <button id="btn-left" onclick="sendCommand('panda/cmd/move', 'left')">←</button>
-                            <button id="btn-stop" class="btn-stop" onclick="sendCommand('panda/cmd/move', 'stop')">STOP</button>
-                            <button id="btn-right" onclick="sendCommand('panda/cmd/move', 'right')">→</button>
+                            <button id="btn-left" onclick="sendCommand('moon/cmd/move', 'left')">←</button>
+                            <button id="btn-stop" class="btn-stop" onclick="sendCommand('moon/cmd/move', 'stop')">STOP</button>
+                            <button id="btn-right" onclick="sendCommand('moon/cmd/move', 'right')">→</button>
                         </div>
-                        <button id="btn-back" onclick="sendCommand('panda/cmd/move', 'back')">↓</button>
+                        <button id="btn-back" onclick="sendCommand('moon/cmd/move', 'back')">↓</button>
                     </div>
                 </div>
 
                 <div class="control-group">
                     <h3>Arm & Face</h3>
                     <div class="button-row">
-                        <button id="btn-wave" onclick="sendCommand('panda/cmd/arm', 'wave')"><i data-lucide="hand"></i> Wave</button>
-                        <button id="btn-arm-up" onclick="sendCommand('panda/cmd/arm', 'up')"><i data-lucide="arrow-up"></i> Up</button>
-                        <button id="btn-arm-down" onclick="sendCommand('panda/cmd/arm', 'down')"><i data-lucide="arrow-down"></i> Down</button>
+                        <button id="btn-wave" onclick="sendCommand('moon/cmd/arm', 'wave')"><i data-lucide="hand"></i> Wave</button>
+                        <button id="btn-arm-up" onclick="sendCommand('moon/cmd/arm', 'up')"><i data-lucide="arrow-up"></i> Up</button>
+                        <button id="btn-arm-down" onclick="sendCommand('moon/cmd/arm', 'down')"><i data-lucide="arrow-down"></i> Down</button>
                     </div>
                     <div class="button-row">
-                        <button id="btn-face-happy" onclick="sendCommand('panda/cmd/face', 'happy')"><i data-lucide="smile"></i> Happy</button>
-                        <button id="btn-face-sad" onclick="sendCommand('panda/cmd/face', 'sad')"><i data-lucide="frown"></i> Sad</button>
-                        <button id="btn-face-angry" onclick="sendCommand('panda/cmd/face', 'angry')"><i data-lucide="flame"></i> Angry</button>
-                        <button id="btn-face-surprised" onclick="sendCommand('panda/cmd/face', 'surprised')"><i data-lucide="scan-face"></i> Wow</button>
-                        <button id="btn-face-love" onclick="sendCommand('panda/cmd/face', 'love')"><i data-lucide="heart"></i> Love</button>
-                        <button id="btn-face-wink" onclick="sendCommand('panda/cmd/face', 'wink')"><i data-lucide="smile-plus"></i> Wink</button>
-                        <button id="btn-face-sleepy" onclick="sendCommand('panda/cmd/face', 'sleepy')"><i data-lucide="moon"></i> Sleepy</button>
-                        <button id="btn-face-dizzy" onclick="sendCommand('panda/cmd/face', 'dizzy')"><i data-lucide="zap"></i> Dizzy</button>
-                        <button id="btn-face-cool" onclick="sendCommand('panda/cmd/face', 'cool')"><i data-lucide="glasses"></i> Cool</button>
-                        <button id="btn-face-cute" onclick="sendCommand('panda/cmd/face', 'cute')"><i data-lucide="sparkles"></i> Cute</button>
-                        <button id="btn-face-neutral" onclick="sendCommand('panda/cmd/face', 'neutral')"><i data-lucide="meh"></i> Neutral</button>
+                        <button id="btn-face-happy" onclick="sendCommand('moon/cmd/face', 'happy')"><i data-lucide="smile"></i> Happy</button>
+                        <button id="btn-face-sad" onclick="sendCommand('moon/cmd/face', 'sad')"><i data-lucide="frown"></i> Sad</button>
+                        <button id="btn-face-angry" onclick="sendCommand('moon/cmd/face', 'angry')"><i data-lucide="flame"></i> Angry</button>
+                        <button id="btn-face-surprised" onclick="sendCommand('moon/cmd/face', 'surprised')"><i data-lucide="scan-face"></i> Wow</button>
+                        <button id="btn-face-love" onclick="sendCommand('moon/cmd/face', 'love')"><i data-lucide="heart"></i> Love</button>
+                        <button id="btn-face-wink" onclick="sendCommand('moon/cmd/face', 'wink')"><i data-lucide="smile-plus"></i> Wink</button>
+                        <button id="btn-face-sleepy" onclick="sendCommand('moon/cmd/face', 'sleepy')"><i data-lucide="moon"></i> Sleepy</button>
+                        <button id="btn-face-dizzy" onclick="sendCommand('moon/cmd/face', 'dizzy')"><i data-lucide="zap"></i> Dizzy</button>
+                        <button id="btn-face-cool" onclick="sendCommand('moon/cmd/face', 'cool')"><i data-lucide="glasses"></i> Cool</button>
+                        <button id="btn-face-cute" onclick="sendCommand('moon/cmd/face', 'cute')"><i data-lucide="sparkles"></i> Cute</button>
+                        <button id="btn-face-neutral" onclick="sendCommand('moon/cmd/face', 'neutral')"><i data-lucide="meh"></i> Neutral</button>
                     </div>
                 </div>
 
                 <div class="control-group">
                     <h3>Misc</h3>
                     <div class="button-row">
-                        <button id="btn-buzz-on" onclick="sendCommand('panda/cmd/buzz', 'on')"><i data-lucide="bell"></i> Buzz ON</button>
-                        <button id="btn-buzz-off" onclick="sendCommand('panda/cmd/buzz', 'off')"><i data-lucide="bell-off"></i> Buzz OFF</button>
+                        <button id="btn-buzz-on" onclick="sendCommand('moon/cmd/buzz', 'on')"><i data-lucide="bell"></i> Buzz ON</button>
+                        <button id="btn-buzz-off" onclick="sendCommand('moon/cmd/buzz', 'off')"><i data-lucide="bell-off"></i> Buzz OFF</button>
                     </div>
                 </div>
             </section>
@@ -166,20 +166,20 @@
                     </div>
                 </div>
 
-                <!-- Voice Transcript box đã được tích hợp trực tiếp lên OLED Face và Panda AI Chat -->
+                <!-- Voice Transcript box đã được tích hợp trực tiếp lên OLED Face và Moon AI Chat -->
 
 
-                <!-- ✨ PANDA AI CHAT PANEL (NEW) -->
+                <!-- ✨ MOON AI CHAT PANEL (NEW) -->
                 <div class="visual-group ai-chat-group">
-                    <h3><span class="panda-icon-h3">🐼</span> Panda AI</h3>
+                    <h3><span class="moon-icon-h3">🐼</span> Moon AI</h3>
 
                     <div class="ai-chat-panel" id="ai-chat-panel">
 
                         <!-- Trạng thái mặc định: chờ wake-word -->
                         <div class="ai-idle-hint" id="ai-idle-hint">
                             <div class="ai-idle-icon">🎙️</div>
-                            <p>Nói <strong>"Panda..."</strong> để bắt đầu hội thoại</p>
-                            <p class="ai-idle-sub">Sau 3 giây im lặng, Panda sẽ trả lời</p>
+                            <p>Nói <strong>"Moon..."</strong> để bắt đầu hội thoại</p>
+                            <p class="ai-idle-sub">Sau 3 giây im lặng, Moon sẽ trả lời</p>
                         </div>
 
                         <!-- Bubble câu hỏi người dùng -->
@@ -193,13 +193,13 @@
                             <div class="thinking-dots">
                                 <span></span><span></span><span></span>
                             </div>
-                            <span class="thinking-label" id="ai-thinking-label">Panda đang suy nghĩ...</span>
+                            <span class="thinking-label" id="ai-thinking-label">Moon đang suy nghĩ...</span>
                         </div>
 
-                        <!-- Bubble câu trả lời Panda -->
-                        <div class="ai-bubble panda-bubble" id="ai-panda-bubble" style="display:none">
-                            <div class="bubble-label"><span>🐼</span> Panda trả lời</div>
-                            <div class="bubble-text" id="ai-panda-text"></div>
+                        <!-- Bubble câu trả lời Moon -->
+                        <div class="ai-bubble moon-bubble" id="ai-moon-bubble" style="display:none">
+                            <div class="bubble-label"><span>🐼</span> Moon trả lời</div>
+                            <div class="bubble-text" id="ai-moon-text"></div>
                             <div class="bubble-cursor" id="ai-cursor">▋</div>
                         </div>
 

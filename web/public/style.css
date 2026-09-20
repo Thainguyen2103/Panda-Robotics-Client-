@@ -1,5 +1,5 @@
-/* ═══════════════════════════════════════════════════════════════════════════
-   Panda Dashboard — Premium UI
+﻿/* ═══════════════════════════════════════════════════════════════════════════
+   Moon Dashboard — Premium UI
    Font: Inter (Google Fonts)
    Theme: Dark glassmorphism, cyan accent
 ═══════════════════════════════════════════════════════════════════════════ */
@@ -571,7 +571,7 @@ button:active { transform: translateY(0); }
     text-transform: uppercase; letter-spacing: 1px;
     margin-bottom: 12px;
 }
-.panda-icon-h3 { font-size: 16px; }
+.moon-icon-h3 { font-size: 16px; }
 
 .ai-chat-panel {
     background: linear-gradient(160deg, #0d1117, #10151e);
@@ -633,9 +633,9 @@ button:active { transform: translateY(0); }
 .user-bubble .bubble-label { color: #58a6ff; }
 .user-bubble .bubble-text  { color: #cdd9e5; }
 
-.panda-bubble { background: rgba(162,155,254,0.07); border: 1px solid rgba(162,155,254,0.18); }
-.panda-bubble .bubble-label { color: var(--purple); }
-.panda-bubble .bubble-text  { color: #e2defe; }
+.moon-bubble { background: rgba(162,155,254,0.07); border: 1px solid rgba(162,155,254,0.18); }
+.moon-bubble .bubble-label { color: var(--purple); }
+.moon-bubble .bubble-text  { color: #e2defe; }
 
 .bubble-cursor {
     display: inline; color: var(--purple);

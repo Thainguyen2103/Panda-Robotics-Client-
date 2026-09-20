@@ -1,8 +1,8 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <title>Panda Demo Dashboard</title>
+    <title>Moon Demo Dashboard</title>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
       body {
@@ -37,7 +37,7 @@
     </style>
   </head>
   <body>
-    <h1>Panda Firmware Demo &ndash; Tiến độ học tập</h1>
+    <h1>Moon Firmware Demo &ndash; Tiến độ học tập</h1>
     <div id="status">Đang kết nối MQTT...</div>
     <div class="stats">
       <div class="correct">Đúng: <span id="correctCount">0</span></div>
@@ -48,8 +48,8 @@
     <script>
       // Broker công cộng dùng chung với firmware-demo/src/main.cpp
       const BROKER_URL = "ws://broker.hivemq.com:8000/mqtt";
-      const TOPIC_RESULT = "panda/demo/khoa/result";
-      const TOPIC_PROGRESS = "panda/demo/khoa/progress";
+      const TOPIC_RESULT = "moon/demo/khoa/result";
+      const TOPIC_PROGRESS = "moon/demo/khoa/progress";
 
       const statusEl = document.getElementById("status");
       const logEl = document.getElementById("log");

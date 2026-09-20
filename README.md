@@ -1,7 +1,7 @@
-# 🐼 Panda Robotics — "Moon"
+﻿# 🐼 Moon Robotics — "Moon"
 
 Robot bạn đồng hành hỗ trợ trẻ em học tiếng Anh — dự án PBL4, Đại học Đà Nẵng.
-Panda nghe được (wake-word "Panda" + câu hỏi tiếng Việt/Anh), nhìn được (nhận diện
+Moon nghe được (wake-word "Moon" + câu hỏi tiếng Việt/Anh), nhìn được (nhận diện
 chủ nhân + cảm xúc), trả lời bằng giọng nói tự nhiên và "diễn" toàn bộ cảm xúc lên
 màn OLED theo phong cách robot Vector (Anki).
 
@@ -39,7 +39,7 @@ server/      brain.py (điều phối), voice.py (STT), llm.py, tts.py,
              vision.py (CV), topics.py (24 chủ đề), mqtt_bridge.py,
              virtual_robot.py (robot ảo để test không cần phần cứng)
 web/         server.js + public/ (dashboard OLED mô phỏng, idle behaviors)
-firmware/    panda_firmware.ino (ESP32, chạy được trên Wokwi lẫn chip thật)
+firmware/    moon_firmware.ino (ESP32, chạy được trên Wokwi lẫn chip thật)
 tools/       bench_topics.py, dev_mic_bridge.py
 ```
 
@@ -60,19 +60,19 @@ copy config\secrets.example.py config\secrets.py   # rồi điền key
 # Dashboard: http://localhost:3000
 ```
 
-Nói **"Panda"** rồi hỏi bất kỳ điều gì bằng tiếng Việt — OLED diễn cảm xúc,
+Nói **"Moon"** rồi hỏi bất kỳ điều gì bằng tiếng Việt — OLED diễn cảm xúc,
 icon chủ đề và trả lời bằng giọng nói.
 
 ## 🔑 MQTT topics (hợp đồng giữa các module)
 
 | Topic | Hướng | Nội dung |
 |---|---|---|
-| `panda/cmd/move\|arm\|buzz\|face\|text` | brain → robot | lệnh hành động / biểu cảm |
-| `panda/status` | robot → brain | `{dist, btn}` sonar + nút |
-| `panda/ai/state\|thinking\|response\|topic` | brain → dashboard | trạng thái AI + chủ đề |
-| `panda/ai/clip`, `panda/ai/mic_live` | mic → brain | clip giọng / mic trực tiếp |
-| `panda/camera` | vision → dashboard | JPEG base64 |
-| `panda/vision/status` | vision → dashboard | danh tính, biểu cảm, cử chỉ, tình trạng mô hình |
+| `moon/cmd/move\|arm\|buzz\|face\|text` | brain → robot | lệnh hành động / biểu cảm |
+| `moon/status` | robot → brain | `{dist, btn}` sonar + nút |
+| `moon/ai/state\|thinking\|response\|topic` | brain → dashboard | trạng thái AI + chủ đề |
+| `moon/ai/clip`, `moon/ai/mic_live` | mic → brain | clip giọng / mic trực tiếp |
+| `moon/camera` | vision → dashboard | JPEG base64 |
+| `moon/vision/status` | vision → dashboard | danh tính, biểu cảm, cử chỉ, tình trạng mô hình |
 
 ## 📦 Model assets (KHÔNG nằm trong repo — tải riêng)
 
@@ -93,7 +93,7 @@ icon chủ đề và trả lời bằng giọng nói.
   MAX98357 + loa 8Ω (miệng) · SSD1306 128×64 (mặt).
 - **Body**: ESP32 DevKit C · TB6612FNG · kit 2WD · HC-SR04 · buzzer · nút nhấn.
 - **Power**: 2×18650 + TP4056 + MT3608.
-- Firmware mẫu + sơ đồ mô phỏng Wokwi: `firmware/panda_firmware/`
+- Firmware mẫu + sơ đồ mô phỏng Wokwi: `firmware/moon_firmware/`
   (`wokwi.toml` + `diagram.json` sẵn sàng; bật `#define USE_MQTT` khi nạp thật).
 
 ## 🧪 Mô phỏng trước khi lắp

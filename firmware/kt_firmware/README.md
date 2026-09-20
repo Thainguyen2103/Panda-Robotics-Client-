@@ -1,4 +1,4 @@
-# kt_firmware — Demo firmware ESP32 (mô phỏng Wokwi)
+﻿# kt_firmware — Demo firmware ESP32 (mô phỏng Wokwi)
 
 Thư mục dùng chung cho phần "Firmware nhúng" (Khoa + bạn nhúng thứ 2), phát triển bằng
 PlatformIO + Wokwi (chưa cần phần cứng thật). Đây là bản demo minh hoạ luồng
@@ -20,7 +20,7 @@ tích hợp dần với phần AI/backend ở `server/` cùng repo. Mỗi ngư�
 src/
 ├── main.cpp        # setup()/loop(), điều phối các module bên dưới
 ├── pins.h          # định nghĩa chân GPIO tập trung
-├── display.h/.cpp  # OLED SSD1306 — 14 biểu cảm (đồng bộ với firmware/panda_firmware.ino
+├── display.h/.cpp  # OLED SSD1306 — 14 biểu cảm (đồng bộ với firmware/moon_firmware.ino
 │                     ở thư mục cha) + hiển thị từ vựng
 ├── input.h/.cpp    # đọc 2 nút bấm (debounce + edge detect)
 ├── network.h/.cpp  # WiFi + MQTT (connect/reconnect/publish, non-blocking)
@@ -32,10 +32,10 @@ web-dashboard/
 ## Lưu ý tích hợp
 
 - Biểu cảm OLED (`neutral/happy/sad/angry/surprised/sleepy/wink/love/cool/cute/dizzy/
-  questioning/thinking/speaking`) được port từ `firmware/panda_firmware/panda_firmware.ino`
+  questioning/thinking/speaking`) được port từ `firmware/moon_firmware/moon_firmware.ino`
   (cùng toạ độ mắt `L=32, R=76, Y=17, W=20, H=30`) để tương thích khi ghép chung.
 - Demo hiện đang publish/subscribe trên broker công cộng `broker.hivemq.com` với topic
-  riêng cho mục đích demo (khác namespace `panda/cmd/*` / `panda/status` mà `server/brain.py`
+  riêng cho mục đích demo (khác namespace `moon/cmd/*` / `moon/status` mà `server/brain.py`
   dùng) — sẽ đổi sang namespace + broker thật khi tích hợp end-to-end.
 - 2 nút bấm hiện đang giả lập kết quả chấm đúng/sai, thay cho STT/fuzzy-matching thật —
   sẽ được thay thế khi ghép với pipeline AI thật ở `server/`.

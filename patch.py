@@ -9,7 +9,7 @@ def replace_in_file(filepath, old, new):
         f.write(content)
 
 # 1. Update config/settings.py
-replace_in_file('config/settings.py', 'TOPIC_VOICE_LOG = "panda/log/voice"', 'TOPIC_VOICE_LOG = "panda/log/voice"\nTOPIC_CAMERA = "panda/camera"')
+replace_in_file('config/settings.py', 'TOPIC_VOICE_LOG = "moon/log/voice"', 'TOPIC_VOICE_LOG = "moon/log/voice"\nTOPIC_CAMERA = "moon/camera"')
 
 # 2. Update server/vision.py
 vision_add_import = "import base64\nimport server.mqtt_bridge as mqtt_bridge\n"
@@ -33,7 +33,7 @@ vision_new_loop = '''        if frame is not None:
 replace_in_file('server/vision.py', vision_old_loop, vision_new_loop)
 
 # 3. Update web/server.js
-replace_in_file('web/server.js', "mqttClient.subscribe('panda/log/voice');", "mqttClient.subscribe('panda/log/voice');\n    mqttClient.subscribe('panda/camera');")
+replace_in_file('web/server.js', "mqttClient.subscribe('moon/log/voice');", "mqttClient.subscribe('moon/log/voice');\n    mqttClient.subscribe('moon/camera');")
 
 # 4. Update index.html
 html_old = '''                    <div class="camera-box">
@@ -54,14 +54,14 @@ html_new = '''                    <div class="camera-box" style="padding: 0;">
 replace_in_file('web/public/index.html', html_old, html_new)
 
 # 5. Update app.js
-appjs_old = "    } else if (topic === 'panda/cmd/face') {"
-appjs_new = '''    } else if (topic === 'panda/camera') {
+appjs_old = "    } else if (topic === 'moon/cmd/face') {"
+appjs_new = '''    } else if (topic === 'moon/camera') {
         const camImg = document.getElementById('cam-image');
         const camPlaceholder = document.getElementById('cam-placeholder');
         camImg.src = "data:image/jpeg;base64," + payload;
         camImg.style.display = 'block';
         if (camPlaceholder) camPlaceholder.style.display = 'none';
-    } else if (topic === 'panda/cmd/face') {'''
+    } else if (topic === 'moon/cmd/face') {'''
 replace_in_file('web/public/app.js', appjs_old, appjs_new)
 
 print('Patch applied successfully')

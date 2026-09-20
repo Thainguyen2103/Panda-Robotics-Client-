@@ -1,8 +1,8 @@
-# tools/dev_mic_bridge.py — GIẢ LẬP mic robot bằng mic laptop
+﻿# tools/dev_mic_bridge.py — GIẢ LẬP mic robot bằng mic laptop
 # ============================================================
 # Bắt clip giọng từ mic laptop (cùng VAD 3 lớp của voice.py) rồi publish
 # base64 PCM 16kHz lên đúng topic mà robot ESP32 sẽ dùng sau này
-# (panda/ai/clip) → brain xử lý y hệt, KHÔNG phân biệt nguồn.
+# (moon/ai/clip) → brain xử lý y hệt, KHÔNG phân biệt nguồn.
 #
 # Mục đích: test hôm nay bằng mic laptop trên ĐÚNG code path của robot,
 # để ngày lắp mic thật vào chỉ việc nạp firmware, não không đổi dòng nào.
@@ -13,7 +13,7 @@
 #       python server/brain.py
 #   Terminal 2 (bridge này):
 #       python tools/dev_mic_bridge.py
-#   Rồi nói "Panda..." vào mic laptop.
+#   Rồi nói "Moon..." vào mic laptop.
 #
 # Sau này robot thật: ESP32 publish clip cùng định dạng → gỡ bridge là xong.
 
@@ -37,7 +37,7 @@ from server import voice, mqtt_bridge
 def main():
     print("🎙️ [BRIDGE] Mic laptop → clip base64 →", settings.TOPIC_BROWSER_CLIP)
     print("   (giả lập mic robot — brain phải chạy với MIC_SOURCE='remote')")
-    print("   Nói 'Panda...' để thử. Ctrl+C để dừng.\n")
+    print("   Nói 'Moon...' để thử. Ctrl+C để dừng.\n")
 
     while True:
         try:

@@ -1,4 +1,4 @@
-"""
+﻿"""
 test_pipeline.py — Kiểm tra toàn bộ pipeline Voice → LLM → TTS
 ================================================================
 Chạy từng test một để xác nhận từng module hoạt động đúng.
@@ -118,7 +118,7 @@ def test_tts():
 
     info("Phát âm câu test — lắng nghe xem có tiếng không...")
     t0 = time.time()
-    tts.speak("Xin chào! Mình là Panda, đang test hệ thống giọng nói.", blocking=True)
+    tts.speak("Xin chào! Mình là Moon, đang test hệ thống giọng nói.", blocking=True)
     elapsed = time.time() - t0
 
     assert_ok(elapsed > 0.5,
@@ -199,19 +199,19 @@ def test_voice():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def test_wake_word():
-    section("TEST 4 — Wake-word \"Panda\"")
+    section("TEST 4 — Wake-word \"Moon\"")
     from server import voice
 
     if not voice.groq_client or not voice.sd:
         warn("Bỏ qua — thiếu Groq hoặc sounddevice"); return
 
     from config import settings
-    wake_words = getattr(settings, "PANDA_WAKE_WORDS", ["panda"])
+    wake_words = getattr(settings, "MOON_WAKE_WORDS", ["moon"])
     info(f"Wake words: {wake_words}")
 
     voice._select_input_device()   # warm-up mic trước để probe không nuốt mất giọng bạn
     print()
-    input(f"  {YELLOW}❓ Nhấn Enter rồi nói \"Panda\" (hoặc \"Hey Panda\")...{RESET}")
+    input(f"  {YELLOW}❓ Nhấn Enter rồi nói \"Moon\" (hoặc \"Hey Moon\")...{RESET}")
 
     audio = voice._record_until_silence()
     text  = voice._transcribe_dual(audio) if audio else ""   # dual vi+en giống pipeline thật
@@ -244,7 +244,7 @@ def test_full_pipeline():
 
     voice._select_input_device()   # warm-up mic trước để probe không nuốt mất giọng bạn
     print()
-    input(f"  {YELLOW}❓ Nhấn Enter rồi nói \"Panda, bạn tên là gì?\"...{RESET}")
+    input(f"  {YELLOW}❓ Nhấn Enter rồi nói \"Moon, bạn tên là gì?\"...{RESET}")
 
     # Bước 1: STT
     info("⏳ Đang nghe...")
@@ -300,7 +300,7 @@ def print_summary():
 if __name__ == "__main__":
     args = sys.argv[1:]
 
-    print(f"\n{BOLD}{CYAN}[PANDA] Pipeline Test Suite{RESET}")
+    print(f"\n{BOLD}{CYAN}[MOON] Pipeline Test Suite{RESET}")
     print(f"{CYAN}   Kiem tra: Voice (Groq) -> LLM (DeepSeek) -> TTS (Fish Audio){RESET}")
 
     try:
