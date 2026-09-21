@@ -9,85 +9,121 @@
 // vào chi tiết TFT/WiFi/MQTT/nút bấm (những phần đó nằm ở display.*, network.*, input.*).
 // Xem WEEKLY_LOGIC.md để hiểu lý do tách module theo cách này.
 
-const char *TOPIC_RESULT = "panda/demo/khoa/result";
-const char *TOPIC_PROGRESS = "panda/demo/khoa/progress";
-const char *DEMO_WORD = "hello";
-
-static int correctCount = 0;
-static int wrongCount = 0;
-
-static void publishResult(const char *result)
-{
-  char payload[128];
-  snprintf(payload, sizeof(payload),
-           "{\"word\":\"%s\",\"result\":\"%s\",\"ts\":%lu}",
-           DEMO_WORD, result, millis());
-  networkPublish(TOPIC_RESULT, payload);
-
-  char progress[64];
-  snprintf(progress, sizeof(progress),
-           "{\"correct\":%d,\"wrong\":%d}", correctCount, wrongCount);
-  networkPublish(TOPIC_PROGRESS, progress);
-
-  Serial.print("Da publish: ");
-  Serial.println(payload);
-}
+// Bản demo không còn chấm đúng/sai (bỏ 21/09/2026) nên chỉ còn 1 topic: báo cho server
+// biết robot đang hiện từ nào trên màn.
+const char *TOPIC_WORD = "panda/demo/khoa/word";
 
 // ---------------------------------------------------------------------------
-//  Biểu cảm lúc "rảnh"
+//  Danh sách từ vựng demo (tiếng Anh + tiếng Nhật)
 //
-//  Chỉ còn 2 nút: ĐÚNG -> happy, SAI -> sad. Nút bấm luôn được ưu tiên và giữ nguyên
-//  biểu cảm đó một lúc. Nếu quá IDLE_ENTER_MS mà không ai bấm gì, robot tự lần lượt
-//  diễn các biểu cảm còn lại cho đỡ "chết cứng" — cũng là cách xem hết mọi animation
-//  mà không cần thêm nút test nào.
+//  Phạm vi dự án từ 21/09/2026 có thêm tiếng Nhật bên cạnh tiếng Anh, nên mỗi từ mang 3
+//  phần: chữ Latin, Kanji, và cách đọc bằng Kana. Từ nào tiếng Nhật không dùng Kanji thì
+//  để trống ô kanji — display.cpp sẽ tự phóng to phần Kana thay vào chỗ đó.
+//
+//  LƯU Ý khi sửa file này: phải lưu bằng mã hoá UTF-8 (VS Code mặc định là UTF-8, xem góc
+//  dưới bên phải). Nếu lưu nhầm bảng mã khác, các chữ Nhật bên dưới biến thành byte rác và
+//  màn hình sẽ hiện ra khoảng trắng.
+//
+//  Đây chỉ là dữ liệu tạm để test khi chưa có server: sau này khi bật lại MQTT, từ vựng sẽ
+//  do server gửi xuống qua topic panda/cmd/word và gọi đúng hàm displaySetWord().
 // ---------------------------------------------------------------------------
-static const char *IDLE_FACES[] = {
-    "neutral", "questioning", "cute", "surprised", "thinking", "love",
-    "cool", "hearing", "speaking", "dizzy", "wink", "sleepy"};
-static const int IDLE_FACES_LEN = sizeof(IDLE_FACES) / sizeof(IDLE_FACES[0]);
-
-static const unsigned long IDLE_ENTER_MS = 6000; // im lặng bao lâu thì bắt đầu tự diễn
-static const unsigned long IDLE_STEP_MS = 4500;  // mỗi biểu cảm giữ bao lâu
-
-static unsigned long lastUserActionMs = 0;
-static unsigned long idleStepMs = 0;
-static bool idleActive = false;
-static int idleIndex = 0;
-
-// Gọi khi có tương tác của người dùng (bấm nút / gõ lệnh Serial): tạm dừng chế độ tự
-// diễn và đếm lại từ đầu, để biểu cảm vừa đặt không bị ghi đè ngay sau đó.
-static void markUserAction()
+struct VocabWord
 {
-  lastUserActionMs = millis();
-  idleActive = false;
+  const char *english;
+  const char *kanji;
+  const char *kana;
+};
+
+static const VocabWord VOCAB[] = {
+    {"dog", "犬", "いぬ"},
+    {"cat", "猫", "ねこ"},
+    {"water", "水", "みず"},
+    {"fish", "魚", "さかな"},
+    {"mountain", "山", "やま"},
+    {"flower", "花", "はな"},
+    {"book", "本", "ほん"},
+    {"rain", "雨", "あめ"},
+    {"cake", "", "ケーキ"}, // từ mượn, tiếng Nhật viết bằng Katakana, không có Kanji
+};
+static const int VOCAB_LEN = sizeof(VOCAB) / sizeof(VOCAB[0]);
+
+// -1 = chưa hiện từ nào lần nào, nên lần bấm nút đầu tiên sẽ hiện đúng từ số 0.
+static int vocabIndex = -1;
+
+// Hiện từ kế tiếp ra giữa màn (và báo lên MQTT nếu đang bật). Hết danh sách thì quay
+// vòng về từ đầu tiên.
+static void showNextWord()
+{
+  vocabIndex = (vocabIndex + 1) % VOCAB_LEN;
+  const VocabWord &w = VOCAB[vocabIndex];
+  displaySetWord(w.english, w.kanji, w.kana);
+
+  char payload[192];
+  snprintf(payload, sizeof(payload),
+           "{\"word\":\"%s\",\"kanji\":\"%s\",\"kana\":\"%s\",\"ts\":%lu}",
+           w.english, w.kanji, w.kana, millis());
+  networkPublish(TOPIC_WORD, payload);
 }
 
-static void handleIdleFaces()
+// ---------------------------------------------------------------------------
+//  Danh sách biểu cảm để nút thứ nhất lần lượt đi qua.
+//
+//  Trước đây robot tự đổi biểu cảm khi không ai bấm gì trong 6 giây. Bỏ cơ chế đó ngày
+//  21/09/2026 vì giờ đã có hẳn một nút riêng để đổi — tự đổi nữa sẽ ghi đè mất biểu cảm
+//  vừa chọn và làm hành vi khó đoán.
+// ---------------------------------------------------------------------------
+static const char *FACES[] = {
+    "neutral", "happy", "sad", "angry", "surprised", "sleepy", "wink", "love",
+    "cool", "cute", "dizzy", "questioning", "hearing", "thinking", "speaking"};
+static const int FACES_LEN = sizeof(FACES) / sizeof(FACES[0]);
+
+static int faceIndex = 0;
+
+// Sang biểu cảm kế tiếp. Nếu đang hiện từ vựng thì thao tác này cũng đưa màn hình quay
+// về khuôn mặt (xem displaySetExpression trong display.cpp).
+static void showNextFace()
 {
-  unsigned long now = millis();
-  if (now - lastUserActionMs < IDLE_ENTER_MS)
-  {
-    return; // vẫn đang trong lúc "có người tương tác"
-  }
-
-  if (!idleActive)
-  {
-    idleActive = true;
-    idleStepMs = now - IDLE_STEP_MS; // đổi mặt ngay lập tức khi vừa vào chế độ rảnh
-  }
-
-  if (now - idleStepMs < IDLE_STEP_MS)
-  {
-    return;
-  }
-  idleStepMs = now;
-  displaySetExpression(IDLE_FACES[idleIndex]);
-  idleIndex = (idleIndex + 1) % IDLE_FACES_LEN;
+  faceIndex = (faceIndex + 1) % FACES_LEN;
+  displaySetExpression(FACES[faceIndex]);
 }
 
-// Gõ "face <ten>" qua Serial Monitor để xem thẳng 1 biểu cảm bất kỳ — cùng quy ước
-// "face X" với firmware của bạn AI trong nhóm (xem ai.md mục 5). Tiện khi cần chụp ảnh
-// hoặc quay video đúng một biểu cảm, khỏi phải ngồi đợi vòng tự diễn chạy tới.
+// Tách một chuỗi thành tối đa 3 phần ngăn cách bằng dấu cách. Cắt theo BYTE là an toàn với
+// tiếng Nhật: trong UTF-8, byte của dấu cách (0x20) không bao giờ xuất hiện bên trong một
+// chữ nhiều byte, nên không có nguy cơ cắt đôi chữ 犬 thành byte rác.
+static int splitWords(const String &text, String *parts, int maxParts)
+{
+  int count = 0;
+  int i = 0;
+  while (count < maxParts && i < (int)text.length())
+  {
+    while (i < (int)text.length() && text[i] == ' ')
+    {
+      i++;
+    }
+    if (i >= (int)text.length())
+    {
+      break;
+    }
+    int space = text.indexOf(' ', i);
+    if (space < 0)
+    {
+      space = text.length();
+    }
+    parts[count++] = text.substring(i, space);
+    i = space;
+  }
+  return count;
+}
+
+// 2 lệnh gõ qua Serial Monitor:
+//
+//   face <ten>              — xem thẳng 1 biểu cảm bất kỳ (cùng quy ước với firmware của bạn
+//                             AI trong nhóm, xem ai.md mục 5).
+//   word <anh> <kanji> <kana>  — đặt từ vựng tuỳ ý, ví dụ: word dog 犬 いぬ
+//
+// Lệnh "word" là cách kiểm chứng luồng UTF-8 chạy đúng với chữ BẤT KỲ chứ không chỉ mấy từ
+// dựng sẵn trong VOCAB — đúng việc mà MQTT sẽ làm sau này. Gõ tiếng Nhật vào Serial Monitor
+// cần bàn phím/IME tiếng Nhật; nếu không gõ được, cứ dùng danh sách VOCAB dựng sẵn.
 static void handleSerialCommand()
 {
   if (!Serial.available())
@@ -96,15 +132,26 @@ static void handleSerialCommand()
   }
   String line = Serial.readStringUntil('\n');
   line.trim();
-  if (!line.startsWith("face "))
+
+  if (line.startsWith("face "))
   {
+    String arg = line.substring(5);
+    arg.trim();
+    displaySetExpression(arg.c_str());
     return;
   }
 
-  String arg = line.substring(5);
-  arg.trim();
-  markUserAction();
-  displaySetExpression(arg.c_str());
+  if (line.startsWith("word "))
+  {
+    String parts[3];
+    int count = splitWords(line.substring(5), parts, 3);
+    if (count == 0)
+    {
+      Serial.println("[main] Cu phap: word <tieng anh> <kanji> <kana>");
+      return;
+    }
+    displaySetWord(parts[0].c_str(), parts[1].c_str(), parts[2].c_str());
+  }
 }
 
 void setup()
@@ -115,12 +162,13 @@ void setup()
   networkSetup();
   audioI2sSetup(); // module học I2S của Tuần 3 — xem audio_i2s.cpp để hiểu vì sao chưa đọc được âm thanh thật trong Wokwi
 
-  displaySetStats(DEMO_WORD, correctCount, wrongCount);
-  displaySetExpression("neutral");
-  lastUserActionMs = millis();
+  // Khởi động ở chế độ khuôn mặt — từ vựng chỉ hiện khi người dùng bấm nút hỏi.
+  displaySetExpression(FACES[faceIndex]);
 
-  Serial.println("[main] San sang. Nut XANH = dung, nut DO = sai.");
-  Serial.println("[main] De yen ~6s robot se tu dien lan luot cac bieu cam.");
+  Serial.println("[main] San sang.");
+  Serial.println("[main] Nut chan 25 = doi bieu cam ke tiep (15 bieu cam).");
+  Serial.println("[main] Nut chan 26 = hien tu vung ke tiep ra giua man (bam lai = tu khac).");
+  Serial.println("[main] Go 'face <ten>' hoac 'word <anh> <kanji> <kana>' de test thu cong.");
 
   // In lượng RAM trống còn lại sau khi mọi thứ đã khởi tạo xong (khung đệm màn hình 62KB,
   // WiFi, MQTT...). Nếu con số này tụt xuống dưới ~40KB thì cần lo: các thao tác mạng sau
@@ -136,24 +184,15 @@ void loop()
   handleSerialCommand();
 
   ButtonEvent event = inputPoll();
-  if (event == ButtonEvent::Correct)
+  if (event == ButtonEvent::NextFace)
   {
-    markUserAction();
-    correctCount++;
-    displaySetExpression("happy");
-    displaySetStats(DEMO_WORD, correctCount, wrongCount);
-    publishResult("correct");
+    showNextFace();
   }
-  else if (event == ButtonEvent::Wrong)
+  else if (event == ButtonEvent::NextWord)
   {
-    markUserAction();
-    wrongCount++;
-    displaySetExpression("sad");
-    displaySetStats(DEMO_WORD, correctCount, wrongCount);
-    publishResult("wrong");
+    showNextWord();
   }
 
-  handleIdleFaces();
   displayLoop();
   audioI2sLoop();
 

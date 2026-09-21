@@ -28,11 +28,12 @@
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
 
-// 2 nút bấm mô phỏng kết quả chấm đúng/sai (thay cho STT/AI thật).
-// Chỉ còn đúng 2 nút: nút thứ 3 "đổi biểu cảm" đã bỏ vì bây giờ khi không ai bấm gì,
-// robot tự luân chuyển biểu cảm (xem handleIdleFaces() trong main.cpp).
-#define PIN_BTN_CORRECT 25
-#define PIN_BTN_WRONG 26
+// 2 nút điều khiển demo (đổi công dụng 21/09/2026 — trước đây là chấm đúng/sai):
+//   PIN_BTN_FACE (25) — đổi sang biểu cảm kế tiếp trong 15 biểu cảm
+//   PIN_BTN_WORD (26) — hiện từ vựng kế tiếp ra giữa màn để học
+// Giữ nguyên số chân cũ nên không phải sửa lại diagram.json hay đấu lại dây.
+#define PIN_BTN_FACE 25
+#define PIN_BTN_WORD 26
 
 // Mic I2S (INMP441 thật sẽ gắn ở Tuần 9) — chọn 32/33/34 để không đụng chân SPI của màn
 // hình (2/4/5/18/19/23) và 2 nút bấm (25/26) ở trên.

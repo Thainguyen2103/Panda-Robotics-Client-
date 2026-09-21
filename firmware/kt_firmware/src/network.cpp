@@ -1,4 +1,21 @@
 #include "network.h"
+
+// CỜ BẬT/TẮT TOÀN BỘ MẠNG (thêm 21/09/2026) — giá trị thật đặt ở platformio.ini.
+//
+// Vì sao cần: giai đoạn này mới làm một mình phần hiển thị từ vựng, chưa có server/dashboard
+// gửi gì về, nên WiFi+MQTT chỉ tổ làm chậm vòng test: mỗi lần khởi động chờ WiFi tới 15 giây,
+// mất mạng thì cứ 5 giây lại thử kết nối lại, và mỗi lần mqtt.connect() có thể "đứng hình"
+// tới 3 giây giữa lúc animation đang chạy.
+//
+// Tắt bằng CỜ BIÊN DỊCH thay vì comment từng dòng ở main.cpp: khi ENABLE_MQTT=0 thì cả
+// #include <WiFi.h> bên dưới cũng không được biên dịch (bản build không còn kéo theo chồng
+// WiFi/TCP-IP), còn 4 hàm công khai vẫn tồn tại dưới dạng rỗng nên main.cpp KHÔNG phải sửa
+// dòng nào. Bật lại: đổi -D ENABLE_MQTT=0 thành 1 trong platformio.ini.
+#ifndef ENABLE_MQTT
+#define ENABLE_MQTT 1
+#endif
+
+#if ENABLE_MQTT
 #include <WiFi.h>
 #include <PubSubClient.h>
 
@@ -179,3 +196,34 @@ void networkPublish(const char *topic, const char *payload)
   }
   mqtt.publish(topic, payload);
 }
+
+#else // ENABLE_MQTT == 0
+
+// ---------------------------------------------------------------------------
+//  Bản rỗng dùng khi tắt mạng. Giữ nguyên 4 hàm công khai để main.cpp gọi như thường,
+//  chỉ khác là chúng không làm gì. In ra Serial nội dung lẽ ra được publish, để vẫn
+//  kiểm tra được luồng dữ liệu (từ nào, đúng/sai bao nhiêu) mà không cần broker.
+// ---------------------------------------------------------------------------
+
+void networkSetup()
+{
+  Serial.println("[net] WiFi/MQTT DANG TAT (ENABLE_MQTT=0 trong platformio.ini).");
+  Serial.println("[net] Doi co do thanh 1 de bat lai khi ghep voi server that.");
+}
+
+void networkLoop() {}
+
+bool networkIsReady()
+{
+  return false;
+}
+
+void networkPublish(const char *topic, const char *payload)
+{
+  Serial.print("[net] (tat MQTT) le ra publish ");
+  Serial.print(topic);
+  Serial.print(" -> ");
+  Serial.println(payload);
+}
+
+#endif // ENABLE_MQTT
