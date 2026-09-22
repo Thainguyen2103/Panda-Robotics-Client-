@@ -36,6 +36,8 @@ class LearningRagTests(unittest.TestCase):
             "Hey, do you know who I am?",
             "Explain quantum physics",
             "こんにちは",
+            "今何時ですか？",
+            "Hãy giới thiệu bản thân bằng một câu tiếng Việt ngắn.",
         ):
             self.assertEqual(self.rag.search(question), [])
             self.assertEqual(retrieve_context(question), "")
@@ -54,6 +56,15 @@ class LearningRagTests(unittest.TestCase):
         self.assertTrue(any("Verified learning material" in item for item in contents))
         self.assertTrue(any("猫" in item for item in contents))
         self.assertIn("Chỉ trả lời bằng tiếng Việt", contents[-2])
+
+    def test_llm_does_not_inject_lessons_into_regular_conversation(self):
+        for question in (
+            "Xin chào Moon, hãy trả lời thật ngắn.",
+            "Bạn thích màu gì?",
+            "Hãy nói một điều vui vẻ.",
+        ):
+            contents = [message["content"] for message in llm._get_messages(question)]
+            self.assertFalse(any("Verified learning material" in item for item in contents))
 
 
 if __name__ == "__main__":

@@ -14,6 +14,18 @@ APPLE = {
 
 
 class GroundedLearningAnswerTests(unittest.TestCase):
+    def test_realtime_time_answer_uses_latest_turn_language(self):
+        japanese = llm.realtime_answer("今何時ですか？")
+        english = llm.realtime_answer("What time is it?")
+        vietnamese = llm.realtime_answer("Bây giờ là mấy giờ?")
+        self.assertIn("現在は", japanese)
+        self.assertIn("です", japanese)
+        self.assertTrue(english.startswith("It is "))
+        self.assertTrue(vietnamese.startswith("Bây giờ là "))
+
+    def test_non_time_question_does_not_use_realtime_shortcut(self):
+        self.assertIsNone(llm.realtime_answer("Hãy kể một câu chuyện ngắn"))
+
     def test_direct_lookup_is_grounded_in_vietnamese(self):
         with patch.object(llm, "learning_display_info", return_value=APPLE):
             answer = llm.grounded_learning_answer(

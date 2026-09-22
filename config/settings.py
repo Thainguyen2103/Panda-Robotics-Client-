@@ -37,6 +37,7 @@ LLM_PROVIDER = os.environ.get("MOON_LLM_PROVIDER", "ollama").strip().lower()
 GEMINI_LLM_MODEL = os.environ.get("GEMINI_LLM_MODEL", "gemini-3.5-flash-lite")
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
 OLLAMA_LLM_MODEL = os.environ.get("OLLAMA_LLM_MODEL", "moon-tutor")
+OLLAMA_MAX_TOKENS = int(os.environ.get("OLLAMA_MAX_TOKENS", "128"))
 LEARNING_RAG_ENABLED = os.environ.get("MOON_LEARNING_RAG", "1").strip().lower() not in {
     "0", "false", "no", "off",
 }

@@ -25,7 +25,9 @@ if sys.stderr and hasattr(sys.stderr, "reconfigure"):
 
 DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data.json")
 _CJK_IDEOGRAPH = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
-_JAPANESE_META_KANJI = set("日本語")
+# Các chữ thường xuất hiện trong câu hỏi chung, không phải từ cần tra cứu.
+# Ví dụ ``今何時ですか`` không được khớp bài ``時計`` chỉ vì cùng chữ ``時``.
+_JAPANESE_META_KANJI = set("日本語今何時年月")
 
 
 def strip_accents(text: str) -> str:
@@ -212,6 +214,17 @@ class MoonRAG:
         q_norm = self._normalize(query)
         q_unacc = strip_accents(q_norm)
         q_words = set(q_unacc.split())
+
+        # Tầng semantic dành cho câu đố hoặc mô tả gián tiếp. Không chạy nó
+        # cho hội thoại thông thường như "giới thiệu bản thân", vì vài từ
+        # chung trong ví dụ bài học sẽ tạo context dài nhưng không liên quan.
+        semantic_markers = (
+            "con gi", "cai gi", "thu gi", "loai nao", "mon gi", "do vui",
+            "what animal", "which animal", "what creature", "guess which",
+            "何の動物", "どの動物", "なぞなぞ",
+        )
+        if not any(marker in q_unacc for marker in semantic_markers):
+            return []
 
         # Loại bỏ các hư từ tiếng Việt thông dụng để tập trung vào từ mang ý nghĩa
         stopwords = {

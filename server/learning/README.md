@@ -14,7 +14,8 @@ STT Việt/Anh/Nhật
 ```
 
 `server/llm.py` là cổng LLM chính. Mặc định nó dùng model Ollama `moon-tutor`
-(được tạo từ Qwen 2.5 7B); Gemini chỉ phục vụ STT trong cấu hình mặc định.
+(được tạo từ Qwen 3.5 2B Q4 để vừa GPU 4 GB); Gemini chỉ phục vụ STT trong cấu
+hình mặc định.
 Khi câu hỏi khớp bài học, dữ liệu Kanji,
 Hiragana, Romaji, tiếng Anh, tiếng Việt, ví dụ và câu đố được đưa vào prompt.
 Nếu không khớp, cuộc hội thoại dùng LLM bình thường.
@@ -45,8 +46,10 @@ Có thể đổi model hoặc provider bằng biến môi trường:
 ```powershell
 $env:MOON_LLM_PROVIDER = "ollama"
 $env:OLLAMA_LLM_MODEL = "moon-tutor"
+$env:OLLAMA_MAX_TOKENS = "128"
 ```
 
-Nếu model chưa có, tải bằng `ollama pull <tên-model>`. Khi Ollama hoặc model
+Nếu model chưa có, tải bằng `ollama pull qwen3.5:2b-q4_K_M`, rồi chạy lại lệnh
+`ollama create` phía trên. Khi Ollama hoặc model
 không sẵn sàng, phần LLM báo lỗi rõ ràng thay vì dùng quota Gemini. Chỉ khi chủ
 động đặt `MOON_LLM_PROVIDER=gemini` thì Gemini mới được dùng để sinh văn bản.

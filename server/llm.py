@@ -51,6 +51,7 @@ try:
     GEMINI_LLM_MODEL = getattr(settings, "GEMINI_LLM_MODEL", "gemini-3.5-flash-lite")
     OLLAMA_HOST       = getattr(settings, "OLLAMA_HOST", "http://127.0.0.1:11434")
     OLLAMA_LLM_MODEL  = getattr(settings, "OLLAMA_LLM_MODEL", "moon-tutor")
+    OLLAMA_MAX_TOKENS = getattr(settings, "OLLAMA_MAX_TOKENS", 128)
     LLM_PROVIDER     = getattr(settings, "LLM_PROVIDER", "ollama")
     LEARNING_RAG_ENABLED = getattr(settings, "LEARNING_RAG_ENABLED", True)
     QUICK_MODEL      = getattr(settings, "QUICK_MODEL", "groq/compound-mini")
@@ -62,6 +63,7 @@ except Exception:
     GEMINI_LLM_MODEL = "gemini-3.5-flash-lite"
     OLLAMA_HOST = "http://127.0.0.1:11434"
     OLLAMA_LLM_MODEL = "moon-tutor"
+    OLLAMA_MAX_TOKENS = 128
     LLM_PROVIDER     = "ollama"
     LEARNING_RAG_ENABLED = True
     QUICK_MODEL      = "groq/compound-mini"
@@ -165,12 +167,30 @@ if LEARNING_RAG_ENABLED:
         print(f"⚠️ [RAG] Không thể nạp kho bài học: {e}")
 
 
+_LEARNING_INTENT_MARKERS = (
+    "tiếng nhật", "tiếng anh", "học từ", "dạy", "chỉ cho", "từ gì",
+    "đọc", "viết", "nghĩa", "phát âm", "chữ hán", "hiragana", "romaji",
+    "đố", "con gì", "cái gì", "thứ gì", "loài nào",
+    "japanese", "english word", "teach", "learn", "pronounce", "meaning",
+    "how do you say", "how is", "quiz", "what animal", "which animal",
+    "日本語", "英語", "漢字", "ひらがな", "ローマ字", "読み", "読ん", "書き",
+    "意味", "教えて", "クイズ", "何の動物", "どの動物",
+)
+
+
+def has_learning_intent(question: str) -> bool:
+    normalized = unicodedata.normalize("NFC", question or "").casefold()
+    return any(marker in normalized for marker in _LEARNING_INTENT_MARKERS)
+
+
 def learning_context(question: str) -> str:
     """Return verified lesson context without making the whole LLM depend on RAG."""
-    if not _retrieve_learning_context:
+    if not _retrieve_learning_context or not has_learning_intent(question):
         return ""
     try:
-        return _retrieve_learning_context(question)
+        # Một bài liên quan là đủ cho model local và giảm đáng kể thời gian
+        # xử lý prompt so với việc bơm hai bài dài vào mỗi lượt.
+        return _retrieve_learning_context(question, top_k=1)
     except Exception as e:
         print(f"⚠️ [RAG] Truy xuất bài học lỗi: {e}")
         return ""
@@ -193,6 +213,43 @@ _VOCAB_LOOKUP_MARKERS = (
     "how do you say", "in japanese", "how is", "pronounce", "written in",
     "日本語", "読み", "読ん", "書き", "漢字", "ひらがな", "ローマ字", "意味",
 )
+
+_TIME_QUERY_MARKERS = (
+    "mấy giờ", "bao nhiêu giờ", "giờ hiện tại", "bây giờ là mấy giờ",
+    "hôm nay ngày", "ngày bao nhiêu", "thứ mấy",
+    "what time", "current time", "time is it", "what date", "what day is it",
+    "today's date", "何時", "いま何時", "今何時", "今日は何日", "何曜日", "今日の日付",
+)
+
+
+def realtime_answer(question: str) -> str | None:
+    """Return exact local time without spending an LLM inference round."""
+    normalized = unicodedata.normalize("NFC", question or "").casefold()
+    if not any(marker in normalized for marker in _TIME_QUERY_MARKERS):
+        return None
+
+    now = datetime.now()
+    language = response_language(question)
+    if language == "ja":
+        weekdays = ["月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日", "日曜日"]
+        return (
+            f"現在は{now:%H時%M分}、{now.year}年{now.month}月{now.day}日"
+            f"（{weekdays[now.weekday()]}）です。"
+        )
+    if language == "en":
+        weekdays = [
+            "Monday", "Tuesday", "Wednesday", "Thursday",
+            "Friday", "Saturday", "Sunday",
+        ]
+        months = [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+        ]
+        return (
+            f"It is {now:%H:%M} on {weekdays[now.weekday()]}, "
+            f"{months[now.month - 1]} {now.day}, {now.year}."
+        )
+    return f"Bây giờ là {now:%H:%M}, {_WEEKDAYS[now.weekday()]} ngày {now:%d/%m/%Y}."
 
 
 def grounded_learning_answer(question: str) -> str | None:
@@ -237,29 +294,13 @@ def grounded_learning_answer(question: str) -> str | None:
     )
 
 # ─── System Prompt — Tính cách Moon ──────────────────────────────────────────
-SYSTEM_PROMPT = """Bạn là Moon — một robot thông minh, đáng yêu và thân thiện.
-Bạn được tạo ra bởi nhóm sinh viên đại học Đà Nẵng trong dự án PBL4.
-
-Tính cách của bạn:
-- Thông minh nhưng dễ gần, hay dùng emoji khi phù hợp 🐼
-- Trả lời bằng tiếng Việt tự nhiên, ngắn gọn và súc tích
-- Thỉnh thoảng tự xưng là "Moon" thay vì "tôi"
-- Luôn tích cực và khuyến khích người dùng
-- Nếu không biết điều gì, thành thật nói không biết thay vì bịa đặt
-- Khi được hỏi về cảm xúc hoặc cảm nhận, hãy trả lời như một người bạn thật sự
-
-Lưu ý:
-- Câu trả lời nên ngắn gọn (2-4 câu) vì sẽ được đọc to bằng giọng nói
-- Tránh dùng markdown, bullet point hay ký tự đặc biệt khó đọc
-- Hãy nói tự nhiên như hội thoại thông thường
-- KHÔNG dùng dấu **, ## hay bất kỳ ký hiệu markdown nào
-- NGÔN NGỮ: tuân thủ chỉ dẫn ngôn ngữ riêng của lượt hỏi mới nhất. Chọn ngôn
-  ngữ chính một cách tự nhiên và được giữ/dùng thuật ngữ ngoại ngữ quen thuộc
-  khi chúng rõ nghĩa hơn. Không dịch đôi toàn bộ câu trừ khi người dùng yêu cầu
-- BÙ ĐẮP LỖI NHẬN DẠNG: câu hỏi đến từ giọng nói nên có thể thiếu chữ,
-  sai chính tả (vd "ngon bị nào" = "ngọn núi nào"). Hãy tự suy luận ý định
-  hợp lý nhất rồi trả lời tự nhiên; KHÔNG nhắc lại phần chữ bị lỗi,
-  KHÔNG hỏi lại nếu ý đã rõ ràng."""
+SYSTEM_PROMPT = """You are Moon, a friendly panda robot from the PBL4 project.
+- Reply only in the language of the user's latest message: Vietnamese, English, or Japanese.
+- Never use Chinese unless the user speaks Chinese.
+- Give a natural, accurate voice answer in one to three short sentences.
+- Follow an explicit sentence limit and do not use Markdown.
+- If unsure, say you do not know instead of inventing facts.
+- Input comes from STT; silently repair an obvious minor transcription error."""
 
 # ─── Ngữ cảnh thời gian thực (để LLM biết "thế giới thật") ───────────────────
 # Giống Anki Vector: LLM không tự biết giờ/thời tiết — phải CẤP cho nó.
@@ -309,7 +350,9 @@ def _maybe_weather(question: str) -> str | None:
 # ─── Conversation history ─────────────────────────────────────────────────────
 _conversation_history: list[dict] = []
 _history_lock = threading.Lock()
-MAX_HISTORY = 10
+# Bốn lượt gần nhất đủ giữ mạch hội thoại nhưng không làm prompt local tăng dần
+# đến mức chậm rõ rệt sau một phút trò chuyện.
+MAX_HISTORY = 4
 
 
 _VIETNAMESE_MARKERS = {
@@ -377,12 +420,11 @@ def response_language_instruction(question: str) -> str:
 def _get_messages(user_question: str) -> list[dict]:
     with _history_lock:
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        # Ngữ cảnh thời gian thực: đồng hồ + thời tiết (nếu được hỏi)
-        ctx = _current_context()
+        # Câu hỏi giờ/ngày đã có nhánh deterministic. Chỉ bơm thời tiết khi
+        # được hỏi để model nhỏ không lặp lại giờ hệ thống trong hội thoại thường.
         wx = _maybe_weather(user_question)
         if wx:
-            ctx += " | " + wx
-        messages.append({"role": "system", "content": ctx})
+            messages.append({"role": "system", "content": wx})
         lesson_context = learning_context(user_question)
         if lesson_context:
             print("📚 [RAG] Đã thêm bài học xác thực vào prompt.")
@@ -470,6 +512,18 @@ def chat(
     if on_thinking:
         on_thinking("thinking")
 
+    exact_answer = realtime_answer(question)
+    if exact_answer:
+        if on_thinking:
+            on_thinking("answering")
+        if on_chunk:
+            on_chunk(exact_answer)
+        _add_to_history(question, exact_answer)
+        if on_done:
+            on_done(exact_answer)
+        print(f'✅ [REALTIME] Trả lời tức thì: "{exact_answer}"')
+        return exact_answer
+
     # Với câu hỏi tra từ trực tiếp, lấy đáp án từ dữ liệu bài học đã xác thực.
     # Nhánh này vừa nhanh vừa tránh để model nhỏ làm sai Kanji/Hiragana/Romaji.
     grounded_answer = grounded_learning_answer(question)
@@ -511,8 +565,11 @@ def chat(
             _provider_name,
             _model_name,
             messages,
-            max_tokens=extra_kwargs.get("max_tokens", 512),
-            temperature=0.7,
+            max_tokens=extra_kwargs.get(
+                "max_tokens",
+                OLLAMA_MAX_TOKENS if _provider_name == "ollama" else 512,
+            ),
+            temperature=0.25 if _provider_name == "ollama" else 0.7,
         )
         for text_chunk in text_stream:
             # Xử lý DeepSeek-R1 <think> tags streaming
