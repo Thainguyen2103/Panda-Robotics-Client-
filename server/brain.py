@@ -6,13 +6,13 @@ Pipeline chính:
     → voice/runtime/local.py (VAD + Groq STT) → transcript text
       → Phát hiện wake-word "Moon"
         → Nghe câu hỏi (nếu cần)
-          → llm.py (DeepSeek/Groq) → stream câu trả lời
+          → llm.py (RAG + Qwen local qua Ollama) → stream câu trả lời
             → tts.py (Fish Audio) → phát âm thanh
               → Quay về standby, tiếp tục nghe
 
 Modules kết hợp:
   - server/voice/    : local/browser STT and shared wake-word logic
-  - server/llm.py    : LLM (DeepSeek / Groq)
+  - server/llm.py    : Qwen local + kho bài học Nhật–Anh–Việt
   - server/tts.py    : TTS (Fish Audio)
   - server/vision/   : CV engine, camera runtime and observable signals
   - server/mqtt_bridge : giao tiếp với robot và dashboard
@@ -325,7 +325,7 @@ def _correct_and_classify(text: str):
     """HYBRID tiết kiệm trễ: 1 call compound-mini vừa sửa lỗi chính tả vừa
     phân loại chủ đề → (topic_id | None, câu đã sửa)."""
     r = llm.quick(
-        "Bạn là bộ sửa lỗi + phân loại cho trợ lý giọng nói Việt/Anh.\n"
+        "Bạn là bộ sửa lỗi + phân loại cho trợ lý giọng nói Việt/Anh/Nhật.\n"
         "Hãy suy luận thầm theo ngữ cảnh rồi chọn 1 chủ đề phù hợp nhất và sửa lỗi "
         "chính tả câu chép từ giọng nói. Chỉ sửa từ nghe nhầm/gần âm và dấu câu; "
         "không thêm ý, không trả lời câu hỏi, giữ nguyên tên riêng, chữ viết tắt, "
@@ -337,6 +337,7 @@ def _correct_and_classify(text: str):
         "- 'Hơ tiếp hôm nay như thế nào?' → weather|Thời tiết hôm nay như thế nào?\n"
         "- 'bây giờ là mẹ giờ' → time|Bây giờ là mấy giờ?\n"
         "- 'Tích phân là gì' → math|Tích phân là gì?\n"
+        "- 'こんいちは' → chat|こんにちは\n"
         "Trả về đúng 1 dòng dạng: topic_id|câu_đã_sửa\n"
         f"Câu: {text}")
     if not r or "|" not in r:
@@ -745,6 +746,10 @@ def on_browser_audio(client, userdata, msg):
 def on_mic_live(client, userdata, msg):
     """Dashboard bật/tắt live-mic → bảo vòng lặp server nhường đường."""
     on = msg.payload.decode() == "1"
+    if on:
+        # Một lần bấm bắt đầu là một phiên hội thoại mới. Không để ngôn ngữ hay
+        # chủ đề của phiên trước kéo lệch câu trả lời đầu tiên của phiên sau.
+        llm.clear_history()
     voice.set_external_mic(on)
 
 

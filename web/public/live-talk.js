@@ -296,7 +296,7 @@ function handleServer(message) {
         resetGeminiTurnDetector();
         if (pipeline === 'brain') {
             outputMode = 'brain';
-            $('model').textContent = 'Brain · Gemini STT (VI/EN/JA) · LLM · Fish';
+            $('model').textContent = 'Brain · Gemini STT (VI/EN/JA) · Qwen 3.5 2B · Fish';
             setState('listening', message.calibrating
                 ? 'Đang đo tiếng nền — hãy giữ im lặng' : 'Brain đang nghe — không cần gọi Moon');
             dispatch('ready', {engine: message.engine});
@@ -729,11 +729,11 @@ function updatePipelineUi() {
         ? ' Moon chỉ mở hội thoại sau khi nghe tên mình hoặc cách phát âm gần giống.'
         : ' Hội thoại bắt đầu ngay khi bạn bấm nút.';
     $('description').textContent = (brain
-        ? 'Gemini STT nhận tiếng Việt, Anh và Nhật rồi chuyển câu nói cho Brain; Fish Audio trả lời liên tục.'
+        ? 'Gemini STT nhận tiếng Việt, Anh và Nhật rồi chuyển câu nói cho Qwen local; Fish Audio trả lời liên tục.'
         : 'Gemini nghe và hiểu âm thanh trực tiếp; có thể trả lời bằng Fish Voice hoặc Gemini Native.')
         + activationText + ' OLED chỉ hiển thị biểu cảm phù hợp.';
     $('model').textContent = brain
-        ? 'Brain · Gemini STT (VI/EN/JA) · LLM · Fish'
+        ? 'Brain · Gemini STT (VI/EN/JA) · Qwen 3.5 2B · Fish'
         : `gemini-3.8-live · ${$('mode').value === 'fish' ? 'Fish Voice' : 'Kore'}`;
     $('start').innerHTML = activation === 'wakeword'
         ? '<i data-lucide="ear"></i> Bắt đầu chờ tên Moon'
