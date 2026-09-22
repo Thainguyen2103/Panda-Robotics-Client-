@@ -60,7 +60,8 @@ cùng microphone:
 
 - **Gemini Live — audio native**: Gemini nghe và tạo câu trả lời; có thể chọn
   Fish Voice hoặc giọng Gemini Native.
-- **Brain Pipeline — STT → LLM → Fish**: VAD chia câu, Groq Whisper nhận diện,
+- **Brain Pipeline — STT → LLM → Fish**: Gemini Transcribe Live nhận diện trực tiếp
+  tiếng Việt, Anh và Nhật,
   `brain.py` xử lý bằng LLM hiện tại và Fish phát giọng. Sau khi được bật trực
   tiếp hoặc bằng wakeword, đây là một phiên liên tục.
 
@@ -178,12 +179,13 @@ không âm thầm giả vờ đang chạy Porcupine.
 6. Sau wake không nói, phiên vẫn ở chế độ hội thoại liên tục. Thử kết thúc/bật
    lại, từ chối quyền mic, ngắt mạng và khôi phục mạng.
 
-Trong thời gian chờ wakeword, audio được gửi tới Voice service để Porcupine hoặc
-Groq xác nhận từ khóa. Sau khi thức, Gemini Live nhận audio trực tiếp; riêng Brain
-Pipeline dùng Groq STT rồi chuyển text qua MQTT tới Brain/LLM và Fish. Raw audio
-không đi qua MQTT. Khi Brain/Fish đang phát câu trả lời, luồng thu tạm nghỉ và mở
-lại sau khi loa im để hạn chế Moon tự nghe chính mình. Bấm **Kết thúc** sẽ đóng
-socket, dừng track microphone và hủy dữ liệu đang chờ.
+Trong thời gian chờ wakeword, audio được Gemini Transcribe nhận dạng và chỉ mở
+hội thoại khi transcript chứa tên `Moon` hoặc `ムーン`. Sau khi thức, chế độ Gemini
+Live nhận audio trực tiếp; riêng Brain Pipeline tiếp tục dùng Gemini Transcribe
+Live rồi chuyển text qua MQTT tới Brain/LLM và Fish. Raw audio không đi qua MQTT.
+Khi Brain/Fish đang phát câu trả lời, luồng thu tạm nghỉ và mở lại sau khi loa im
+để hạn chế Moon tự nghe chính mình. Bấm **Kết thúc** sẽ đóng socket, dừng track
+microphone và hủy dữ liệu đang chờ.
 
 Thu âm dùng AEC/khử nhiễu của trình duyệt, high-pass 120 Hz và PCM mono 16 kHz.
 AGC bị tắt trong giai đoạn chờ để tránh tiếng động lớn giả làm wakeword; sau khi
@@ -204,6 +206,7 @@ node tests/test_vision_ui.cjs
 node tests/test_voice_browser.cjs
 node tests/test_voice_bridge.cjs
 node tests/test_gemini_live_bridge.cjs
+node tests/test_gemini_transcribe_bridge.cjs
 ```
 
 Test xác minh segmentation, tiếng click/im lặng, wake token, STT chậm/lỗi,
@@ -214,7 +217,8 @@ Tên hiển thị, persona AI và cấu hình đã chuyển sang Moon. `panda/*`
 hợp đồng MQTT để tương thích firmware hiện tại; thư mục firmware không sửa.
 Biến môi trường vision mới: `MOON_CAMERA_SOURCE`, `MOON_DISTANCE_SCALE_CM`.
 
-Tham khảo: [Groq STT và confidence metadata](https://console.groq.com/docs/speech-to-text),
+Tham khảo: [Gemini Live Transcription](https://ai.google.dev/gemini-api/docs/live-api/live-transcribe),
+[Groq STT dự phòng](https://console.groq.com/docs/speech-to-text),
 [Porcupine frame length, sample rate và sensitivity](https://picovoice.ai/docs/api/porcupine-python/).
 
 Sau cập nhật chống nhiễu: ngưỡng RMS bằng tối thiểu cấu hình hoặc 2.2 lần nền

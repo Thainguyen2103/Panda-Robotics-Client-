@@ -148,13 +148,11 @@ QUICK_MODEL = "groq/compound-mini"
 # Lấy key tại: https://console.groq.com/keys  (điền vào config/secrets.py)
 GROQ_API_KEY = _key("GROQ_API_KEY")
 
-# Ngôn ngữ nhận dạng giọng nói (STT):
-#   "vi" = tiếng Việt (KHUYẾN DỤNG cho Moon — chính xác nhất và nhanh gấp đôi,
-#          đã đo: 0.48s so với 1.02s của auto; auto hay đoán nhầm sang tiếng khác
-#          với clip ngắn: "Moon ơi" → "Bonne t'en la vie!")
-#   None = tự động phát hiện (chỉ dùng nếu cần hội thoại tiếng Anh thật sự)
-#   "en" = luôn tiếng Anh
-STT_LANGUAGE = "vi"
+# Dashboard dùng Gemini Transcribe Live và chỉ gợi ý ba ngôn ngữ của dự án.
+# Groq/local fallback phải để auto-detect, không khóa tiếng Việt, để câu hỏi
+# tiếng Anh và tiếng Nhật vẫn được giữ nguyên.
+STT_LANGUAGES = ("vi-VN", "en-US", "ja-JP")
+STT_LANGUAGE = None
 
 # ─── Tinh chỉnh STT/VAD (kiểu Anki Vector) ────────────────────────────────────
 # Model Groq Whisper: large-v3-turbo = nhanh + chính xác nhất trên Groq

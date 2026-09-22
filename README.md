@@ -13,8 +13,8 @@ màn OLED theo phong cách robot Vector (Anki).
 - **Live Talk liên tục**: Gemini Live hiểu audio trực tiếp, hỗ trợ ngắt lời; có thể
   trả lời bằng cùng giọng Fish của Moon (mặc định) hoặc giọng Gemini Native nhanh hơn.
   API key chỉ nằm ở backend và OLED chỉ hiển thị biểu cảm do function call chọn.
-- **Não cloud**: Groq Whisper (STT) → Groq LLM (trả lời) → Fish Audio (TTS streaming
-  từng câu) — độ trễ wake→tiếng đầu tiên ~2-3s.
+- **Não cloud**: Gemini Transcribe Live Việt/Anh/Nhật (STT) → LLM (trả lời)
+  → Fish Audio (TTS streaming từng câu) — độ trễ wake→tiếng đầu tiên ~2-3s.
 - **Phân loại 24 chủ đề** (hybrid: keyword 0ms + LLM enum fallback, benchmark 15/15)
   → OLED hiển thị icon + caption + màu riêng từng chủ đề.
 - **Thị giác máy**: YuNet (face) + SFace (chủ nhân đã đăng ký) + FER+ (biểu cảm) +

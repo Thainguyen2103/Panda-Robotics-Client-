@@ -296,7 +296,7 @@ function handleServer(message) {
         resetGeminiTurnDetector();
         if (pipeline === 'brain') {
             outputMode = 'brain';
-            $('model').textContent = 'Brain · Groq STT · LLM · Fish';
+            $('model').textContent = 'Brain · Gemini STT (VI/EN/JA) · LLM · Fish';
             setState('listening', message.calibrating
                 ? 'Đang đo tiếng nền — hãy giữ im lặng' : 'Brain đang nghe — không cần gọi Moon');
             dispatch('ready', {engine: message.engine});
@@ -353,6 +353,9 @@ function handleServer(message) {
         if (typeof message.rms === 'number') $('level').value = message.rms;
     } else if (pipeline === 'brain' && message.event === 'processing') {
         setState('thinking', 'Đang chuyển giọng nói thành văn bản…');
+    } else if (pipeline === 'brain' && message.event === 'partial') {
+        showHeard(message.text || 'Đang nghe…');
+        showLatency('STT trực tiếp');
     } else if (pipeline === 'brain' && message.event === 'transcript') {
         showHeard(message.text);
         showCorrected('', false);
@@ -422,6 +425,8 @@ function handleWakeServer(message, token) {
         if (typeof message.rms === 'number') $('level').value = message.rms;
     } else if (message.event === 'processing') {
         setState('waiting', 'Đang kiểm tra từ khóa…');
+    } else if (message.event === 'partial') {
+        showHeard(message.text || 'Đang nghe tên Moon…');
     } else if (message.event === 'verifying_wake') {
         if (message.text) showHeard(`Đang xác minh: ${message.text}`);
         setState('waiting', 'Đang xác minh tên Moon…');
@@ -449,7 +454,7 @@ function handleWakeServer(message, token) {
 }
 
 async function connectWakeSocket(token) {
-    const endpoint = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/voice/ws`;
+    const endpoint = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/transcribe/ws?mode=wake`;
     const socket = new WebSocket(endpoint);
     ws = socket;
     await new Promise((resolve, reject) => {
@@ -520,7 +525,7 @@ async function promoteWakeToLive(token) {
 async function connectSocket(token) {
     pipeline = $('pipeline').value === 'brain' ? 'brain' : 'gemini';
     const mode = $('mode').value === 'native' ? 'native' : 'fish';
-    const path = pipeline === 'brain' ? '/voice/ws?mode=continuous' : `/live/ws?mode=${encodeURIComponent(mode)}`;
+    const path = pipeline === 'brain' ? '/transcribe/ws?mode=continuous' : `/live/ws?mode=${encodeURIComponent(mode)}`;
     const endpoint = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${path}`;
     const socket = new WebSocket(endpoint);
     socket.binaryType = 'arraybuffer';
@@ -724,11 +729,11 @@ function updatePipelineUi() {
         ? ' Moon chỉ mở hội thoại sau khi nghe tên mình hoặc cách phát âm gần giống.'
         : ' Hội thoại bắt đầu ngay khi bạn bấm nút.';
     $('description').textContent = (brain
-        ? 'Groq STT chuyển câu nói cho Brain và LLM hiện tại; Fish Audio trả lời liên tục.'
+        ? 'Gemini STT nhận tiếng Việt, Anh và Nhật rồi chuyển câu nói cho Brain; Fish Audio trả lời liên tục.'
         : 'Gemini nghe và hiểu âm thanh trực tiếp; có thể trả lời bằng Fish Voice hoặc Gemini Native.')
         + activationText + ' OLED chỉ hiển thị biểu cảm phù hợp.';
     $('model').textContent = brain
-        ? 'Brain · Groq STT · LLM · Fish'
+        ? 'Brain · Gemini STT (VI/EN/JA) · LLM · Fish'
         : `gemini-3.8-live · ${$('mode').value === 'fish' ? 'Fish Voice' : 'Kore'}`;
     $('start').innerHTML = activation === 'wakeword'
         ? '<i data-lucide="ear"></i> Bắt đầu chờ tên Moon'
