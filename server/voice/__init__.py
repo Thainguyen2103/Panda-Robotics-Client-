@@ -9,11 +9,11 @@ import sys
 import types
 
 
-_RUNTIME_NAME = f"{__name__}.local_runtime"
+_RUNTIME_NAME = f"{__name__}.runtime.local"
 
 
 def _runtime_module():
-    return importlib.import_module(".local_runtime", __name__)
+    return importlib.import_module(".runtime.local", __name__)
 
 
 def __getattr__(name):

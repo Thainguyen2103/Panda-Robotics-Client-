@@ -30,7 +30,7 @@ màn OLED theo phong cách robot Vector (Anki).
 
 ```
  mic trình duyệt ─┬→ Gemini Live (audio trực tiếp)
-                  └→ voice/web_service.py (wake/VAD/STT) ─→ brain.py
+                  └→ voice/runtime/web.py (wake/VAD/STT) ─→ brain.py
  camera / ESP32-CAM    ─→ vision/ (YuNet/SFace/FER)          │
                                                            ├─→ llm.py (Groq)
  dashboard web (OLED ảo, nút điều khiển) ←─ MQTT broker ←─┤
@@ -42,14 +42,17 @@ màn OLED theo phong cách robot Vector (Anki).
 ```
 config/      settings.py (cấu hình và đường dẫn), secrets.example.py (mẫu key)
 server/      brain.py (điều phối), llm.py, tts.py, mqtt_bridge.py
-server/voice/  local_runtime.py, web_service.py, core.py, wakeword.py
-server/vision/ engine.py, runtime.py, features.py, signals.py
+server/voice/  audio/, speech/, wake/, runtime/ (chia theo chức năng)
+server/vision/ face/, body/, hands/, pipeline/, runtime/
 models/      voice/ và vision/ (model local, không commit)
 data/private/ dữ liệu sinh trắc local, không commit
 web/         server.js + public/ (dashboard OLED mô phỏng, idle behaviors)
 firmware/    panda_firmware.ino (ESP32, chạy được trên Wokwi lẫn chip thật)
 tools/       supported utilities, local diagnostics and archived one-off patches
 ```
+
+Xem [sơ đồ module Voice/Vision](docs/voice-vision-structure.md) trước khi thêm
+model, tín hiệu hoặc transport mới.
 
 ## 🎙️ Test Live Voice trên dashboard
 

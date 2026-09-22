@@ -1,4 +1,4 @@
-from .runtime import main
+from .runtime.camera import main
 
 
 main()

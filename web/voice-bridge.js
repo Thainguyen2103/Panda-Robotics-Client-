@@ -85,7 +85,7 @@ function startVoiceService() {
         const root = path.resolve(__dirname, '..');
         const python = [path.join(root, '.voice-venv', 'Scripts', 'python.exe'),
             path.join(root, '.voice-venv', 'bin', 'python')].find(p => fs.existsSync(p)) || 'python';
-        child = spawn(python, ['-m', 'server.voice.web_service'], {cwd: root, windowsHide: true, stdio: 'inherit'});
+        child = spawn(python, ['-m', 'server.voice.runtime.web'], {cwd: root, windowsHide: true, stdio: 'inherit'});
         child.on('error', err => console.error('[VOICE] Cannot start:', err.message));
         child.on('exit', code => console.log('[VOICE] Service exited:', code));
     });

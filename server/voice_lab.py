@@ -1,6 +1,6 @@
 """Compatibility entry point for the browser voice service."""
-from server.voice.web_service import *
-from server.voice.web_service import main
+from server.voice.runtime.web import *
+from server.voice.runtime.web import main
 
 
 if __name__ == "__main__":

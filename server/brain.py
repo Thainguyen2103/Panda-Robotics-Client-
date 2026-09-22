@@ -3,7 +3,7 @@ Brain — Bộ não trung tâm của Robot Moon
 =========================================
 Pipeline chính:
   Người nói
-    → voice/local_runtime.py (VAD + Groq STT) → transcript text
+    → voice/runtime/local.py (VAD + Groq STT) → transcript text
       → Phát hiện wake-word "Moon"
         → Nghe câu hỏi (nếu cần)
           → llm.py (DeepSeek/Groq) → stream câu trả lời
@@ -42,11 +42,17 @@ from config import settings
 from server import mqtt_bridge
 from server.vision import start_vision
 from server import voice
-from server.voice import (register_callbacks, continuous_listen_loop,
-                          listen_for_question, pause_listening, resume_listening,
-                          transcribe_bytes, _is_hallucination, _contains_wake_word,
-                          STT_MODEL_QUESTION, _levenshtein, _strip_diacritics)
-from server.voice.core import safe_asr_correction
+from server.voice.runtime.local import (
+    STT_MODEL_QUESTION, continuous_listen_loop, listen_for_question,
+    pause_listening, register_callbacks, resume_listening, transcribe_bytes,
+)
+from server.voice.speech.filters import (
+    contains_wake_word as _contains_wake_word,
+    is_hallucination as _is_hallucination,
+    levenshtein as _levenshtein,
+    strip_diacritics as _strip_diacritics,
+)
+from server.voice.speech.validation import safe_asr_correction
 from server.tts import speak, SentencePlayer
 from server import tts   # module object — cho tts.play_beep()/play_tick()
 from server import llm

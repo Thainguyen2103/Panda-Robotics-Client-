@@ -6,9 +6,9 @@ import threading
 import time
 
 from config import settings
-from server.vision.engine import LOG, VisionEngine, cv2, empty_result
-from server.vision.features import ARM_EDGES
-from server.vision.signals import HAND_EDGES
+from server.vision.body.pose import ARM_EDGES
+from server.vision.hands.analysis import HAND_EDGES
+from server.vision.pipeline.engine import LOG, VisionEngine, cv2, empty_result
 
 
 class LatestFrame:

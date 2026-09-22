@@ -1,23 +1,21 @@
-"""Browser microphone service. Run with ``python -m server.voice.web_service``."""
+"""State machine for one browser microphone session."""
 import asyncio
-import contextlib
 import io
-import json
 import struct
 import time
 import wave
 from pathlib import Path
 
-from aiohttp import web, WSMsgType
-from groq import AsyncGroq
 import webrtcvad
 
 from config import settings
-from server.voice.core import (Segmenter, wake_tail, should_verify_wake,
-                               confirmed_wake_tail, confident_wake_tail,
-                               reliable_transcript, wake_transcript,
-                               RATE, FRAME_BYTES, FRAME_MS)
+from server.voice.audio.segmentation import Segmenter, RATE, FRAME_BYTES, FRAME_MS
 from server.voice.paths import wake_model_path
+from server.voice.speech.validation import reliable_transcript
+from server.voice.wake.matcher import (
+    wake_tail, should_verify_wake, confirmed_wake_tail, confident_wake_tail,
+    wake_transcript,
+)
 
 
 def acoustic_engine():
@@ -306,72 +304,3 @@ class Session:
                 self.wake_quiet_frames = 0
                 self.segmenter.reset()
                 await self.emit('timeout', text='Chưa nghe được câu nói. Hãy gọi Moon lại.')
-
-
-async def socket_handler(request):
-    # Browser microphone audio and API quota are only accessible from this origin.
-    if request.headers.get('Origin') != f'{request.scheme}://{request.host}':
-        raise web.HTTPForbidden()
-    ws = web.WebSocketResponse(max_msg_size=4096, heartbeat=20)
-    await ws.prepare(request)
-    if not settings.GROQ_API_KEY:
-        await ws.send_json(dict(event='error', text='Thiếu GROQ_API_KEY trong config/secrets.py hoặc môi trường.'))
-        await ws.close()
-        return ws
-    continuous = request.query.get('mode') == 'continuous'
-    engine = None
-    tasks = []
-    try:
-        if continuous:
-            description = 'Groq Whisper liên tục: không cần wake word'
-        else:
-            engine, description = acoustic_engine()
-        async with AsyncGroq(api_key=settings.GROQ_API_KEY, timeout=15, max_retries=0) as client:
-            session = Session(ws, client, engine, continuous=continuous)
-            await session.emit('ready', engine=description, calibrating=True,
-                               mode='continuous' if continuous else 'wakeword')
-            tasks = [asyncio.create_task(session.worker()), asyncio.create_task(session.watchdog())]
-            async for msg in ws:
-                if msg.type == WSMsgType.BINARY:
-                    await session.feed(msg.data)
-                elif msg.type == WSMsgType.ERROR:
-                    break
-                elif msg.type == WSMsgType.TEXT:
-                    try:
-                        command = json.loads(msg.data).get('command')
-                    except Exception:
-                        command = None
-                    if command == 'pause':
-                        session.pause()
-                    elif command == 'resume':
-                        await session.resume()
-    except Exception as exc:
-        if not ws.closed:
-            await ws.send_json(dict(event='error', text=f'Voice lỗi ({type(exc).__name__}). Kiểm tra cấu hình model/mic.'))
-    finally:
-        for task in tasks:
-            task.cancel()
-        for task in tasks:
-            with contextlib.suppress(asyncio.CancelledError, ConnectionError):
-                await task
-        if engine:
-            engine.delete()
-        await ws.close()
-    return ws
-
-
-def make_app():
-    app = web.Application()
-    app.router.add_get('/ws', socket_handler)
-    async def dashboard(request):
-        raise web.HTTPFound('http://localhost:3000/')
-    app.router.add_get('/', dashboard)
-    return app
-
-
-def main():
-    web.run_app(make_app(), host='127.0.0.1', port=8765)
-
-
-if __name__ == '__main__':
-    main()

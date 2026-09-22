@@ -1,5 +1,5 @@
 """
-Wake-word engine kiểu Anki Vector — server/voice/wakeword.py
+Wake-word engine kiểu Anki Vector — server/voice/wake/porcupine.py
 =======================================================
 Bắt từ khóa "Moon" BẰNG ÂM HỌC trên thiết bị (Porcupine), KHÔNG đi qua ASR:
   - Không phụ thuộc ngôn ngữ câu nói xung quanh (Việt/Anh/trộn đều được)
@@ -37,7 +37,7 @@ if sys.stderr and hasattr(sys.stderr, "reconfigure"):
     except Exception:
         pass
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 from config import settings
 from server.voice.paths import wake_model_path

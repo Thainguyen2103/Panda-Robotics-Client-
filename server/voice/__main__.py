@@ -1,4 +1,4 @@
-from .local_runtime import main
+from .runtime.local import main
 
 
 main()

@@ -1,30 +1,23 @@
 """Public API for Moon's vision subsystem."""
 from config import settings
 
-from .engine import (
-    ArmGestures,
-    HeadGestures,
-    StableLabel,
+from .body.gestures import ArmGestures
+from .pipeline.engine import (
     VisionEngine,
     cv2,
     emotion_face_crop,
     empty_result,
     iou,
 )
-from .features import FaceDetails, HeadMotion, ExpressionState, upper_body, ARM_EDGES
+from .body.pose import ARM_EDGES, upper_body
+from .face.analysis import FaceDetails, HeadMotion, ExpressionState
+from .face.eyes import EyeState, distance_estimate, eye_geometry
+from .face.gestures import HeadGestures
+from .fusion import combined_actions, nearby_objects
+from .hands.analysis import HAND_EDGES, HandDetails, finger_gesture, finger_states
 from .paths import MODEL_DIR, DATA_DIR, model_path, data_path
-from .runtime import LatestFrame, camera_source, start_vision
-from .signals import (
-    EyeState,
-    HandDetails,
-    HAND_EDGES,
-    combined_actions,
-    distance_estimate,
-    eye_geometry,
-    finger_gesture,
-    finger_states,
-    nearby_objects,
-)
+from .runtime.camera import LatestFrame, camera_source, start_vision
+from .stability import StableLabel
 
 # Compatibility for older tools that treated the source directory as model data.
 BASE = MODEL_DIR
