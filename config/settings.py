@@ -33,6 +33,8 @@ def _key(name: str) -> str:
 # Gemini Live native audio (dashboard Live Talk). Node cũng đọc cùng key này
 # trực tiếp từ config/secrets.py; key không bao giờ được gửi xuống trình duyệt.
 GEMINI_API_KEY = _key("GEMINI_API_KEY")
+LLM_PROVIDER = os.environ.get("MOON_LLM_PROVIDER", "auto").strip().lower()
+GEMINI_LLM_MODEL = os.environ.get("GEMINI_LLM_MODEL", "gemini-3.5-flash-lite")
 
 # MQTT Broker Configuration
 MQTT_BROKER = "localhost"

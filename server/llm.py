@@ -47,25 +47,38 @@ try:
     from config import settings
     DEEPSEEK_API_KEY = getattr(settings, "DEEPSEEK_API_KEY", None)
     GROQ_API_KEY     = getattr(settings, "GROQ_API_KEY", None)
+    GEMINI_API_KEY   = getattr(settings, "GEMINI_API_KEY", None)
     GROQ_LLM_MODEL   = getattr(settings, "GROQ_LLM_MODEL", "deepseek-r1-distill-llama-70b")
+    GEMINI_LLM_MODEL = getattr(settings, "GEMINI_LLM_MODEL", "gemini-3.5-flash-lite")
+    LLM_PROVIDER     = getattr(settings, "LLM_PROVIDER", "auto")
     QUICK_MODEL      = getattr(settings, "QUICK_MODEL", "groq/compound-mini")
 except Exception:
     DEEPSEEK_API_KEY = None
     GROQ_API_KEY     = None
+    GEMINI_API_KEY   = None
     GROQ_LLM_MODEL   = "deepseek-r1-distill-llama-70b"
+    GEMINI_LLM_MODEL = "gemini-3.5-flash-lite"
+    LLM_PROVIDER     = "auto"
     QUICK_MODEL      = "groq/compound-mini"
 
 # ─── Xác định model và client sẽ dùng ────────────────────────────────────────
 _client      = None
 _model_name  = None
 _is_deepseek = False   # True = dùng DeepSeek API trực tiếp
+_provider_name = None
 
 def _init_client():
-    """Khởi tạo LLM client: DeepSeek ưu tiên, fallback Groq."""
-    global _client, _model_name, _is_deepseek
+    """Khởi tạo LLM client: DeepSeek → Gemini → Groq, hoặc provider được chọn."""
+    global _client, _model_name, _is_deepseek, _provider_name
+
+    requested = str(LLM_PROVIDER or "auto").strip().lower()
+    allowed = {"auto", "deepseek", "gemini", "groq"}
+    if requested not in allowed:
+        print(f"⚠️ [LLM] MOON_LLM_PROVIDER={requested!r} không hợp lệ; dùng auto.")
+        requested = "auto"
 
     # ── Option A: DeepSeek API (openai-compatible) ────────────────────────────
-    if DEEPSEEK_API_KEY:
+    if requested in {"auto", "deepseek"} and DEEPSEEK_API_KEY:
         try:
             from openai import OpenAI
             _client = OpenAI(
@@ -75,6 +88,7 @@ def _init_client():
             # Chọn model: "deepseek-reasoner" nếu config yêu cầu, còn lại dùng "deepseek-chat"
             _model_name  = GROQ_LLM_MODEL if "reasoner" in GROQ_LLM_MODEL else "deepseek-chat"
             _is_deepseek = True
+            _provider_name = "deepseek"
             print(f"✅ [LLM] DeepSeek API sẵn sàng. Model: {_model_name}")
             return
         except ImportError:
@@ -82,12 +96,27 @@ def _init_client():
         except Exception as e:
             print(f"⚠️ [LLM] Lỗi DeepSeek: {e}")
 
-    # ── Option B: Groq (free fallback) ───────────────────────────────────────
-    if GROQ_API_KEY:
+    # ── Option B: Gemini text generation ─────────────────────────────────────
+    if requested in {"auto", "gemini"} and GEMINI_API_KEY:
+        try:
+            from server.llm_providers.gemini import GeminiTextClient
+            _client = GeminiTextClient(GEMINI_API_KEY, GEMINI_LLM_MODEL)
+            _model_name = GEMINI_LLM_MODEL
+            _is_deepseek = False
+            _provider_name = "gemini"
+            print(f"✅ [LLM] Gemini sẵn sàng. Model: {_model_name}")
+            return
+        except Exception as e:
+            print(f"⚠️ [LLM] Lỗi Gemini: {e}")
+
+    # ── Option C: Groq (free fallback) ───────────────────────────────────────
+    if requested in {"auto", "groq"} and GROQ_API_KEY:
         try:
             from groq import Groq
             _client     = Groq(api_key=GROQ_API_KEY)
             _model_name = GROQ_LLM_MODEL
+            _is_deepseek = False
+            _provider_name = "groq"
             print(f"✅ [LLM] Groq LLM sẵn sàng. Model: {_model_name}")
             return
         except ImportError:
@@ -95,7 +124,7 @@ def _init_client():
         except Exception as e:
             print(f"⚠️ [LLM] Lỗi Groq: {e}")
 
-    print("❌ [LLM] Không có LLM client nào khả dụng. Cần điền DEEPSEEK_API_KEY hoặc GROQ_API_KEY.")
+    print("❌ [LLM] Không có LLM client khả dụng. Kiểm tra Gemini/DeepSeek/Groq API key.")
 
 _init_client()
 
@@ -188,11 +217,14 @@ _ENGLISH_MARKERS = {
     "your",
 }
 _VIETNAMESE_DISTINCTIVE = set("ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ")
+_JAPANESE_SCRIPT = re.compile(r"[\u3040-\u30ff\u31f0-\u31ff\u3400-\u4dbf\u4e00-\u9fff]")
 
 
 def response_language(question: str) -> str:
     """Classify only the latest spoken turn for response routing."""
     normalized = unicodedata.normalize("NFC", question or "").casefold()
+    if _JAPANESE_SCRIPT.search(normalized):
+        return "ja"
     words = re.findall(r"[^\W\d_]+", normalized, flags=re.UNICODE)
     vi_score = sum(word in _VIETNAMESE_MARKERS for word in words)
     en_score = sum(word in _ENGLISH_MARKERS for word in words)
@@ -224,6 +256,9 @@ def response_language_instruction(question: str) -> str:
     if language == "vi":
         return ("[Ngôn ngữ trả lời cho lượt mới nhất] Người dùng nói tiếng Việt. "
                 "Chỉ trả lời bằng tiếng Việt tự nhiên.")
+    if language == "ja":
+        return ("[最新ターンの応答言語] ユーザーは日本語で話しました。"
+                "自然で分かりやすい日本語だけで答えてください。")
     return ("[Response language for the latest turn] Infer the dominant language "
             "and reply naturally in that language. Code-switch only where it helps: "
             "keep familiar English technical terms, product names, and phrases when "
@@ -307,27 +342,36 @@ def chat(
         if _is_deepseek and "reasoner" in _model_name:
             extra_kwargs["max_tokens"] = 8000  # reasoner cần nhiều token hơn
 
-        stream = _client.chat.completions.create(
-            model=_model_name,
-            messages=messages,
-            stream=True,
-            max_tokens=extra_kwargs.get("max_tokens", 512),
-            temperature=0.7,
-        )
-
         if on_thinking:
             on_thinking("answering")
+
+        if _provider_name == "gemini":
+            text_stream = _client.stream_chat(
+                messages,
+                max_tokens=extra_kwargs.get("max_tokens", 512),
+                temperature=0.7,
+            )
+        else:
+            stream = _client.chat.completions.create(
+                model=_model_name,
+                messages=messages,
+                stream=True,
+                max_tokens=extra_kwargs.get("max_tokens", 512),
+                temperature=0.7,
+            )
+
+            def _openai_chunks():
+                for chunk in stream:
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, "content") and delta.content:
+                        yield delta.content
+
+            text_stream = _openai_chunks()
 
         full_response   = ""
         in_think_block  = False  # Bỏ qua nội dung <think>...</think>
 
-        for chunk in stream:
-            delta = chunk.choices[0].delta
-            if not hasattr(delta, "content") or not delta.content:
-                continue
-
-            text_chunk = delta.content
-
+        for text_chunk in text_stream:
             # Xử lý DeepSeek-R1 <think> tags streaming
             if "<think>" in text_chunk:
                 in_think_block = True
@@ -372,6 +416,12 @@ def quick(prompt: str, max_tokens: int = 200) -> str:
     chọn cảm xúc. Dùng model INSTANT (nhanh gấp ~10 lần gpt-oss reasoning)."""
     if not _client:
         return ""
+    if _provider_name == "gemini":
+        try:
+            return _client.complete(prompt, max_tokens=max_tokens, temperature=0.2)
+        except Exception as e:
+            print(f"⚠️ [LLM] quick() lỗi: {e}")
+            return ""
     for attempt in (1, 2):
         try:
             r = _client.chat.completions.create(
@@ -410,7 +460,7 @@ def chat_async(
 # ─── Test ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print("=== Test LLM Module ===")
-    print(f"Client: {'DeepSeek' if _is_deepseek else 'Groq'} | Model: {_model_name}\n")
+    print(f"Client: {_provider_name or 'none'} | Model: {_model_name}\n")
 
     def on_thinking(stage):
         print("🧠 Thinking..." if stage == "thinking" else "✍️  Answering...")
