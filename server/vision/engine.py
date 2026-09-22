@@ -1,13 +1,6 @@
-"""YuNet/SFace/FER+ and upper-body gestures, using a latest-frame mailbox.
-
-Importing this module opens neither a camera nor a network connection.
-"""
-import base64
+"""Vision inference engine; importing it opens no camera or network connection."""
 from collections import deque
 import logging
-from pathlib import Path
-import sys
-import threading
 import time
 
 import numpy as np
@@ -16,13 +9,13 @@ try:
 except ImportError:
     cv2 = None
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from config import settings
-from server.vision_features import FaceDetails, HeadMotion, ExpressionState, upper_body, ARM_EDGES
-from server.vision_signals import EyeState, HandDetails, distance_estimate, combined_actions, nearby_objects, HAND_EDGES
+from server.vision.features import FaceDetails, HeadMotion, ExpressionState, upper_body
+from server.vision.paths import MODEL_DIR, DATA_DIR, model_path, data_path
+from server.vision.signals import EyeState, HandDetails, distance_estimate, combined_actions, nearby_objects
 
 LOG = logging.getLogger("moon.vision")
-BASE = Path(__file__).resolve().parent
+BASE = MODEL_DIR  # Backward-compatible name; new code should use MODEL_DIR/DATA_DIR.
 EMOTIONS = ("neutral", "happy", "surprised", "sad", "angry", "disgust", "fear", "contempt")
 
 
@@ -246,16 +239,17 @@ class VisionEngine:
             self.errors["opencv"] = "OpenCV is not installed"
             return
         cv2.setNumThreads(settings.VISION_CV_THREADS)
-        self._load("face", lambda: cv2.FaceDetectorYN_create(str(BASE/"face_detection_yunet_2023mar.onnx"), "", (320,320), settings.VISION_FACE_THRESHOLD))
-        self._load("identity", lambda: cv2.FaceRecognizerSF_create(str(BASE/"face_recognition_sface_2021dec.onnx"), ""))
-        self._load("emotion", lambda: cv2.dnn.readNetFromONNX(str(BASE/settings.EMOTION_MODEL)))
+        self._load("face", lambda: cv2.FaceDetectorYN_create(str(model_path("face_detection_yunet_2023mar.onnx")), "", (320,320), settings.VISION_FACE_THRESHOLD))
+        self._load("identity", lambda: cv2.FaceRecognizerSF_create(str(model_path("face_recognition_sface_2021dec.onnx")), ""))
+        self._load("emotion", lambda: cv2.dnn.readNetFromONNX(str(model_path(settings.EMOTION_MODEL))))
         if settings.VISION_FACE_DETAILS_ENABLED:
-            self._load("face_details",lambda:FaceDetails(BASE/settings.VISION_FACE_DETAILS_MODEL))
+            self._load("face_details",lambda:FaceDetails(model_path(settings.VISION_FACE_DETAILS_MODEL)))
         if settings.VISION_HANDS_ENABLED:
-            self._load("hands",lambda:HandDetails(BASE/settings.VISION_HANDS_MODEL))
-        if (BASE/"master_face.npy").exists():
+            self._load("hands",lambda:HandDetails(model_path(settings.VISION_HANDS_MODEL)))
+        enrollment = data_path("master_face.npy")
+        if enrollment.exists():
             try:
-                feature = np.load(BASE/"master_face.npy", allow_pickle=False)
+                feature = np.load(enrollment, allow_pickle=False)
                 if feature.size != 128 or not np.isfinite(feature).all() or np.linalg.norm(feature) < 1e-6:
                     raise ValueError("Invalid master face embedding")
                 self.master = feature.astype(np.float32).reshape(1,128)
@@ -263,9 +257,7 @@ class VisionEngine:
                 self.errors["enrollment"] = str(exc)
         if settings.VISION_POSE_ENABLED:
             def load_pose():
-                path = Path(settings.YOLO_MODEL)
-                if not path.is_absolute():
-                    path = BASE/path
+                path = model_path(settings.YOLO_MODEL)
                 if not path.is_file():
                     raise FileNotFoundError(f"Missing pose model: {path.name}")
                 import torch
@@ -275,7 +267,7 @@ class VisionEngine:
             self._load("pose", load_pose)
         if settings.VISION_OBJECTS_ENABLED:
             def load_objects():
-                path = BASE/settings.VISION_OBJECTS_MODEL
+                path = model_path(settings.VISION_OBJECTS_MODEL)
                 if not path.is_file(): raise FileNotFoundError(path.name)
                 import torch
                 torch.set_num_threads(settings.VISION_CV_THREADS)
@@ -531,174 +523,3 @@ class VisionEngine:
         if self.errors:
             result["status"] = "degraded"
         return result
-
-
-class LatestFrame:
-    """Single-slot mailbox: slow inference never queues old frames."""
-    def __init__(self):
-        self.lock = threading.Lock()
-        self.frame,self.timestamp,self.sequence = None,0.,0
-
-    def put(self, frame):
-        with self.lock:
-            self.frame,self.timestamp = frame,time.monotonic()
-            self.sequence += 1
-
-    def get(self):
-        with self.lock:
-            return self.frame,self.timestamp,self.sequence
-
-
-def camera_source():
-    source = settings.VISION_SOURCE
-    return int(source) if str(source).isdigit() else source
-
-
-def start_vision(callback, stop_event=None, publish=None):
-    """Preserve the brain callback; send detailed diagnostics on a separate topic."""
-    if publish is None:
-        from server.mqtt_bridge import publish
-    stop = stop_event if stop_event is not None else threading.Event()
-    mailbox = LatestFrame()
-    result_lock = threading.Lock()
-    latest = empty_result("starting")
-    last_good_inference = time.monotonic()
-
-    def emit(result):
-        nonlocal latest,last_good_inference
-        with result_lock:
-            latest = result
-            if result.get("frame_time",0):
-                last_good_inference = time.monotonic()
-        try:
-            publish(settings.TOPIC_VISION_STATUS,result)
-            publish("panda/user_status",result)
-            callback(result["person_detected"],result["emotion"],result["action"])
-        except Exception:
-            LOG.exception("Vision output failed")
-
-    def capture():
-        cap = None
-        try:
-            while not stop.is_set():
-                if cap is None:
-                    if cv2 is None:
-                        stop.wait(1)
-                        continue
-                    cap = cv2.VideoCapture(camera_source())
-                    if not cap.isOpened():
-                        cap.release()
-                        cap = None
-                        stop.wait(2)
-                        continue
-                    cap.set(cv2.CAP_PROP_FRAME_WIDTH,settings.VISION_WIDTH)
-                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,settings.VISION_HEIGHT)
-                    cap.set(cv2.CAP_PROP_BUFFERSIZE,1)
-                ok,frame = cap.read()
-                if not ok or frame is None:
-                    mailbox.put(None)
-                    cap.release()
-                    cap = None
-                    stop.wait(1)
-                    continue
-                scale = min(1.,settings.VISION_WIDTH/frame.shape[1],settings.VISION_HEIGHT/frame.shape[0])
-                if scale < 1:
-                    frame = cv2.resize(frame,(max(1,int(frame.shape[1]*scale)),max(1,int(frame.shape[0]*scale))))
-                mailbox.put(frame)
-                stop.wait(.001)
-        except Exception:
-            LOG.exception("Camera capture failed")
-            mailbox.put(None)
-        finally:
-            if cap is not None:
-                cap.release()
-
-    def infer():
-        engine = VisionEngine()
-        sequence = -1
-        try:
-            while not stop.is_set():
-                began = time.monotonic()
-                frame,timestamp,current = mailbox.get()
-                if frame is not None and current != sequence and began-timestamp <= settings.VISION_STALE_SEC:
-                    sequence = current
-                    try:
-                        result = engine.process(frame)
-                        result["frame_time"] = timestamp
-                        if time.monotonic()-timestamp <= settings.VISION_STALE_SEC:
-                            emit(result)
-                    except Exception:
-                        LOG.exception("Vision frame failed")
-                        engine.reset()
-                elif frame is None or began-timestamp > settings.VISION_STALE_SEC:
-                    engine.reset()
-                stop.wait(max(.01,1/max(1,settings.VISION_AI_FPS)-(time.monotonic()-began)))
-        finally:
-            close = getattr(engine,"close",None)
-            if close:
-                close()
-
-    workers = [threading.Thread(target=fn,daemon=True,name=name)
-               for fn,name in ((capture,"vision-camera"),(infer,"vision-ai"))]
-    for worker in workers:
-        worker.start()
-    last_sequence,last_offline = -1,-float("inf")
-    try:
-        while not stop.is_set():
-            began = time.monotonic()
-            frame,timestamp,sequence = mailbox.get()
-            with result_lock:
-                result = dict(latest)
-                inference_age = began-last_good_inference
-            camera_lost = frame is None or began-timestamp > settings.VISION_STALE_SEC
-            if camera_lost or inference_age > settings.VISION_STALE_SEC:
-                if began-last_offline >= 1:
-                    emit(empty_result("camera_unavailable" if camera_lost else "inference_stale"))
-                    last_offline = began
-            if frame is not None and sequence != last_sequence and not camera_lost:
-                last_sequence = sequence
-                display = frame.copy()
-                if began-result.get("frame_time",0) <= .5:
-                    for hand in result.get("hands",[]):
-                        if began-hand["timestamp"] > .5: continue
-                        points = [(int(v[0]*display.shape[1]),int(v[1]*display.shape[0])) for v in hand["landmarks"]]
-                        for a,b in HAND_EDGES: cv2.line(display,points[a],points[b],(80,220,120),1)
-                        for p in points: cv2.circle(display,p,2,(80,255,180),-1)
-                    for obj in result.get("objects",[]):
-                        if began-obj["timestamp"] > 1.5: continue
-                        x,y,w,h = obj["box"]
-                        x,y,w,h = int(x*display.shape[1]),int(y*display.shape[0]),int(w*display.shape[1]),int(h*display.shape[0])
-                        cv2.rectangle(display,(x,y),(x+w,y+h),(220,180,80),1)
-                        cv2.putText(display,obj["label"],(x,max(14,y-4)),cv2.FONT_HERSHEY_SIMPLEX,.4,(220,180,80),1)
-                    if settings.VISION_DRAW_SKELETON and began-result.get("pose_time",0) <= .5:
-                        joints = result.get("upper_body_joints",{})
-                        def point(joint):
-                            return (int(joint["x"]*display.shape[1]),int(joint["y"]*display.shape[0]))
-                        for a,b in ARM_EDGES:
-                            if joints.get(a,{}).get("visible") and joints.get(b,{}).get("visible"):
-                                cv2.line(display,point(joints[a]),point(joints[b]),(255,200,0),2)
-                        for joint in joints.values():
-                            if joint["visible"]:
-                                cv2.circle(display,point(joint),4,(0,220,255),-1)
-                    for key,color in (("face_box",(0,255,0)),("person_box",(255,180,0))):
-                        if result.get(key):
-                            x,y,w,h = map(int,result[key])
-                            cv2.rectangle(display,(x,y),(x+w,y+h),color,2)
-                    # Labels belong in the stable dashboard, not flickering on the video.
-                width = min(480,display.shape[1])
-                display = cv2.resize(display,(width,max(1,round(display.shape[0]*width/display.shape[1]))))
-                ok,encoded = cv2.imencode(".jpg",display,[cv2.IMWRITE_JPEG_QUALITY,60])
-                if ok:
-                    publish(settings.TOPIC_CAMERA,base64.b64encode(encoded).decode("ascii"))
-            stop.wait(max(.001,1/max(1,settings.VISION_STREAM_FPS)-(time.monotonic()-began)))
-    finally:
-        stop.set()
-        for worker in workers:
-            worker.join(timeout=2)
-
-
-if __name__ == "__main__":
-    if hasattr(sys.stdout,"reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8",errors="replace")
-    logging.basicConfig(level=logging.INFO)
-    start_vision(lambda detected,emotion,action:None)

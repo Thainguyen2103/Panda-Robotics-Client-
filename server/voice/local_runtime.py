@@ -46,7 +46,7 @@ if sys.stderr and hasattr(sys.stderr, "reconfigure"):
     except Exception:
         pass
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from config import settings
 
@@ -576,7 +576,7 @@ def _levenshtein(a: str, b: str) -> int:
 
 def _contains_wake_word(text: str) -> bool:
     """Match the complete name Moon, without fuzzy or accent folding."""
-    from server.voice_core import wake_tail
+    from server.voice.core import wake_tail
     return wake_tail(text or "") is not None
 
 
@@ -839,7 +839,7 @@ def listen_for_question() -> str | None:
 #  TEST ĐỨNG MỘT MÌNH
 # ═══════════════════════════════════════════════════════════════════════════════
 
-if __name__ == "__main__":
+def main():
     print("=== Test Voice Module ===")
     print(f"Model: {STT_MODEL} | Language: {STT_LANGUAGE or 'auto'} | "
           f"Noise floor: {VAD_NOISE_FLOOR}")
@@ -853,3 +853,7 @@ if __name__ == "__main__":
         on_wake_word=lambda t: print(f"🐼 → WAKE-WORD: {t}"),
     )
     continuous_listen_loop()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,5 +1,22 @@
 # config/settings.py
 import os
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+MODEL_ROOT = Path(os.environ.get("MOON_MODEL_ROOT", PROJECT_ROOT / "models")).expanduser().resolve()
+PRIVATE_DATA_ROOT = Path(
+    os.environ.get("MOON_PRIVATE_DATA_ROOT", PROJECT_ROOT / "data" / "private")
+).expanduser().resolve()
+VOICE_MODEL_DIR = Path(
+    os.environ.get("MOON_VOICE_MODEL_DIR", MODEL_ROOT / "voice")
+).expanduser().resolve()
+VISION_MODEL_DIR = Path(
+    os.environ.get("MOON_VISION_MODEL_DIR", MODEL_ROOT / "vision")
+).expanduser().resolve()
+VISION_DATA_DIR = Path(
+    os.environ.get("MOON_VISION_DATA_DIR", PRIVATE_DATA_ROOT)
+).expanduser().resolve()
 
 # ─── API keys: nạp từ config/secrets.py (KHÔNG push) hoặc biến môi trường ────
 # Xem secrets.example.py để biết cách tạo secrets.py
@@ -187,7 +204,7 @@ PERSON_LOST_GRACE_SEC = 10.0
 # Cấu hình key trong secrets.py/môi trường và model Moon .ppn đúng nền tảng.
 # Nếu chưa có, Voice Lab dùng Whisper một lượt, khớp đúng token Moon.
 PICOVOICE_ACCESS_KEY = _key("PICOVOICE_ACCESS_KEY")
-MOON_PPN_PATH = os.environ.get("MOON_PPN_PATH", "")   # để trống = mặc định server/moon.ppn
+MOON_PPN_PATH = os.environ.get("MOON_PPN_PATH", "")   # để trống = models/voice/moon.ppn
 
 
 # ─── Wake-word ───────────────────────────────────────────────────────────────

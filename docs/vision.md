@@ -111,7 +111,7 @@ $env:MOON_CAMERA_SOURCE = 'http://<dia-chi-esp32>:81/stream'
 Diagnostic trả thêm `hand_frames`, `object_frames`, `hand_gestures` và
 `object_labels`, tiện kiểm tra riêng trường hợp chỉ đưa bàn tay/cẳng tay vào ảnh.
 
-Các file cần ở `server/`: `face_detection_yunet_2023mar.onnx`,
+Các file cần ở `models/vision/`: `face_detection_yunet_2023mar.onnx`,
 `face_recognition_sface_2021dec.onnx`, `emotion-ferplus-8.onnx`, `yolov8n-pose.pt`,
 `face_landmarker.task` (3,8 MB).
 Không tự tải model trong lúc khởi động. Môi trường đã kiểm tra tại máy này:
@@ -121,7 +121,7 @@ diagnostic. Các ngưỡng và lịch xử lý nằm trong `config/settings.py`.
 Tải model mốc mặt khi cài trên máy khác (máy phát triển đã tải sẵn):
 
 ```powershell
-Invoke-WebRequest -Uri 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task' -OutFile server/face_landmarker.task
+Invoke-WebRequest -Uri 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task' -OutFile models/vision/face_landmarker.task
 node tests/test_vision_ui.cjs
 ```
 
@@ -153,7 +153,7 @@ Hiệu năng thay đổi theo ánh sáng, số người và tải CPU khi chạy
 
 ## Đăng ký chủ nhân
 
-Không tự nhận người đầu tiên làm chủ nhân nữa. Mẫu `master_face.npy` có sẵn vẫn
+Không tự nhận người đầu tiên làm chủ nhân nữa. Mẫu `data/private/master_face.npy` có sẵn vẫn
 được đọc; nếu trước đây mẫu được tạo nhầm, đăng ký lại bằng ít nhất ba ảnh khác
 nhau, chỉ có một người, mặt rõ nét, đủ sáng, chủ yếu nhìn thẳng:
 

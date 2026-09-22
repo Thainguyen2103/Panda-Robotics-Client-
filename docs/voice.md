@@ -140,7 +140,7 @@ bộ Brain.
 - **Porcupine**: phát hiện âm học trên máy, báo wake ngay khi engine phát hiện,
   không đợi STT. Cài `pip install pvporcupine` bằng Python trong `.voice-venv`;
   tạo keyword **Moon** trong [Picovoice Console](https://console.picovoice.ai/),
-  tải model đúng hệ điều hành/kiến trúc về `server/moon.ppn`;
+  tải model đúng hệ điều hành/kiến trúc về `models/voice/moon.ppn`;
   điền `PICOVOICE_ACCESS_KEY` trong `config/secrets.py`. Có thể dùng biến môi trường
   `MOON_PPN_PATH` trỏ đến model. Đổi tên file model Panda không biến nó thành model Moon.
 - **Whisper dự phòng**: dùng ngay khi có Groq key, không cần `.ppn`. Pass

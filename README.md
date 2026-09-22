@@ -30,8 +30,8 @@ màn OLED theo phong cách robot Vector (Anki).
 
 ```
  mic trình duyệt ─┬→ Gemini Live (audio trực tiếp)
-                  └→ voice_lab.py (wake/VAD/STT) ─→ brain.py
- camera / ESP32-CAM    ─→ vision.py (YuNet/SFace/FER)     │
+                  └→ voice/web_service.py (wake/VAD/STT) ─→ brain.py
+ camera / ESP32-CAM    ─→ vision/ (YuNet/SFace/FER)          │
                                                            ├─→ llm.py (Groq)
  dashboard web (OLED ảo, nút điều khiển) ←─ MQTT broker ←─┤
  robot ESP32 (OLED thật, motor, buzz)    ←─ MQTT broker ←─┴─→ tts.py (Fish Audio)
@@ -40,13 +40,15 @@ màn OLED theo phong cách robot Vector (Anki).
 ## 📁 Cấu trúc thư mục
 
 ```
-config/      settings.py (mọi hằng số), secrets.example.py (mẫu key)
-server/      brain.py (điều phối), voice.py (STT), llm.py, tts.py,
-             vision.py (CV), topics.py (24 chủ đề), mqtt_bridge.py,
-             virtual_robot.py (robot ảo để test không cần phần cứng)
+config/      settings.py (cấu hình và đường dẫn), secrets.example.py (mẫu key)
+server/      brain.py (điều phối), llm.py, tts.py, mqtt_bridge.py
+server/voice/  local_runtime.py, web_service.py, core.py, wakeword.py
+server/vision/ engine.py, runtime.py, features.py, signals.py
+models/      voice/ và vision/ (model local, không commit)
+data/private/ dữ liệu sinh trắc local, không commit
 web/         server.js + public/ (dashboard OLED mô phỏng, idle behaviors)
 firmware/    panda_firmware.ino (ESP32, chạy được trên Wokwi lẫn chip thật)
-tools/       bench_topics.py, dev_mic_bridge.py
+tools/       supported utilities, local diagnostics and archived one-off patches
 ```
 
 ## 🎙️ Test Live Voice trên dashboard
@@ -70,7 +72,7 @@ pip install -r requirements.txt
 # 2. Key API
 copy config\secrets.example.py config\secrets.py   # rồi điền key
 
-# 3. Model files (xem bảng dưới) vào thư mục server/
+# 3. Model files (xem bảng dưới) vào models/vision/ hoặc models/voice/
 
 # 4. Chạy tất cả
 .\start.bat          # brain + web dashboard
@@ -102,7 +104,7 @@ trả lời bằng giọng đã chọn.
 | `res10_300x300_ssd_iter_140000.caffemodel` + `deploy.prototxt` | OpenCV dnn samples |
 | `haarcascade_frontalface_default.xml` | OpenCV data |
 | `yolov8n.pt`, `yolov8n-pose.pt` | Ultralytics (tự tải khi chạy lần đầu) |
-| `master_face.npy` | Đăng ký rõ ràng bằng `tools/enroll_face.py`; không tự lấy người đầu tiên (dữ liệu sinh trắc — không push) |
+| `master_face.npy` | `data/private/`; đăng ký bằng `tools/enroll_face.py` (dữ liệu sinh trắc — không push) |
 
 ## 🔩 Phần cứng (robot thật — thin client)
 
@@ -121,7 +123,7 @@ trả lời bằng giọng đã chọn.
 
 ## 🔒 Bảo mật
 
-- `config/secrets.py` (key thật) và `master_face.npy` (sinh trắc) nằm trong `.gitignore`.
+- `config/secrets.py`, model local và `data/private/master_face.npy` nằm trong `.gitignore`.
 - Chia sẻ code = chia sẻ `secrets.example.py`.
 - Model weights không push (repo nhẹ, tránh bản quyền nhị phân).
 

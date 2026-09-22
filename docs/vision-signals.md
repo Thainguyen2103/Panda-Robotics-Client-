@@ -3,10 +3,10 @@
 ## Cách dùng
 
 Khởi động lại brain bằng `start.bat`, tải lại dashboard với Ctrl+F5. Model bàn
-tay đã tải vào `server/hand_landmarker.task`. Khi chuyển sang máy khác:
+tay đã tải vào `models/vision/hand_landmarker.task`. Khi chuyển sang máy khác:
 
 ```powershell
-Invoke-WebRequest -Uri 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task' -OutFile server/hand_landmarker.task
+Invoke-WebRequest -Uri 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task' -OutFile models/vision/hand_landmarker.task
 ```
 
 Không tự tải model lúc khởi động. Thiếu model nào sẽ báo lỗi riêng, các nhánh
@@ -115,7 +115,7 @@ hoặc người. Số ví dụ không phải kết quả đo camera của bạn.
 
 ## Đồ vật
 
-YOLOv8n dùng `server/yolov8n.pt`, hỗ trợ 80 lớp COCO và xuất `objects[]` gồm nhãn, điểm, box chuẩn hóa,
+YOLOv8n dùng `models/vision/yolov8n.pt`, hỗ trợ 80 lớp COCO và xuất `objects[]` gồm nhãn, điểm, box chuẩn hóa,
 timestamp và `near_hands`. Các lớp vật thể được dịch sang tiếng Việt trên dashboard.
 “Gần tay” chỉ dựa vào lân cận hình học 2D, không khẳng định đang cầm/nắm.
 Không thấy đồ vật không có nghĩa đồ vật không tồn tại.

@@ -3,7 +3,7 @@ Brain — Bộ não trung tâm của Robot Moon
 =========================================
 Pipeline chính:
   Người nói
-    → voice.py (VAD + Groq STT) → transcript text
+    → voice/local_runtime.py (VAD + Groq STT) → transcript text
       → Phát hiện wake-word "Moon"
         → Nghe câu hỏi (nếu cần)
           → llm.py (DeepSeek/Groq) → stream câu trả lời
@@ -11,10 +11,10 @@ Pipeline chính:
               → Quay về standby, tiếp tục nghe
 
 Modules kết hợp:
-  - server/voice.py  : STT (Groq Whisper)
+  - server/voice/    : local/browser STT and shared wake-word logic
   - server/llm.py    : LLM (DeepSeek / Groq)
   - server/tts.py    : TTS (Fish Audio)
-  - server/vision.py : CV (YuNet face + FER+ emotion)
+  - server/vision/   : CV engine, camera runtime and observable signals
   - server/mqtt_bridge : giao tiếp với robot và dashboard
 """
 
@@ -46,7 +46,7 @@ from server.voice import (register_callbacks, continuous_listen_loop,
                           listen_for_question, pause_listening, resume_listening,
                           transcribe_bytes, _is_hallucination, _contains_wake_word,
                           STT_MODEL_QUESTION, _levenshtein, _strip_diacritics)
-from server.voice_core import safe_asr_correction
+from server.voice.core import safe_asr_correction
 from server.tts import speak, SentencePlayer
 from server import tts   # module object — cho tts.play_beep()/play_tick()
 from server import llm
@@ -687,8 +687,8 @@ def _process_command(text: str):
 
 def _handle_transcript(text: str):
     """
-    Callback mỗi khi voice.py nhận được transcript từ Groq.
-    Note: voice.py đã tự publish lên panda/log/voice rồi —
+    Callback mỗi khi Voice runtime nhận được transcript từ Groq.
+    Note: Voice runtime đã tự publish lên panda/log/voice rồi —
           ở đây chỉ xử lý lệnh điều khiển.
     """
     if voice_ai_state != "standby":
