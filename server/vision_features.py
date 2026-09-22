@@ -103,7 +103,7 @@ class ExpressionState:
         self.since,self.confirmed = 0.,-float("inf")
         self.source = "uncertain"
 
-    def update(self,probs,cues,now):
+    def update(self,probs,cues,now,*,fer_fresh=True):
         intensities = expression_intensities(cues)
         model_label,count,model_source = emotion_candidate(probs,cues) if probs is not None else ("unknown",3,"uncertain")
         # Trust a decisive non-neutral FER result. Geometric cues primarily recover
@@ -133,7 +133,10 @@ class ExpressionState:
             label,dwell,source = "unknown",.30,"uncertain"
         if label != self.pending:
             self.pending,self.since = label,now
-        if label != "unknown" and now-self.since >= dwell:
+        # Cached FER probabilities may be displayed, but only a new inference
+        # can confirm or extend a FER-based label. Landmarks are sampled each frame.
+        fresh = source == "landmarks" or fer_fresh
+        if label != "unknown" and fresh and now-self.since >= dwell:
             self.value,self.confirmed,self.source = label,now,source
         elif now-self.confirmed > .6:
             self.value,self.source = "unknown","uncertain"

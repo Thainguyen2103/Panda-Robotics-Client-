@@ -91,7 +91,10 @@ class VisionPanel {
         if (emotionElement) emotionElement.title = ranking
             ? 'Tối đa 5 đầu ra FER+ có điểm cao nhất, xếp theo thứ tự giảm dần.'
             : `Nguồn: ${s.emotion_source || 'unknown'} · độ tin cậy ${Math.round((s.emotion_confidence || 0)*100)}% (ước lượng từ mô hình/tín hiệu mặt)`;
-        if (offline) this.events.clear();
+        if (offline) {
+            this.events.clear();
+            this.hands.clear();
+        }
         const active = [...this.events.values()].filter(event=>this.now()-event.time<1800);
         this.text('cv-action',active.length ? active.map(event=>event.text).join(' · ') : 'Chưa rõ');
         for (const [channel,id] of [['head','cv-head'],['arms','cv-arms'],['left_hand','cv-left-hand'],['right_hand','cv-right-hand']]) {

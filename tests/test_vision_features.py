@@ -5,6 +5,41 @@ from server.vision import StableLabel, ArmGestures
 
 
 class FeatureTests(unittest.TestCase):
+    def test_crossed_arms_use_shoulders_and_chest_region(self):
+        for mirrored in (False,True):
+            for wrists,expected in (
+                (((200,180),(100,180)),"unknown"),
+                (((120,160),(180,160)),"arms_crossed"),
+                (((120,240),(180,240)),"unknown"),
+            ):
+                with self.subTest(mirrored=mirrored,wrists=wrists):
+                    p = np.zeros((17,3))
+                    p[5],p[6] = (200,100,1),(100,100,1)
+                    p[7],p[8] = (200,135,1),(100,135,1)
+                    p[9],p[10] = (*wrists[0],1),(*wrists[1],1)
+                    if mirrored:
+                        p[:,0] = 300-p[:,0]
+                    gestures = ArmGestures()
+                    gestures.update(p,0)
+                    self.assertEqual(gestures.update(p,.2),expected)
+
+    def test_cached_fer_cannot_confirm_or_refresh_emotion(self):
+        state = ExpressionState()
+        probs = np.array([.03,.79,.03,.03,.03,.03,.03,.03])
+        state.update(probs,{},0,fer_fresh=True)
+        self.assertEqual(state.update(probs,{},.31,fer_fresh=False)["emotion"],"unknown")
+        self.assertEqual(state.update(probs,{},.4,fer_fresh=True)["emotion"],"happy")
+        self.assertEqual(state.update(probs,{},.7,fer_fresh=False)["emotion"],"happy")
+        self.assertEqual(state.update(probs,{},1.1,fer_fresh=False)["emotion"],"unknown")
+
+    def test_fresh_landmarks_can_confirm_without_new_fer(self):
+        state = ExpressionState()
+        cues = {"smile":.8}
+        state.update(None,cues,0,fer_fresh=False)
+        result = state.update(None,cues,.2,fer_fresh=False)
+        self.assertEqual(result["emotion"],"happy")
+        self.assertEqual(result["emotion_source"],"landmarks")
+
     def test_moderate_nod_and_shake(self):
         for axis,label in (("pitch","head_nod"),("yaw","head_shake")):
             motion = HeadMotion()

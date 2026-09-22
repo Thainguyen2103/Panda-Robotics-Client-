@@ -198,8 +198,20 @@ class ArmGestures:
         hips = [visible(s,e,w) and p[w,1] > p[s,1]+.30*scale
                 and abs(p[w,0]-p[s,0]) < .65*scale
                 and abs(p[e,0]-p[s,0]) > .25*scale for s,e,w in available]
-        crossed = (visible(5,6,9,10) and p[9,0] > p[10,0]
-                   and max(p[9,1],p[10,1]) < max(p[5,1],p[6,1])+1.05*scale)
+        crossed = False
+        if visible(5,6,9,10):
+            # Project onto the shoulder axis so mirroring/leaning cannot reverse
+            # the rule. Both wrists must cross the torso midpoint, below the shoulders.
+            across = (p[6,:2]-p[5,:2])/scale
+            down = np.array([-across[1],across[0]])
+            if down[1] < 0:
+                down = -down
+            left = (p[9,:2]-p[5,:2])/scale
+            right = (p[10,:2]-p[5,:2])/scale
+            crossed = (np.dot(left,across) > .55 and np.dot(right,across) < .45
+                       and -.15 <= np.dot(right,across)
+                       and np.dot(left,across) <= 1.15
+                       and all(.15 <= np.dot(wrist,down) <= 1.05 for wrist in (left,right)))
         label = ("waving" if waving else "both_hands_up" if len(available)==2 and all(raised)
                  else "hand_raised" if any(raised) else "arms_crossed" if crossed
                  else "arms_out" if len(out)==2 and all(out)
@@ -444,6 +456,9 @@ class VisionEngine:
                         self.identity_label.reset()
                     self.identity_result = {key:result[key] for key in ("identity","identity_score")}
                 result.update(self.identity_result)
+                emotion_fresh = False
+                if now-self.emotion_time > settings.VISION_EMOTION_STALE_SEC:
+                    self.emotion_probs = None
                 if stage == "emotion":
                     self.emotion_time = now
                     def expression():
@@ -457,11 +472,13 @@ class VisionEngine:
                         return probs/probs.sum()
                     probs = self._run("emotion",expression)
                     if probs is not None:
+                        emotion_fresh = True
                         self.emotion_probs = probs if self.emotion_probs is None else .65*probs+.35*self.emotion_probs
                     else:
                         self.emotion_probs = None
                         self.emotion_label.reset()
-                result.update(self.expression_state.update(self.emotion_probs,self.cues,now))
+                result.update(self.expression_state.update(
+                    self.emotion_probs,self.cues,now,fer_fresh=emotion_fresh))
                 result["emotion_probs"] = {name:round(float(value),5) for name,value in zip(EMOTIONS,self.emotion_probs)} if self.emotion_probs is not None else {}
             else:
                 self.identity_time = self.emotion_time = -float("inf")
