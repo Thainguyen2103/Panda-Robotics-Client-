@@ -23,9 +23,17 @@ import os
 import sys
 import time
 import threading
-import re
 import unicodedata
 from datetime import datetime
+
+from server.llm_language import (
+    language_failure_message,
+    normalize_user_question,
+    response_language,
+    response_language_instruction,
+    response_language_matches,
+    strict_retry_instruction,
+)
 
 # Fix Windows terminal encoding (giống brain.py) — tránh crash khi in emoji/Việt
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
@@ -355,68 +363,6 @@ _history_lock = threading.Lock()
 MAX_HISTORY = 4
 
 
-_VIETNAMESE_MARKERS = {
-    "ai", "bao", "bạn", "biết", "bây", "cho", "chào", "chưa", "có",
-    "của", "đang", "đâu", "được", "gì", "giờ", "hãy", "hôm", "không",
-    "là", "mình", "muốn", "nào", "nay", "nhiêu", "ơi", "sao", "thế",
-    "tại", "tôi", "và", "với", "xin",
-}
-_ENGLISH_MARKERS = {
-    "am", "are", "can", "could", "did", "do", "does", "hello", "hey",
-    "how", "i", "is", "know", "me", "my", "please", "should", "tell",
-    "the", "today", "what", "when", "where", "who", "why", "would", "you",
-    "your",
-}
-_VIETNAMESE_DISTINCTIVE = set("ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ")
-_JAPANESE_SCRIPT = re.compile(r"[\u3040-\u30ff\u31f0-\u31ff\u3400-\u4dbf\u4e00-\u9fff]")
-
-
-def response_language(question: str) -> str:
-    """Classify only the latest spoken turn for response routing."""
-    normalized = unicodedata.normalize("NFC", question or "").casefold()
-    if _JAPANESE_SCRIPT.search(normalized):
-        return "ja"
-    words = re.findall(r"[^\W\d_]+", normalized, flags=re.UNICODE)
-    vi_score = sum(word in _VIETNAMESE_MARKERS for word in words)
-    en_score = sum(word in _ENGLISH_MARKERS for word in words)
-    if any(char in _VIETNAMESE_DISTINCTIVE for char in normalized):
-        vi_score += 2
-
-    if vi_score and en_score:
-        # One borrowed word does not make an otherwise clear sentence mixed.
-        if min(vi_score, en_score) >= 2 or abs(vi_score - en_score) <= 1:
-            return "adaptive"
-    if en_score >= 2 and en_score > vi_score:
-        return "en"
-    if vi_score >= 1 and vi_score > en_score:
-        return "vi"
-    # A multi-word ASCII utterance with no Vietnamese evidence is normally an
-    # English sentence (for example "Explain quantum physics"). A lone name or
-    # acronym stays ambiguous and is therefore answered bilingually.
-    if not vi_score and len(words) >= 2 and normalized.isascii():
-        return "en"
-    return "adaptive"
-
-
-def response_language_instruction(question: str) -> str:
-    language = response_language(question)
-    if language == "en":
-        return ("[Response language for the latest turn] The user spoke English. "
-                "Reply only in natural English, even if conversation history or "
-                "other instructions are written in Vietnamese.")
-    if language == "vi":
-        return ("[Ngôn ngữ trả lời cho lượt mới nhất] Người dùng nói tiếng Việt. "
-                "Chỉ trả lời bằng tiếng Việt tự nhiên.")
-    if language == "ja":
-        return ("[最新ターンの応答言語] ユーザーは日本語で話しました。"
-                "自然で分かりやすい日本語だけで答えてください。")
-    return ("[Response language for the latest turn] Infer the dominant language "
-            "and reply naturally in that language. Code-switch only where it helps: "
-            "keep familiar English technical terms, product names, and phrases when "
-            "they are clearer than a forced translation. Do not duplicate the whole "
-            "answer in two languages unless the user explicitly asks for translation.")
-
-
 def _get_messages(user_question: str) -> list[dict]:
     with _history_lock:
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -490,6 +436,21 @@ def _stream_provider(client, provider, model, messages, max_tokens, temperature)
             yield delta.content
 
 
+def _generate_response(messages: list[dict], max_tokens: int, temperature: float) -> str:
+    """Collect one provider response so its language can be checked before TTS."""
+    text = "".join(
+        _stream_provider(
+            _client,
+            _provider_name,
+            _model_name,
+            messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+    )
+    return _strip_thinking(text)
+
+
 # ─── Chat function ─────────────────────────────────────────────────────────────
 def chat(
     question: str,
@@ -512,7 +473,11 @@ def chat(
     if on_thinking:
         on_thinking("thinking")
 
-    exact_answer = realtime_answer(question)
+    model_question = normalize_user_question(question)
+    if model_question != question:
+        print(f'✍️ [LLM] Hiệu chỉnh chắc chắn: "{question}" → "{model_question}"')
+
+    exact_answer = realtime_answer(model_question)
     if exact_answer:
         if on_thinking:
             on_thinking("answering")
@@ -526,7 +491,7 @@ def chat(
 
     # Với câu hỏi tra từ trực tiếp, lấy đáp án từ dữ liệu bài học đã xác thực.
     # Nhánh này vừa nhanh vừa tránh để model nhỏ làm sai Kanji/Hiragana/Romaji.
-    grounded_answer = grounded_learning_answer(question)
+    grounded_answer = grounded_learning_answer(model_question)
     if grounded_answer:
         if on_thinking:
             on_thinking("answering")
@@ -548,7 +513,7 @@ def chat(
     t0 = time.time()
 
     try:
-        messages = _get_messages(question)
+        messages = _get_messages(model_question)
 
         # Extra params cho DeepSeek Reasoner
         extra_kwargs = {}
@@ -558,40 +523,36 @@ def chat(
         if on_thinking:
             on_thinking("answering")
 
-        full_response = ""
-        in_think_block = False
-        text_stream = _stream_provider(
-            _client,
-            _provider_name,
-            _model_name,
-            messages,
-            max_tokens=extra_kwargs.get(
-                "max_tokens",
-                OLLAMA_MAX_TOKENS if _provider_name == "ollama" else 512,
-            ),
-            temperature=0.25 if _provider_name == "ollama" else 0.7,
+        max_tokens = extra_kwargs.get(
+            "max_tokens",
+            OLLAMA_MAX_TOKENS if _provider_name == "ollama" else 512,
         )
-        for text_chunk in text_stream:
-            # Xử lý DeepSeek-R1 <think> tags streaming
-            if "<think>" in text_chunk:
-                in_think_block = True
-            if "</think>" in text_chunk:
-                in_think_block = False
-                after = text_chunk.split("</think>", 1)[-1]
-                if after:
-                    full_response += after
-                    if on_chunk:
-                        on_chunk(after)
-                continue
-
-            if not in_think_block:
-                full_response += text_chunk
-                if on_chunk:
-                    on_chunk(text_chunk)
-
-        full_response = _strip_thinking(full_response)
+        temperature = 0.25 if _provider_name == "ollama" else 0.7
+        full_response = _generate_response(messages, max_tokens, temperature)
         if not full_response:
             raise RuntimeError(f"{_provider_name} trả về nội dung rỗng")
+
+        expected_language = response_language(model_question)
+        if not response_language_matches(full_response, expected_language):
+            print(
+                "⚠️ [LLM] Câu trả lời sai ngôn ngữ; tạo lại trước khi gửi TTS "
+                f"(cần {expected_language})."
+            )
+            retry_messages = messages[:-1] + [
+                {
+                    "role": "system",
+                    "content": strict_retry_instruction(expected_language),
+                },
+                messages[-1],
+            ]
+            full_response = _generate_response(retry_messages, max_tokens, 0.1)
+            if not response_language_matches(full_response, expected_language):
+                full_response = language_failure_message(expected_language)
+
+        # Không phát bản nháp ra loa. Chỉ câu đã qua kiểm tra ngôn ngữ mới được
+        # chuyển cho bộ tách câu/TTS ở Brain.
+        if on_chunk:
+            on_chunk(full_response)
 
         elapsed = time.time() - t0
         print(
