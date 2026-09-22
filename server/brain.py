@@ -6,13 +6,13 @@ Pipeline chính:
     → voice/runtime/local.py (VAD + Groq STT) → transcript text
       → Phát hiện wake-word "Moon"
         → Nghe câu hỏi (nếu cần)
-          → llm.py (RAG + Gemini/DeepSeek/Groq) → stream câu trả lời
+          → llm.py (RAG + Qwen local qua Ollama) → stream câu trả lời
             → tts.py (Fish Audio) → phát âm thanh
               → Quay về standby, tiếp tục nghe
 
 Modules kết hợp:
   - server/voice/    : local/browser STT and shared wake-word logic
-  - server/llm.py    : LLM đa provider + kho bài học Nhật–Anh–Việt
+  - server/llm.py    : Qwen local + kho bài học Nhật–Anh–Việt
   - server/tts.py    : TTS (Fish Audio)
   - server/vision/   : CV engine, camera runtime and observable signals
   - server/mqtt_bridge : giao tiếp với robot và dashboard

@@ -1,7 +1,7 @@
 """
 LLM (Large Language Model) module
 ===================================
-Hỗ trợ DeepSeek, Gemini và Groq; có thể bổ sung ngữ cảnh từ kho bài học RAG.
+Mặc định dùng Qwen local qua Ollama; có thể bổ sung ngữ cảnh từ kho bài học RAG.
 
 Setup:
     pip install openai groq
@@ -49,7 +49,9 @@ try:
     GEMINI_API_KEY   = getattr(settings, "GEMINI_API_KEY", None)
     GROQ_LLM_MODEL   = getattr(settings, "GROQ_LLM_MODEL", "deepseek-r1-distill-llama-70b")
     GEMINI_LLM_MODEL = getattr(settings, "GEMINI_LLM_MODEL", "gemini-3.5-flash-lite")
-    LLM_PROVIDER     = getattr(settings, "LLM_PROVIDER", "auto")
+    OLLAMA_HOST       = getattr(settings, "OLLAMA_HOST", "http://127.0.0.1:11434")
+    OLLAMA_LLM_MODEL  = getattr(settings, "OLLAMA_LLM_MODEL", "moon-tutor")
+    LLM_PROVIDER     = getattr(settings, "LLM_PROVIDER", "ollama")
     LEARNING_RAG_ENABLED = getattr(settings, "LEARNING_RAG_ENABLED", True)
     QUICK_MODEL      = getattr(settings, "QUICK_MODEL", "groq/compound-mini")
 except Exception:
@@ -58,7 +60,9 @@ except Exception:
     GEMINI_API_KEY   = None
     GROQ_LLM_MODEL   = "deepseek-r1-distill-llama-70b"
     GEMINI_LLM_MODEL = "gemini-3.5-flash-lite"
-    LLM_PROVIDER     = "auto"
+    OLLAMA_HOST = "http://127.0.0.1:11434"
+    OLLAMA_LLM_MODEL = "moon-tutor"
+    LLM_PROVIDER     = "ollama"
     LEARNING_RAG_ENABLED = True
     QUICK_MODEL      = "groq/compound-mini"
 
@@ -69,16 +73,36 @@ _is_deepseek = False   # True = dùng DeepSeek API trực tiếp
 _provider_name = None
 
 def _init_client():
-    """Khởi tạo LLM client: DeepSeek → Gemini → Groq, hoặc provider được chọn."""
+    """Khởi tạo LLM chính; provider ``ollama`` không dùng API LLM dự phòng."""
     global _client, _model_name, _is_deepseek, _provider_name
 
+    _client = None
+    _model_name = None
+    _is_deepseek = False
+    _provider_name = None
+
     requested = str(LLM_PROVIDER or "auto").strip().lower()
-    allowed = {"auto", "deepseek", "gemini", "groq"}
+    allowed = {"auto", "ollama", "deepseek", "gemini", "groq"}
     if requested not in allowed:
         print(f"⚠️ [LLM] MOON_LLM_PROVIDER={requested!r} không hợp lệ; dùng auto.")
         requested = "auto"
 
-    # ── Option A: DeepSeek API (openai-compatible) ────────────────────────────
+    # ── Option A: Qwen local qua Ollama ───────────────────────────────────────
+    if requested in {"auto", "ollama"}:
+        try:
+            from server.llm_providers.ollama import OllamaTextClient
+            ollama_client = OllamaTextClient(OLLAMA_LLM_MODEL, OLLAMA_HOST)
+            ollama_client.ensure_ready()
+            _client = ollama_client
+            _model_name = OLLAMA_LLM_MODEL
+            _provider_name = "ollama"
+            print(f"✅ [LLM] Ollama sẵn sàng. Model: {_model_name}")
+
+            return
+        except Exception as e:
+            print(f"⚠️ [LLM] Ollama chưa sẵn sàng: {e}")
+
+    # ── Option B: DeepSeek API (openai-compatible) ────────────────────────────
     if requested in {"auto", "deepseek"} and DEEPSEEK_API_KEY:
         try:
             from openai import OpenAI
@@ -97,7 +121,8 @@ def _init_client():
         except Exception as e:
             print(f"⚠️ [LLM] Lỗi DeepSeek: {e}")
 
-    # ── Option B: Gemini text generation ─────────────────────────────────────
+    # ── Option C: Gemini text generation khi được chọn rõ ràng hoặc dùng auto ─
+    # Provider mặc định là Ollama, nên Gemini API key vẫn chỉ phục vụ STT.
     if requested in {"auto", "gemini"} and GEMINI_API_KEY:
         try:
             from server.llm_providers.gemini import GeminiTextClient
@@ -110,7 +135,7 @@ def _init_client():
         except Exception as e:
             print(f"⚠️ [LLM] Lỗi Gemini: {e}")
 
-    # ── Option C: Groq (free fallback) ───────────────────────────────────────
+    # ── Option D: Groq ────────────────────────────────────────────────────────
     if requested in {"auto", "groq"} and GROQ_API_KEY:
         try:
             from groq import Groq
@@ -125,7 +150,7 @@ def _init_client():
         except Exception as e:
             print(f"⚠️ [LLM] Lỗi Groq: {e}")
 
-    print("❌ [LLM] Không có LLM client khả dụng. Kiểm tra Gemini/DeepSeek/Groq API key.")
+    print("❌ [LLM] Không có LLM client khả dụng. Kiểm tra Ollama hoặc cấu hình provider.")
 
 _init_client()
 
@@ -160,6 +185,56 @@ def learning_display_info(question: str) -> dict | None:
     except Exception as e:
         print(f"⚠️ [RAG] Lấy dữ liệu màn hình lỗi: {e}")
         return None
+
+
+_VOCAB_LOOKUP_MARKERS = (
+    "tiếng nhật", "đọc thế nào", "đọc là gì", "viết thế nào", "nghĩa là gì",
+    "chữ hán", "hán tự", "kanji", "hiragana", "romaji",
+    "how do you say", "in japanese", "how is", "pronounce", "written in",
+    "日本語", "読み", "読ん", "書き", "漢字", "ひらがな", "ローマ字", "意味",
+)
+
+
+def grounded_learning_answer(question: str) -> str | None:
+    """Answer direct vocabulary lookups from verified lesson fields.
+
+    Small local models can omit a field or alter a Kanji even when the prompt
+    contains correct RAG data. Direct lookups therefore use a deterministic
+    sentence assembled from the lesson; Qwen remains responsible for normal
+    conversation and open-ended teaching.
+    """
+    normalized = unicodedata.normalize("NFC", question or "").casefold()
+    if not any(marker in normalized for marker in _VOCAB_LOOKUP_MARKERS):
+        return None
+
+    info = learning_display_info(question)
+    if not info:
+        return None
+
+    kanji = str(info.get("kanji") or "").strip()
+    hiragana = str(info.get("hiragana") or "").strip()
+    romaji = str(info.get("romaji") or "").strip()
+    english = str(info.get("english") or "").strip()
+    vietnamese = str(info.get("vietnamese") or "").strip()
+    if not all((kanji, hiragana, romaji, english, vietnamese)):
+        return None
+
+    language = response_language(question)
+    if language == "ja":
+        return (
+            f"日本語では「{kanji}」と書き、「{hiragana}」"
+            f"（ローマ字: {romaji}）と読みます。英語では「{english}」、"
+            f"ベトナム語では「{vietnamese}」です。"
+        )
+    if language == "en":
+        return (
+            f"In Japanese, {english} is written {kanji} and read {hiragana} "
+            f"({romaji}); in Vietnamese, it means {vietnamese}."
+        )
+    return (
+        f"Trong tiếng Nhật, {vietnamese} viết là {kanji}, đọc là {hiragana} "
+        f"({romaji}); tiếng Anh là {english}."
+    )
 
 # ─── System Prompt — Tính cách Moon ──────────────────────────────────────────
 SYSTEM_PROMPT = """Bạn là Moon — một robot thông minh, đáng yêu và thân thiện.
@@ -350,6 +425,29 @@ def _strip_thinking(text: str) -> str:
     return _re.sub(r"<think>.*?</think>", "", text, flags=_re.DOTALL).strip()
 
 
+def _stream_provider(client, provider, model, messages, max_tokens, temperature):
+    """Normalize native and OpenAI-compatible providers into text chunks."""
+    if provider in {"gemini", "ollama"}:
+        yield from client.stream_chat(
+            messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        return
+
+    stream = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        stream=True,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    for chunk in stream:
+        delta = chunk.choices[0].delta
+        if hasattr(delta, "content") and delta.content:
+            yield delta.content
+
+
 # ─── Chat function ─────────────────────────────────────────────────────────────
 def chat(
     question: str,
@@ -369,14 +467,28 @@ def chat(
     Returns:
         Câu trả lời đầy đủ (str).
     """
+    if on_thinking:
+        on_thinking("thinking")
+
+    # Với câu hỏi tra từ trực tiếp, lấy đáp án từ dữ liệu bài học đã xác thực.
+    # Nhánh này vừa nhanh vừa tránh để model nhỏ làm sai Kanji/Hiragana/Romaji.
+    grounded_answer = grounded_learning_answer(question)
+    if grounded_answer:
+        if on_thinking:
+            on_thinking("answering")
+        if on_chunk:
+            on_chunk(grounded_answer)
+        _add_to_history(question, grounded_answer)
+        if on_done:
+            on_done(grounded_answer)
+        print(f'✅ [RAG] Trả lời xác thực: "{grounded_answer[:80]}"')
+        return grounded_answer
+
     if not _client:
-        error_msg = "Xin lỗi, Moon chưa kết nối được với não bộ AI. Vui lòng kiểm tra API key."
+        error_msg = "Xin lỗi, Moon chưa kết nối được với Qwen. Vui lòng kiểm tra Ollama."
         if on_done:
             on_done(error_msg)
         return error_msg
-
-    if on_thinking:
-        on_thinking("thinking")
 
     print(f"🧠 [LLM] Câu hỏi: \"{question}\" | Model: {_model_name}")
     t0 = time.time()
@@ -392,39 +504,22 @@ def chat(
         if on_thinking:
             on_thinking("answering")
 
-        if _provider_name == "gemini":
-            text_stream = _client.stream_chat(
-                messages,
-                max_tokens=extra_kwargs.get("max_tokens", 512),
-                temperature=0.7,
-            )
-        else:
-            stream = _client.chat.completions.create(
-                model=_model_name,
-                messages=messages,
-                stream=True,
-                max_tokens=extra_kwargs.get("max_tokens", 512),
-                temperature=0.7,
-            )
-
-            def _openai_chunks():
-                for chunk in stream:
-                    delta = chunk.choices[0].delta
-                    if hasattr(delta, "content") and delta.content:
-                        yield delta.content
-
-            text_stream = _openai_chunks()
-
-        full_response   = ""
-        in_think_block  = False  # Bỏ qua nội dung <think>...</think>
-
+        full_response = ""
+        in_think_block = False
+        text_stream = _stream_provider(
+            _client,
+            _provider_name,
+            _model_name,
+            messages,
+            max_tokens=extra_kwargs.get("max_tokens", 512),
+            temperature=0.7,
+        )
         for text_chunk in text_stream:
             # Xử lý DeepSeek-R1 <think> tags streaming
             if "<think>" in text_chunk:
                 in_think_block = True
             if "</think>" in text_chunk:
                 in_think_block = False
-                # Lấy phần sau </think>
                 after = text_chunk.split("</think>", 1)[-1]
                 if after:
                     full_response += after
@@ -437,11 +532,15 @@ def chat(
                 if on_chunk:
                     on_chunk(text_chunk)
 
-        # Clean up nếu còn sót tag
         full_response = _strip_thinking(full_response)
+        if not full_response:
+            raise RuntimeError(f"{_provider_name} trả về nội dung rỗng")
 
         elapsed = time.time() - t0
-        print(f"✅ [LLM] Xong ({elapsed:.2f}s): \"{full_response[:80]}\"")
+        print(
+            f"✅ [LLM] Xong ({elapsed:.2f}s) | {_provider_name}/{_model_name}: "
+            f"\"{full_response[:80]}\""
+        )
 
         _add_to_history(question, full_response)
 
@@ -463,29 +562,27 @@ def quick(prompt: str, max_tokens: int = 200) -> str:
     chọn cảm xúc. Dùng model INSTANT (nhanh gấp ~10 lần gpt-oss reasoning)."""
     if not _client:
         return ""
-    if _provider_name == "gemini":
-        try:
-            return _client.complete(prompt, max_tokens=max_tokens, temperature=0.2)
-        except Exception as e:
-            print(f"⚠️ [LLM] quick() lỗi: {e}")
-            return ""
-    for attempt in (1, 2):
-        try:
-            r = _client.chat.completions.create(
-                model=QUICK_MODEL,
-                messages=[{"role": "user", "content": prompt}],
+
+    try:
+        if _provider_name in {"gemini", "ollama"}:
+            return _client.complete(
+                prompt,
                 max_tokens=max_tokens,
                 temperature=0.2,
-                stream=False,
             )
-            return (r.choices[0].message.content or "").strip()
-        except Exception as e:
-            # 429 rate limit free-tier → thử lại 1 lần sau 2.5s
-            if "429" in str(e) and attempt == 1:
-                time.sleep(2.5)
-                continue
-            print(f"⚠️ [LLM] quick() lỗi: {e}")
-            return ""
+
+        quick_model = QUICK_MODEL if _provider_name == "groq" else _model_name
+        response = _client.chat.completions.create(
+            model=quick_model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_tokens,
+            temperature=0.2,
+            stream=False,
+        )
+        return (response.choices[0].message.content or "").strip()
+    except Exception as e:
+        print(f"⚠️ [LLM] quick() lỗi: {e}")
+        return ""
 
 
 def chat_async(
