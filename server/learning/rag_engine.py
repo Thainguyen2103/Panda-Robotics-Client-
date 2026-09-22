@@ -1,5 +1,5 @@
 # ==============================================================================
-# rag_engine.py — Bộ máy Cascading RAG 3 Tầng (3-Tier Filtering) cho Robot Panda
+# rag_engine.py — Bộ máy Cascading RAG 3 Tầng (3-Tier Filtering) cho Robot Moon
 # Hỗ trợ học Tiếng Nhật - Tiếng Anh - Tiếng Việt cho trẻ em 7-10 tuổi
 # ==============================================================================
 
@@ -24,6 +24,8 @@ if sys.stderr and hasattr(sys.stderr, "reconfigure"):
         pass
 
 DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data.json")
+_CJK_IDEOGRAPH = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
+_JAPANESE_META_KANJI = set("日本語")
 
 
 def strip_accents(text: str) -> str:
@@ -33,7 +35,7 @@ def strip_accents(text: str) -> str:
     return text.replace('đ', 'd').replace('Đ', 'D')
 
 
-class PandaRAG:
+class MoonRAG:
     """
     Kiến trúc RAG Lọc 3 Tầng (3-Tier Cascading Filter / Multi-Stage Retrieval):
     --------------------------------------------------------------------------
@@ -80,13 +82,13 @@ class PandaRAG:
         return " ".join(text.split())
 
     def _clean_query(self, query: str) -> str:
-        """Loại bỏ tên robot / wake-word (Panda ơi, này Panda) để tránh nhầm sang bài học Gấu trúc Panda"""
+        """Loại bỏ wake-word Moon nhưng vẫn giữ câu hỏi thật về gấu trúc."""
         q = query.lower()
         # Nếu bé hỏi rõ về con gấu trúc thì giữ lại
         if any(w in q for w in ["con gấu trúc", "loài gấu trúc", "gấu trúc tiếng", "gấu trúc ăn gì"]):
             return query
         # Bỏ các từ xưng hô chào robot ở đầu hoặc cuối câu
-        q_clean = re.sub(r"\b(panda ơi|ơi panda|này panda|ê panda|hey panda|panda)\b", "", q, flags=re.IGNORECASE)
+        q_clean = re.sub(r"\b(moon ơi|ơi moon|này moon|ê moon|hey moon|moon)\b", "", q, flags=re.IGNORECASE)
         q_clean = q_clean.strip()
         return q_clean if len(q_clean) >= 2 else query
 
@@ -101,12 +103,16 @@ class PandaRAG:
         clean_q = self._clean_query(query)
         q_norm = self._normalize(clean_q)
         q_tokens = set(q_norm.split())
+        # Chỉ so Hán tự thật. Các trường Kanji có thể chứa cả Hiragana, còn
+        # câu hỏi thường có cụm mô tả chung "日本語" không phải từ cần tra.
+        query_kanji = set(_CJK_IDEOGRAPH.findall(query)) - _JAPANESE_META_KANJI
 
         matches = []
         for item in self.knowledge_base:
             # 1. Khớp chữ Hán (Kanji) trực tiếp
             kanji = item.get("kanji", "")
-            if kanji and any(k_char in query for k_char in kanji if k_char.strip()):
+            item_kanji = set(_CJK_IDEOGRAPH.findall(kanji))
+            if query_kanji.intersection(item_kanji):
                 matches.append((10.0, item))
                 continue
 
@@ -153,6 +159,12 @@ class PandaRAG:
             for kw in item.get("keywords", []):
                 kw_norm = self._normalize(kw)
                 kw_unacc = strip_accents(kw_norm)
+
+                # Từ không dấu quá ngắn dễ đụng từ tiếng Anh thông dụng:
+                # "đỏ" -> "do", "cá" -> "ca". Chỉ khớp chúng khi còn dấu
+                # ở tầng exact; bản không dấu nên dùng cụm từ dài hơn.
+                if len(kw_unacc) < 3:
+                    continue
 
                 # Bỏ qua từ đơn 'cho' nếu câu là 'chỉ cho', 'nói cho'
                 if kw_unacc == "cho" and ("chi cho" in q_unacc or "noi cho" in q_unacc or "do cho" in q_unacc):
@@ -202,7 +214,12 @@ class PandaRAG:
         q_words = set(q_unacc.split())
 
         # Loại bỏ các hư từ tiếng Việt thông dụng để tập trung vào từ mang ý nghĩa
-        stopwords = {"la", "gi", "the", "nao", "sao", "cho", "minh", "hoi", "ban", "oi", "con", "cai", "be", "biet", "khong"}
+        stopwords = {
+            "la", "gi", "the", "nao", "sao", "cho", "minh", "hoi", "ban",
+            "oi", "con", "cai", "be", "biet", "khong", "co", "rat", "an",
+            "a", "am", "are", "do", "does", "i", "is", "me", "my", "the",
+            "to", "what", "who", "you", "your",
+        }
         content_words = q_words - stopwords
         if not content_words:
             content_words = q_words
@@ -219,7 +236,9 @@ class PandaRAG:
 
             # Tính độ trùng khớp ý niệm (Jaccard Overlap)
             matched_words = content_words.intersection(doc_words)
-            if matched_words:
+            # Một từ chung đơn lẻ (ví dụ "I", "you", "hôm nay") không đủ
+            # chứng minh câu hỏi thuộc bài học; tránh bơm RAG sai vào hội thoại.
+            if len(matched_words) >= 2:
                 semantic_score = len(matched_words) / math.sqrt(len(content_words) * len(doc_words) + 1)
                 scored_items.append((semantic_score, item))
 
@@ -293,18 +312,18 @@ class PandaRAG:
 
 # ─── Chạy thử kiểm chứng 3 Tầng Lọc ──────────────────────────────────────────
 if __name__ == "__main__":
-    rag = PandaRAG()
+    rag = MoonRAG()
 
     print("\n--- KIỂM TRA HỆ THỐNG LỌC 3 TẦNG (3-TIER RAG) ---")
 
     # Test 1: Đi vào Tầng 1 (Chính xác từ khóa / Kanji)
-    q1 = "Panda ơi con mèo tiếng Nhật đọc sao?"
+    q1 = "Moon ơi con mèo tiếng Nhật đọc sao?"
     res1 = rag.search(q1)
     print(f"\n1️⃣ Test Tầng 1 (Exact Match): \"{q1}\"")
     print(f"-> Kết quả: {res1[0]['vietnamese']} | Kanji: {res1[0]['kanji']} | English: {res1[0]['english']}")
 
     # Test 2: Đi vào Tầng 2 (Tiếng Việt không dấu / đảo từ)
-    q2 = "chi cho be tu qua tao di panda"
+    q2 = "chi cho be tu qua tao di moon"
     res2 = rag.search(q2)
     print(f"\n2️⃣ Test Tầng 2 (Lexical Unaccented): \"{q2}\"")
     print(f"-> Kết quả: {res2[0]['vietnamese']} | Kanji: {res2[0]['kanji']} | English: {res2[0]['english']}")

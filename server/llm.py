@@ -1,8 +1,7 @@
 """
 LLM (Large Language Model) module
 ===================================
-Ưu tiên: DeepSeek API (deepseek-chat / deepseek-reasoner) — chất lượng cao, model TQ
-Fallback: Groq API (llama / qwen / deepseek-r1-distill) — miễn phí
+Hỗ trợ DeepSeek, Gemini và Groq; có thể bổ sung ngữ cảnh từ kho bài học RAG.
 
 Setup:
     pip install openai groq
@@ -51,6 +50,7 @@ try:
     GROQ_LLM_MODEL   = getattr(settings, "GROQ_LLM_MODEL", "deepseek-r1-distill-llama-70b")
     GEMINI_LLM_MODEL = getattr(settings, "GEMINI_LLM_MODEL", "gemini-3.5-flash-lite")
     LLM_PROVIDER     = getattr(settings, "LLM_PROVIDER", "auto")
+    LEARNING_RAG_ENABLED = getattr(settings, "LEARNING_RAG_ENABLED", True)
     QUICK_MODEL      = getattr(settings, "QUICK_MODEL", "groq/compound-mini")
 except Exception:
     DEEPSEEK_API_KEY = None
@@ -59,6 +59,7 @@ except Exception:
     GROQ_LLM_MODEL   = "deepseek-r1-distill-llama-70b"
     GEMINI_LLM_MODEL = "gemini-3.5-flash-lite"
     LLM_PROVIDER     = "auto"
+    LEARNING_RAG_ENABLED = True
     QUICK_MODEL      = "groq/compound-mini"
 
 # ─── Xác định model và client sẽ dùng ────────────────────────────────────────
@@ -127,6 +128,38 @@ def _init_client():
     print("❌ [LLM] Không có LLM client khả dụng. Kiểm tra Gemini/DeepSeek/Groq API key.")
 
 _init_client()
+
+# ─── Kho bài học RAG của nhóm LLM ───────────────────────────────────────────
+_retrieve_learning_context = None
+_get_learning_display_info = None
+if LEARNING_RAG_ENABLED:
+    try:
+        from server.learning import get_display_info as _get_learning_display_info
+        from server.learning import retrieve_context as _retrieve_learning_context
+    except Exception as e:
+        print(f"⚠️ [RAG] Không thể nạp kho bài học: {e}")
+
+
+def learning_context(question: str) -> str:
+    """Return verified lesson context without making the whole LLM depend on RAG."""
+    if not _retrieve_learning_context:
+        return ""
+    try:
+        return _retrieve_learning_context(question)
+    except Exception as e:
+        print(f"⚠️ [RAG] Truy xuất bài học lỗi: {e}")
+        return ""
+
+
+def learning_display_info(question: str) -> dict | None:
+    """Expose the best lesson fields for OLED/LED integrations."""
+    if not _get_learning_display_info:
+        return None
+    try:
+        return _get_learning_display_info(question)
+    except Exception as e:
+        print(f"⚠️ [RAG] Lấy dữ liệu màn hình lỗi: {e}")
+        return None
 
 # ─── System Prompt — Tính cách Moon ──────────────────────────────────────────
 SYSTEM_PROMPT = """Bạn là Moon — một robot thông minh, đáng yêu và thân thiện.
@@ -275,6 +308,20 @@ def _get_messages(user_question: str) -> list[dict]:
         if wx:
             ctx += " | " + wx
         messages.append({"role": "system", "content": ctx})
+        lesson_context = learning_context(user_question)
+        if lesson_context:
+            print("📚 [RAG] Đã thêm bài học xác thực vào prompt.")
+            messages.append({
+                "role": "system",
+                "content": (
+                    "[Verified learning material] For language-learning facts, use the "
+                    "following lesson exactly. Do not invent or silently alter Kanji, "
+                    "Hiragana, Romaji, translations, examples, or quiz content. When "
+                    "teaching a Japanese word, include its Kanji, Hiragana, Romaji, and "
+                    "meaning in the response language.\n\n"
+                    + lesson_context
+                ),
+            })
         messages.extend(_conversation_history[-MAX_HISTORY * 2:])
         messages.append({"role": "system", "content": response_language_instruction(user_question)})
         messages.append({"role": "user", "content": user_question})

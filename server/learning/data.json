@@ -223,9 +223,9 @@
     "japanese_phonetic": "ben-ki-ô",
     "english": "Study hard",
     "english_phonetic": "xta-đi hat",
-    "example_en": "I study with Robot Panda.",
-    "example_jp": "パンダと楽しく勉強します (Panda to tanoshiku benkyou shimasu)",
-    "example_vi": "Bé cùng học tập vui vẻ với chú robot Panda.",
+    "example_en": "I study with Robot Moon.",
+    "example_jp": "ムーンと楽しく勉強します (Moon to tanoshiku benkyou shimasu)",
+    "example_vi": "Bé cùng học tập vui vẻ với chú robot Moon.",
     "fun_fact": "Chữ Hán 勉 là siêng năng nỗ lực, 強 là trở nên mạnh mẽ vững vàng.",
     "quiz": "Chữ Hán 勉強 trên LED đọc là Benkyou. Đố bé chăm chỉ học tập tiếng Anh là từ gì?"
   },
@@ -392,7 +392,7 @@
     "example_jp": "体育でサッカーをします (Taiiku de sakkaa o shimasu)",
     "example_vi": "Bé chạy nhảy đá bóng cùng bạn bè trong giờ Thể dục.",
     "fun_fact": "Chữ Hán 体育: 体 là thân thể, 育 là nuôi dưỡng. Thể dục giúp bé khỏe như một lực sĩ tí hon!",
-    "quiz": "Môn bóng đá vua tiếng Anh là Football, tiếng Nhật là Sakkaa, bé đọc lại cùng Panda nhé!"
+    "quiz": "Môn bóng đá vua tiếng Anh là Football, tiếng Nhật là Sakkaa, bé đọc lại cùng Moon nhé!"
   },
   {
     "id": "obj_backpack",
@@ -600,7 +600,7 @@
     "example_jp": "回転寿司へ行きました (Kaitenzushi e ikimashita)",
     "example_vi": "Bé thích đi ăn cơm cuộn sushi trên băng chuyền cùng gia đình.",
     "fun_fact": "Chữ Hán 寿 là lời chúc trường thọ may mắn, 司 là quản lý. Sushi là món ăn đem lại niềm vui và may mắn.",
-    "quiz": "Cả thế giới đều gọi món cơm cuộn hải sản này là Sushi. Bé cùng đọc to Sushi với Panda nhé!"
+    "quiz": "Cả thế giới đều gọi món cơm cuộn hải sản này là Sushi. Bé cùng đọc to Sushi với Moon nhé!"
   },
   {
     "id": "dish_icecream",
@@ -833,7 +833,7 @@
     "example_jp": "象の鼻は長いです (Zou no hana wa nagai desu)",
     "example_vi": "Chú voi có chiếc vòi dài thật kỳ diệu.",
     "fun_fact": "Voi là loài động vật trên cạn lớn nhất và có trí nhớ siêu phàm.",
-    "quiz": "Chữ Hán của con voi là 象 (Zou), chiếc vòi dài tiếng Anh là Elephant, bé đọc theo Panda nhé!"
+    "quiz": "Chữ Hán của con voi là 象 (Zou), chiếc vòi dài tiếng Anh là Elephant, bé đọc theo Moon nhé!"
   },
   {
     "id": "animal_panda",
@@ -843,18 +843,18 @@
       "loài gấu trúc",
       "con gấu trúc"
     ],
-    "vietnamese": "Gấu trúc Panda",
+    "vietnamese": "Gấu trúc",
     "kanji": "熊猫",
     "japanese_hiragana": "パンダ",
     "japanese_romaji": "Panda",
     "japanese_phonetic": "pan-đa",
     "english": "Panda",
     "english_phonetic": "pan-đờ",
-    "example_en": "Panda is a cute friend.",
+    "example_en": "A panda is a cute animal.",
     "example_jp": "パンダはみんなの友達です (Panda wa minna no tomodachi desu)",
-    "example_vi": "Gấu trúc Panda là người bạn robot siêu thông minh của bé.",
-    "fun_fact": "Chữ Hán của gấu trúc là 熊猫 (nghĩa là gấu mèo). Panda dành tới 12 tiếng mỗi ngày để ăn lá trúc!",
-    "quiz": "Món ăn yêu thích nhất của bạn gấu trúc Panda là gì bé ơi?"
+    "example_vi": "Gấu trúc là một loài vật đáng yêu.",
+    "fun_fact": "Chữ Hán của gấu trúc là 熊猫 (nghĩa là gấu mèo). Gấu trúc dành tới 12 tiếng mỗi ngày để ăn lá trúc!",
+    "quiz": "Món ăn yêu thích nhất của bạn gấu trúc là gì bé ơi?"
   },
   {
     "id": "nature_sun",
@@ -1108,6 +1108,6 @@
     "example_jp": "おじいさんとおばあちゃんに会いに行きます (Ojiisan to obaachan ni ai ni ikimasu)",
     "example_vi": "Cuối tuần bé về thăm ông bà và nghe ông bà kể chuyện cổ tích.",
     "fun_fact": "Chữ Hán 祖 (Tổ) nghĩa là nguồn cội, gốc gác gia đình mà chúng ta luôn kính trọng.",
-    "quiz": "Ông nội/ông ngoại tiếng Nhật là Ojiisan, bà là Obaasan, bé thử đọc cùng Panda nhé!"
+    "quiz": "Ông nội/ông ngoại tiếng Nhật là Ojiisan, bà là Obaasan, bé thử đọc cùng Moon nhé!"
   }
 ]

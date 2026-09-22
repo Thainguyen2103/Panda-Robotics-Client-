@@ -35,6 +35,9 @@ def _key(name: str) -> str:
 GEMINI_API_KEY = _key("GEMINI_API_KEY")
 LLM_PROVIDER = os.environ.get("MOON_LLM_PROVIDER", "auto").strip().lower()
 GEMINI_LLM_MODEL = os.environ.get("GEMINI_LLM_MODEL", "gemini-3.5-flash-lite")
+LEARNING_RAG_ENABLED = os.environ.get("MOON_LEARNING_RAG", "1").strip().lower() not in {
+    "0", "false", "no", "off",
+}
 
 # MQTT Broker Configuration
 MQTT_BROKER = "localhost"

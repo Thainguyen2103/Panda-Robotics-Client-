@@ -1,5 +1,5 @@
 # ==============================================================================
-# panda_tutor.py — Điều phối Trợ lý AI Panda (Ollama Qwen2.5 + RAG)
+# ollama_tutor.py — Provider Ollama tùy chọn cho Trợ lý AI Moon
 # Chuyên hỗ trợ học Tiếng Nhật, Anh, Việt cho trẻ 7-10 tuổi trên Robot
 # ==============================================================================
 
@@ -20,14 +20,14 @@ if sys.stdout and hasattr(sys.stdout, "reconfigure"):
 
 # Import module RAG
 try:
-    from server.llm.rag_engine import PandaRAG
+    from server.learning.rag_engine import MoonRAG
 except ImportError:
-    from rag_engine import PandaRAG
+    from rag_engine import MoonRAG
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
-MODEL_NAME = "panda-tutor"
+MODEL_NAME = "moon-tutor"
 
-rag_engine = PandaRAG()
+rag_engine = MoonRAG()
 
 
 def check_tts_ready(text: str) -> str:
@@ -66,14 +66,14 @@ def get_led_display_info(question: str) -> Optional[dict]:
     }
 
 
-def ask_panda(
+def ask_moon(
     question: str,
     stream: bool = False,
     on_chunk: Optional[Callable[[str], None]] = None,
     use_rag: bool = True
 ) -> str:
     """
-    Hỏi chú robot Panda thông qua Ollama kết hợp RAG.
+    Hỏi robot Moon thông qua Ollama kết hợp RAG.
     Đầu vào: text (câu hỏi của bé).
     Đầu ra: text (phản hồi đầy đủ, giàu kiến thức, kèm chữ Hán chuẩn cho LED).
     """
@@ -141,14 +141,14 @@ def ask_panda(
             full_text = _call_ollama(payload)
         except Exception as retry_err:
             print(f"❌ [Ollama Retry Error]: {retry_err}")
-            return "Xin lỗi bé nha, Panda gặp chút trục trặc khi suy nghĩ. Bé thử hỏi lại xem sao nha!"
+            return "Xin lỗi bé nha, Moon gặp chút trục trặc khi suy nghĩ. Bé thử hỏi lại xem sao nha!"
     except urllib.error.URLError as e:
-        err_msg = "Xin lỗi bé nha, Panda chưa kết nối được với Ollama. Bé kiểm tra lại giúp Panda nhé!"
+        err_msg = "Xin lỗi bé nha, Moon chưa kết nối được với Ollama. Bé kiểm tra lại giúp Moon nhé!"
         print(f"❌ [Ollama Error]: {e}")
         return err_msg
     except Exception as e:
         print(f"❌ [Error]: {e}")
-        return "Panda đang hơi buồn ngủ một xíu, bé nói lại lần nữa cho Panda nghe rõ nhé!"
+        return "Moon đang hơi buồn ngủ một xíu, bé nói lại lần nữa cho Moon nghe rõ nhé!"
 
     # Giữ nguyên văn bản phong phú (chữ Hán, Hiragana, Romaji) cho màn hình LED và giao diện Text
     return full_text.strip()
@@ -175,7 +175,7 @@ def send_to_robot_mqtt(
     led_info = get_led_display_info(question) or {}
 
     # 2. Sinh câu trả lời từ AI
-    full_reply = ask_panda(question, stream=False, use_rag=True)
+    full_reply = ask_moon(question, stream=False, use_rag=True)
 
     # 3. Chuẩn bị văn bản sạch cho Loa TTS
     tts_text = check_tts_ready(full_reply)
@@ -207,7 +207,7 @@ def send_to_robot_mqtt(
 if __name__ == "__main__":
     print("🐼 === ROBOT PANDA - BẠN ĐỒNG HÀNH HỌC TẬP (TEXT + LED KANJI) ===")
     sample_queries = [
-        "Panda ơi, con mèo tiếng Nhật đọc sao?",
+        "Moon ơi, con mèo tiếng Nhật đọc sao?",
         "Bé muốn học từ quả táo tiếng Anh và tiếng Nhật!",
     ]
 
@@ -219,11 +219,11 @@ if __name__ == "__main__":
         if led_info:
             print(f"📟 [MÀN HÌNH LED]: Chữ Hán: '{led_info['kanji']}' | Hiragana: '{led_info['hiragana']}' | Romaji: '{led_info['romaji']}' | English: '{led_info['english']}'")
 
-        # 2. Câu trả lời dạng text hoàn chỉnh từ Robot Panda
-        print("🐼 Panda: ", end="", flush=True)
+        # 2. Câu trả lời dạng text hoàn chỉnh từ Robot Moon
+        print("🐼 Moon: ", end="", flush=True)
         def print_chunk(c):
             print(c, end="", flush=True)
-        reply = ask_panda(q, stream=True, on_chunk=print_chunk, use_rag=True)
+        reply = ask_moon(q, stream=True, on_chunk=print_chunk, use_rag=True)
         print("\n" + "-" * 50)
 
 
