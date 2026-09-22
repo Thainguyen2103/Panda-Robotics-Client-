@@ -9,6 +9,7 @@ const server = http.createServer(app);
 const io = socketIo(server);
 const {attachVoice, startVoiceService} = require('./voice-bridge');
 const {attachGeminiLive} = require('./gemini-live-bridge');
+const {attachGeminiTranscribe} = require('./gemini-transcribe-bridge');
 const {readFishConfig, synthesizeFishWithRetry} = require('./fish-tts');
 
 // Define MQTT settings
@@ -16,6 +17,7 @@ const MQTT_BROKER = 'mqtt://localhost:1883';
 const mqttClient = mqtt.connect(MQTT_BROKER);
 attachVoice(server);
 attachGeminiLive(server, mqttClient);
+attachGeminiTranscribe(server);
 startVoiceService();
 
 // Tạo một lần rồi giữ trong RAM để lời xác nhận wakeword phát gần như tức thì.

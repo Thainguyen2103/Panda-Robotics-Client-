@@ -179,7 +179,7 @@ class VisionTests(unittest.TestCase):
                 return np.array([[0,10,0,0,0,0,0,0]],dtype=np.float32)
         engine.models.update(face=Detector(),emotion=Emotion())
         frame = np.zeros((240,320,3),dtype=np.uint8)
-        for t in [0,.01,.02,.03]:
+        for t in [0,.1,.2,.31]:
             self.assertEqual(engine.process(frame,now=t)["emotion"],"unknown")
         self.assertEqual(engine.models["emotion"].calls,1)
         engine.process(frame,now=1)
@@ -187,6 +187,23 @@ class VisionTests(unittest.TestCase):
         engine.models.pop("face")
         self.assertEqual(engine.process(frame,now=2.01)["emotion"],"unknown")
         self.assertEqual(engine.emotion_result["emotion"],"unknown")
+
+    def test_emotion_cache_expires_when_scheduler_runs_other_models(self):
+        engine = self.engine()
+        class Detector:
+            def setInputSize(self,size): pass
+            def detect(self,frame): return None,np.array([face()])
+        engine.models["face"] = Detector()
+        engine.face_box = tuple(face()[:4])
+        engine.emotion_probs = np.array([0.,1.,0.,0.,0.,0.,0.,0.])
+        engine.emotion_time = 0.
+        frame = np.zeros((240,320,3),dtype=np.uint8)
+        with patch.object(engine,"_schedule",return_value=None):
+            result = engine.process(frame,now=v.settings.VISION_EMOTION_STALE_SEC+.1)
+        self.assertIsNone(engine.emotion_probs)
+        self.assertEqual(result["emotion_probs"],{})
+        self.assertEqual(result["emotion_scores"],{})
+        self.assertEqual(result["emotion"],"unknown")
 
 
 if __name__ == "__main__":

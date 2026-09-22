@@ -1,13 +1,5 @@
-"""YuNet/SFace/FER+ and upper-body gestures, using a latest-frame mailbox.
-
-Importing this module opens neither a camera nor a network connection.
-"""
-import base64
-from collections import deque
+"""Vision inference engine; importing it opens no camera or network connection."""
 import logging
-from pathlib import Path
-import sys
-import threading
 import time
 
 import numpy as np
@@ -16,13 +8,19 @@ try:
 except ImportError:
     cv2 = None
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from config import settings
-from server.vision_features import FaceDetails, HeadMotion, ExpressionState, upper_body, ARM_EDGES
-from server.vision_signals import EyeState, HandDetails, distance_estimate, combined_actions, nearby_objects, HAND_EDGES
+from server.vision.body.gestures import ArmGestures
+from server.vision.body.pose import upper_body
+from server.vision.face.analysis import FaceDetails, HeadMotion, ExpressionState
+from server.vision.face.eyes import EyeState, distance_estimate
+from server.vision.face.gestures import HeadGestures
+from server.vision.fusion import combined_actions, nearby_objects
+from server.vision.hands.analysis import HandDetails
+from server.vision.paths import MODEL_DIR, DATA_DIR, model_path, data_path
+from server.vision.stability import StableLabel
 
 LOG = logging.getLogger("moon.vision")
-BASE = Path(__file__).resolve().parent
+BASE = MODEL_DIR  # Backward-compatible name; new code should use MODEL_DIR/DATA_DIR.
 EMOTIONS = ("neutral", "happy", "surprised", "sad", "angry", "disgust", "fear", "contempt")
 
 
@@ -47,165 +45,6 @@ def emotion_face_crop(frame, box, padding=.12):
         frame = cv2.copyMakeBorder(frame,pad_top,pad_bottom,pad_left,pad_right,cv2.BORDER_REPLICATE)
         left,top = left+pad_left,top+pad_top
     return frame[top:top+side,left:left+side]
-
-
-class StableLabel:
-    def __init__(self, count=3, hold=0):
-        self.count = count
-        self.hold = hold
-        self.reset()
-
-    def reset(self):
-        self.pending, self.samples = "unknown", 0
-        self.value, self.uncertain = "unknown", 0
-
-    def update(self, label):
-        if label == "unknown":
-            self.pending,self.samples = "unknown",0
-            self.uncertain += 1
-            if self.uncertain > self.hold:
-                self.value = "unknown"
-            return self.value
-        self.samples = self.samples+1 if label == self.pending else 1
-        self.pending = label
-        if self.samples >= self.count:
-            self.value,self.uncertain = label,0
-        else:
-            self.uncertain += 1
-            if self.uncertain > self.hold:
-                self.value = "unknown"
-        return self.value
-
-
-def excursions(values, threshold):
-    """Count changes of direction only after a substantial excursion."""
-    if not values:
-        return 0
-    anchor, direction, reversals = values[0], 0, 0
-    for value in values[1:]:
-        delta = value-anchor
-        if abs(delta) >= threshold:
-            new_direction = 1 if delta > 0 else -1
-            reversals += int(bool(direction) and direction != new_direction)
-            direction, anchor = new_direction, value
-    return reversals
-
-
-class HeadGestures:
-    """Temporal landmark ratios for a frontal face; heuristic, not a trained HAR model."""
-    def __init__(self):
-        self.history = deque()
-        self.last_event = -float("inf")
-
-    def reset(self):
-        self.history.clear()
-        self.last_event = -float("inf")
-
-    def update(self, face, now):
-        # YuNet: right eye, left eye, nose, right mouth, left mouth.
-        points = np.asarray(face[4:14], dtype=float).reshape(5, 2)
-        eye_mid = points[:2].mean(axis=0)
-        eye_axis = points[1]-points[0]
-        width = np.linalg.norm(eye_axis)
-        if width < 15 or not np.isfinite(points).all():
-            self.reset()
-            return "unknown"
-        eye_axis /= width
-        down = np.array([-eye_axis[1], eye_axis[0]])
-        if np.dot(points[3:].mean(axis=0)-eye_mid, down) < 0:
-            down = -down
-        mouth_distance = np.dot(points[3:].mean(axis=0)-eye_mid, down)
-        if mouth_distance < .25*width:
-            self.reset()
-            return "unknown"
-        nose = points[2]-eye_mid
-        yaw = float(np.dot(nose, eye_axis)/width)
-        pitch = float(np.dot(nose, down)/mouth_distance)
-        if self.history and now-self.history[-1][0] > .5:
-            self.history.clear()
-        self.history.append((now, yaw, pitch))
-        while self.history and now-self.history[0][0] > 1.6:
-            self.history.popleft()
-        if len(self.history) < 5 or now-self.history[0][0] < .4 or now-self.last_event < 1.0:
-            return "unknown"
-        yaw_values = [v[1] for v in self.history]
-        pitch_values = [v[2] for v in self.history]
-        yaw_range, pitch_range = np.ptp(yaw_values), np.ptp(pitch_values)
-        label = "unknown"
-        if yaw_range >= .28 and yaw_range > pitch_range*1.5 and excursions(yaw_values, .12) >= 1:
-            label = "head_shake"
-        elif pitch_range >= .18 and pitch_range > yaw_range*1.5 and excursions(pitch_values, .08) >= 1:
-            label = "head_nod"
-        if label != "unknown":
-            self.last_event = now
-            self.history.clear()
-        return label
-
-
-class ArmGestures:
-    """Upper-body gestures that also work when only one arm is in frame."""
-    def __init__(self):
-        self.history = {9: deque(), 10: deque()}
-        self.stable = StableLabel(2)
-
-    def reset(self):
-        for history in self.history.values():
-            history.clear()
-        self.stable.reset()
-
-    def update(self, points, now):
-        p = np.asarray(points)
-        if p.shape != (17, 3) or not np.isfinite(p).all():
-            self.reset()
-            return "unknown"
-        def visible(*indices):
-            return all(p[i,2] >= settings.VISION_KEYPOINT_THRESHOLD for i in indices)
-        visible_shoulders = [i for i in (5,6) if visible(i)]
-        if not visible_shoulders:
-            self.reset()
-            return "unknown"
-        if len(visible_shoulders) == 2:
-            scale = float(np.linalg.norm(p[5,:2]-p[6,:2]))
-        else:
-            shoulder = visible_shoulders[0]
-            elbow = 7 if shoulder == 5 else 8
-            wrist = 9 if shoulder == 5 else 10
-            limb = elbow if visible(elbow) else wrist if visible(wrist) else shoulder
-            scale = float(np.linalg.norm(p[shoulder,:2]-p[limb,:2]))*1.35
-        scale = max(scale,20.)
-        raised, waving = [], False
-        for shoulder, elbow, wrist in ((5,7,9),(6,8,10)):
-            up = visible(shoulder,wrist) and p[wrist,1] < p[shoulder,1]-.15*scale
-            raised.append(up)
-            history = self.history[wrist]
-            if not up:
-                history.clear()
-                continue
-            if history and now-history[-1][0] > .6:
-                history.clear()
-            # Elbow-relative motion is less affected by the whole upper body moving.
-            reference = elbow if visible(elbow) else shoulder
-            if history and history[-1][2] != reference:
-                history.clear()
-            history.append((now,float((p[wrist,0]-p[reference,0])/scale),reference))
-            while history and now-history[0][0] > 1.8:
-                history.popleft()
-            if len(history) >= 4 and history[-1][0]-history[0][0] >= .45:
-                waving |= excursions([v[1] for v in history], .16) >= 1
-        available = [(s,e,w) for s,e,w in ((5,7,9),(6,8,10)) if visible(s,w)]
-        out = [abs(p[w,0]-p[s,0]) > .65*scale and abs(p[w,1]-p[s,1]) < .40*scale
-               for s,e,w in available]
-        hips = [visible(s,e,w) and p[w,1] > p[s,1]+.30*scale
-                and abs(p[w,0]-p[s,0]) < .65*scale
-                and abs(p[e,0]-p[s,0]) > .25*scale for s,e,w in available]
-        crossed = (visible(5,6,9,10) and p[9,0] > p[10,0]
-                   and max(p[9,1],p[10,1]) < max(p[5,1],p[6,1])+1.05*scale)
-        label = ("waving" if waving else "both_hands_up" if len(available)==2 and all(raised)
-                 else "hand_raised" if any(raised) else "arms_crossed" if crossed
-                 else "arms_out" if len(out)==2 and all(out)
-                 else "arm_out" if any(out) else "hands_on_hips" if len(hips)==2 and all(hips)
-                 else "hand_on_hip" if any(hips) else "unknown")
-        return self.stable.update(label)
 
 
 def empty_result(status="ok"):
@@ -234,16 +73,17 @@ class VisionEngine:
             self.errors["opencv"] = "OpenCV is not installed"
             return
         cv2.setNumThreads(settings.VISION_CV_THREADS)
-        self._load("face", lambda: cv2.FaceDetectorYN_create(str(BASE/"face_detection_yunet_2023mar.onnx"), "", (320,320), settings.VISION_FACE_THRESHOLD))
-        self._load("identity", lambda: cv2.FaceRecognizerSF_create(str(BASE/"face_recognition_sface_2021dec.onnx"), ""))
-        self._load("emotion", lambda: cv2.dnn.readNetFromONNX(str(BASE/settings.EMOTION_MODEL)))
+        self._load("face", lambda: cv2.FaceDetectorYN_create(str(model_path("face_detection_yunet_2023mar.onnx")), "", (320,320), settings.VISION_FACE_THRESHOLD))
+        self._load("identity", lambda: cv2.FaceRecognizerSF_create(str(model_path("face_recognition_sface_2021dec.onnx")), ""))
+        self._load("emotion", lambda: cv2.dnn.readNetFromONNX(str(model_path(settings.EMOTION_MODEL))))
         if settings.VISION_FACE_DETAILS_ENABLED:
-            self._load("face_details",lambda:FaceDetails(BASE/settings.VISION_FACE_DETAILS_MODEL))
+            self._load("face_details",lambda:FaceDetails(model_path(settings.VISION_FACE_DETAILS_MODEL)))
         if settings.VISION_HANDS_ENABLED:
-            self._load("hands",lambda:HandDetails(BASE/settings.VISION_HANDS_MODEL))
-        if (BASE/"master_face.npy").exists():
+            self._load("hands",lambda:HandDetails(model_path(settings.VISION_HANDS_MODEL)))
+        enrollment = data_path("master_face.npy")
+        if enrollment.exists():
             try:
-                feature = np.load(BASE/"master_face.npy", allow_pickle=False)
+                feature = np.load(enrollment, allow_pickle=False)
                 if feature.size != 128 or not np.isfinite(feature).all() or np.linalg.norm(feature) < 1e-6:
                     raise ValueError("Invalid master face embedding")
                 self.master = feature.astype(np.float32).reshape(1,128)
@@ -251,9 +91,7 @@ class VisionEngine:
                 self.errors["enrollment"] = str(exc)
         if settings.VISION_POSE_ENABLED:
             def load_pose():
-                path = Path(settings.YOLO_MODEL)
-                if not path.is_absolute():
-                    path = BASE/path
+                path = model_path(settings.YOLO_MODEL)
                 if not path.is_file():
                     raise FileNotFoundError(f"Missing pose model: {path.name}")
                 import torch
@@ -263,7 +101,7 @@ class VisionEngine:
             self._load("pose", load_pose)
         if settings.VISION_OBJECTS_ENABLED:
             def load_objects():
-                path = BASE/settings.VISION_OBJECTS_MODEL
+                path = model_path(settings.VISION_OBJECTS_MODEL)
                 if not path.is_file(): raise FileNotFoundError(path.name)
                 import torch
                 torch.set_num_threads(settings.VISION_CV_THREADS)
@@ -444,6 +282,9 @@ class VisionEngine:
                         self.identity_label.reset()
                     self.identity_result = {key:result[key] for key in ("identity","identity_score")}
                 result.update(self.identity_result)
+                emotion_fresh = False
+                if now-self.emotion_time > settings.VISION_EMOTION_STALE_SEC:
+                    self.emotion_probs = None
                 if stage == "emotion":
                     self.emotion_time = now
                     def expression():
@@ -457,11 +298,13 @@ class VisionEngine:
                         return probs/probs.sum()
                     probs = self._run("emotion",expression)
                     if probs is not None:
+                        emotion_fresh = True
                         self.emotion_probs = probs if self.emotion_probs is None else .65*probs+.35*self.emotion_probs
                     else:
                         self.emotion_probs = None
                         self.emotion_label.reset()
-                result.update(self.expression_state.update(self.emotion_probs,self.cues,now))
+                result.update(self.expression_state.update(
+                    self.emotion_probs,self.cues,now,fer_fresh=emotion_fresh))
                 result["emotion_probs"] = {name:round(float(value),5) for name,value in zip(EMOTIONS,self.emotion_probs)} if self.emotion_probs is not None else {}
             else:
                 self.identity_time = self.emotion_time = -float("inf")
@@ -514,174 +357,3 @@ class VisionEngine:
         if self.errors:
             result["status"] = "degraded"
         return result
-
-
-class LatestFrame:
-    """Single-slot mailbox: slow inference never queues old frames."""
-    def __init__(self):
-        self.lock = threading.Lock()
-        self.frame,self.timestamp,self.sequence = None,0.,0
-
-    def put(self, frame):
-        with self.lock:
-            self.frame,self.timestamp = frame,time.monotonic()
-            self.sequence += 1
-
-    def get(self):
-        with self.lock:
-            return self.frame,self.timestamp,self.sequence
-
-
-def camera_source():
-    source = settings.VISION_SOURCE
-    return int(source) if str(source).isdigit() else source
-
-
-def start_vision(callback, stop_event=None, publish=None):
-    """Preserve the brain callback; send detailed diagnostics on a separate topic."""
-    if publish is None:
-        from server.mqtt_bridge import publish
-    stop = stop_event if stop_event is not None else threading.Event()
-    mailbox = LatestFrame()
-    result_lock = threading.Lock()
-    latest = empty_result("starting")
-    last_good_inference = time.monotonic()
-
-    def emit(result):
-        nonlocal latest,last_good_inference
-        with result_lock:
-            latest = result
-            if result.get("frame_time",0):
-                last_good_inference = time.monotonic()
-        try:
-            publish(settings.TOPIC_VISION_STATUS,result)
-            publish("panda/user_status",result)
-            callback(result["person_detected"],result["emotion"],result["action"])
-        except Exception:
-            LOG.exception("Vision output failed")
-
-    def capture():
-        cap = None
-        try:
-            while not stop.is_set():
-                if cap is None:
-                    if cv2 is None:
-                        stop.wait(1)
-                        continue
-                    cap = cv2.VideoCapture(camera_source())
-                    if not cap.isOpened():
-                        cap.release()
-                        cap = None
-                        stop.wait(2)
-                        continue
-                    cap.set(cv2.CAP_PROP_FRAME_WIDTH,settings.VISION_WIDTH)
-                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,settings.VISION_HEIGHT)
-                    cap.set(cv2.CAP_PROP_BUFFERSIZE,1)
-                ok,frame = cap.read()
-                if not ok or frame is None:
-                    mailbox.put(None)
-                    cap.release()
-                    cap = None
-                    stop.wait(1)
-                    continue
-                scale = min(1.,settings.VISION_WIDTH/frame.shape[1],settings.VISION_HEIGHT/frame.shape[0])
-                if scale < 1:
-                    frame = cv2.resize(frame,(max(1,int(frame.shape[1]*scale)),max(1,int(frame.shape[0]*scale))))
-                mailbox.put(frame)
-                stop.wait(.001)
-        except Exception:
-            LOG.exception("Camera capture failed")
-            mailbox.put(None)
-        finally:
-            if cap is not None:
-                cap.release()
-
-    def infer():
-        engine = VisionEngine()
-        sequence = -1
-        try:
-            while not stop.is_set():
-                began = time.monotonic()
-                frame,timestamp,current = mailbox.get()
-                if frame is not None and current != sequence and began-timestamp <= settings.VISION_STALE_SEC:
-                    sequence = current
-                    try:
-                        result = engine.process(frame)
-                        result["frame_time"] = timestamp
-                        if time.monotonic()-timestamp <= settings.VISION_STALE_SEC:
-                            emit(result)
-                    except Exception:
-                        LOG.exception("Vision frame failed")
-                        engine.reset()
-                elif frame is None or began-timestamp > settings.VISION_STALE_SEC:
-                    engine.reset()
-                stop.wait(max(.01,1/max(1,settings.VISION_AI_FPS)-(time.monotonic()-began)))
-        finally:
-            close = getattr(engine,"close",None)
-            if close:
-                close()
-
-    workers = [threading.Thread(target=fn,daemon=True,name=name)
-               for fn,name in ((capture,"vision-camera"),(infer,"vision-ai"))]
-    for worker in workers:
-        worker.start()
-    last_sequence,last_offline = -1,-float("inf")
-    try:
-        while not stop.is_set():
-            began = time.monotonic()
-            frame,timestamp,sequence = mailbox.get()
-            with result_lock:
-                result = dict(latest)
-                inference_age = began-last_good_inference
-            camera_lost = frame is None or began-timestamp > settings.VISION_STALE_SEC
-            if camera_lost or inference_age > settings.VISION_STALE_SEC:
-                if began-last_offline >= 1:
-                    emit(empty_result("camera_unavailable" if camera_lost else "inference_stale"))
-                    last_offline = began
-            if frame is not None and sequence != last_sequence and not camera_lost:
-                last_sequence = sequence
-                display = frame.copy()
-                if began-result.get("frame_time",0) <= .5:
-                    for hand in result.get("hands",[]):
-                        if began-hand["timestamp"] > .5: continue
-                        points = [(int(v[0]*display.shape[1]),int(v[1]*display.shape[0])) for v in hand["landmarks"]]
-                        for a,b in HAND_EDGES: cv2.line(display,points[a],points[b],(80,220,120),1)
-                        for p in points: cv2.circle(display,p,2,(80,255,180),-1)
-                    for obj in result.get("objects",[]):
-                        if began-obj["timestamp"] > 1.5: continue
-                        x,y,w,h = obj["box"]
-                        x,y,w,h = int(x*display.shape[1]),int(y*display.shape[0]),int(w*display.shape[1]),int(h*display.shape[0])
-                        cv2.rectangle(display,(x,y),(x+w,y+h),(220,180,80),1)
-                        cv2.putText(display,obj["label"],(x,max(14,y-4)),cv2.FONT_HERSHEY_SIMPLEX,.4,(220,180,80),1)
-                    if settings.VISION_DRAW_SKELETON and began-result.get("pose_time",0) <= .5:
-                        joints = result.get("upper_body_joints",{})
-                        def point(joint):
-                            return (int(joint["x"]*display.shape[1]),int(joint["y"]*display.shape[0]))
-                        for a,b in ARM_EDGES:
-                            if joints.get(a,{}).get("visible") and joints.get(b,{}).get("visible"):
-                                cv2.line(display,point(joints[a]),point(joints[b]),(255,200,0),2)
-                        for joint in joints.values():
-                            if joint["visible"]:
-                                cv2.circle(display,point(joint),4,(0,220,255),-1)
-                    for key,color in (("face_box",(0,255,0)),("person_box",(255,180,0))):
-                        if result.get(key):
-                            x,y,w,h = map(int,result[key])
-                            cv2.rectangle(display,(x,y),(x+w,y+h),color,2)
-                    # Labels belong in the stable dashboard, not flickering on the video.
-                width = min(480,display.shape[1])
-                display = cv2.resize(display,(width,max(1,round(display.shape[0]*width/display.shape[1]))))
-                ok,encoded = cv2.imencode(".jpg",display,[cv2.IMWRITE_JPEG_QUALITY,60])
-                if ok:
-                    publish(settings.TOPIC_CAMERA,base64.b64encode(encoded).decode("ascii"))
-            stop.wait(max(.001,1/max(1,settings.VISION_STREAM_FPS)-(time.monotonic()-began)))
-    finally:
-        stop.set()
-        for worker in workers:
-            worker.join(timeout=2)
-
-
-if __name__ == "__main__":
-    if hasattr(sys.stdout,"reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8",errors="replace")
-    logging.basicConfig(level=logging.INFO)
-    start_vision(lambda detected,emotion,action:None)

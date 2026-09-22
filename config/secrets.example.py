@@ -4,7 +4,7 @@
 SECRETS = {
     "PICOVOICE_ACCESS_KEY": "", # tùy chọn: wake âm học, cần model Moon .ppn
     "FISH_AUDIO_API_KEY": "",   # TTS — lấy tại https://fish.audio
-    "GROQ_API_KEY": "",         # STT + LLM — lấy tại https://console.groq.com
+    "GROQ_API_KEY": "",         # LLM + STT local cũ — lấy tại https://console.groq.com
     "DEEPSEEK_API_KEY": "",     # tuỳ chọn (fallback LLM)
-    "GEMINI_API_KEY": "",       # Live Talk audio↔audio — Google AI Studio
+    "GEMINI_API_KEY": "",       # STT Việt/Anh/Nhật + Live Talk — Google AI Studio
 }

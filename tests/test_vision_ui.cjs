@@ -63,3 +63,12 @@ assert.equal(elements.get('cv-left-hand').textContent,'Đang xác nhận: Xòe b
 send({hands:[{side:'right',gesture:'unknown',gesture_candidate:'unknown',extended_fingers:2,confidence:.77,associated:false}]},21750);
 assert.equal(elements.get('cv-right-hand').textContent,'Đã thấy bàn tay · 2 ngón duỗi · 77%');
 console.log('Vision UI: expanded gesture and object labels passed');
+for (const status of ['camera_unavailable','inference_stale']) {
+    send({hands:[{side:'left',gesture:'unknown',gesture_candidate:'victory',confidence:.99}]},now+100);
+    assert.match(elements.get('cv-left-hand').textContent,/Đang xác nhận/);
+    send({status,hands:[],actions:[]},now+100);
+    assert.equal(elements.get('cv-left-hand').textContent,'Chưa rõ',status+' must clear hand candidates immediately');
+    send({hands:[],actions:[]},now+100);
+    assert.equal(elements.get('cv-left-hand').textContent,'Chưa rõ','recovery must not restore old hands');
+}
+console.log('Vision UI: offline hand clearing and recovery passed');

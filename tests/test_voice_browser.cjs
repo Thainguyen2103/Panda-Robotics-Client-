@@ -30,10 +30,10 @@ const {chromium} = require('playwright');
             body: JSON.stringify({error: 'test fallback'}),
         }));
 
-        await page.routeWebSocket('**/voice/ws', socket => {
+        await page.routeWebSocket('**/transcribe/ws**', socket => {
             wakeConnections++;
             socket.send(JSON.stringify({
-                event: 'ready', engine: 'TEST wake mock', calibrating: true,
+                event: 'ready', engine: 'TEST multilingual wake mock', calibrating: false,
             }));
             socket.onMessage(data => {
                 if (typeof data === 'string') {
@@ -44,7 +44,6 @@ const {chromium} = require('playwright');
                 wakeFrames++;
                 if (!wakeScheduled) {
                     wakeScheduled = true;
-                    setTimeout(() => socket.send(JSON.stringify({event: 'calibrated'})), 180);
                     setTimeout(() => socket.send(JSON.stringify({event: 'wake', engine: 'mock'})), 380);
                 }
             });
@@ -97,7 +96,6 @@ const {chromium} = require('playwright');
 
         await page.locator('#live-activation').selectOption('wakeword');
         await page.locator('#live-start').click();
-        await page.waitForFunction(() => document.getElementById('live-state').textContent.includes('đo tiếng nền'));
         await page.waitForFunction(() => document.getElementById('live-state').textContent.includes('Sẵn sàng'));
         await page.waitForFunction(() => document.getElementById('live-state').textContent.includes('Đã thức'));
         await page.waitForFunction(() => window.toneCount >= 2);

@@ -13,8 +13,8 @@ màn OLED theo phong cách robot Vector (Anki).
 - **Live Talk liên tục**: Gemini Live hiểu audio trực tiếp, hỗ trợ ngắt lời; có thể
   trả lời bằng cùng giọng Fish của Moon (mặc định) hoặc giọng Gemini Native nhanh hơn.
   API key chỉ nằm ở backend và OLED chỉ hiển thị biểu cảm do function call chọn.
-- **Não cloud**: Groq Whisper (STT) → Groq LLM (trả lời) → Fish Audio (TTS streaming
-  từng câu) — độ trễ wake→tiếng đầu tiên ~2-3s.
+- **Não cloud**: Gemini Transcribe Live Việt/Anh/Nhật (STT) → LLM (trả lời)
+  → Fish Audio (TTS streaming từng câu) — độ trễ wake→tiếng đầu tiên ~2-3s.
 - **Phân loại 24 chủ đề** (hybrid: keyword 0ms + LLM enum fallback, benchmark 15/15)
   → OLED hiển thị icon + caption + màu riêng từng chủ đề.
 - **Thị giác máy**: YuNet (face) + SFace (chủ nhân đã đăng ký) + FER+ (biểu cảm) +
@@ -30,8 +30,8 @@ màn OLED theo phong cách robot Vector (Anki).
 
 ```
  mic trình duyệt ─┬→ Gemini Live (audio trực tiếp)
-                  └→ voice_lab.py (wake/VAD/STT) ─→ brain.py
- camera / ESP32-CAM    ─→ vision.py (YuNet/SFace/FER)     │
+                  └→ voice/runtime/web.py (wake/VAD/STT) ─→ brain.py
+ camera / ESP32-CAM    ─→ vision/ (YuNet/SFace/FER)          │
                                                            ├─→ llm.py (Groq)
  dashboard web (OLED ảo, nút điều khiển) ←─ MQTT broker ←─┤
  robot ESP32 (OLED thật, motor, buzz)    ←─ MQTT broker ←─┴─→ tts.py (Fish Audio)
@@ -40,14 +40,19 @@ màn OLED theo phong cách robot Vector (Anki).
 ## 📁 Cấu trúc thư mục
 
 ```
-config/      settings.py (mọi hằng số), secrets.example.py (mẫu key)
-server/      brain.py (điều phối), voice.py (STT), llm.py, tts.py,
-             vision.py (CV), topics.py (24 chủ đề), mqtt_bridge.py,
-             virtual_robot.py (robot ảo để test không cần phần cứng)
+config/      settings.py (cấu hình và đường dẫn), secrets.example.py (mẫu key)
+server/      brain.py (điều phối), llm.py, tts.py, mqtt_bridge.py
+server/voice/  audio/, speech/, wake/, runtime/ (chia theo chức năng)
+server/vision/ face/, body/, hands/, pipeline/, runtime/
+models/      voice/ và vision/ (model local, không commit)
+data/private/ dữ liệu sinh trắc local, không commit
 web/         server.js + public/ (dashboard OLED mô phỏng, idle behaviors)
 firmware/    panda_firmware.ino (ESP32, chạy được trên Wokwi lẫn chip thật)
-tools/       bench_topics.py, dev_mic_bridge.py
+tools/       supported utilities, local diagnostics and archived one-off patches
 ```
+
+Xem [sơ đồ module Voice/Vision](docs/voice-vision-structure.md) trước khi thêm
+model, tín hiệu hoặc transport mới.
 
 ## 🎙️ Test Live Voice trên dashboard
 
@@ -70,7 +75,7 @@ pip install -r requirements.txt
 # 2. Key API
 copy config\secrets.example.py config\secrets.py   # rồi điền key
 
-# 3. Model files (xem bảng dưới) vào thư mục server/
+# 3. Model files (xem bảng dưới) vào models/vision/ hoặc models/voice/
 
 # 4. Chạy tất cả
 .\start.bat          # brain + web dashboard
@@ -102,7 +107,7 @@ trả lời bằng giọng đã chọn.
 | `res10_300x300_ssd_iter_140000.caffemodel` + `deploy.prototxt` | OpenCV dnn samples |
 | `haarcascade_frontalface_default.xml` | OpenCV data |
 | `yolov8n.pt`, `yolov8n-pose.pt` | Ultralytics (tự tải khi chạy lần đầu) |
-| `master_face.npy` | Đăng ký rõ ràng bằng `tools/enroll_face.py`; không tự lấy người đầu tiên (dữ liệu sinh trắc — không push) |
+| `master_face.npy` | `data/private/`; đăng ký bằng `tools/enroll_face.py` (dữ liệu sinh trắc — không push) |
 
 ## 🔩 Phần cứng (robot thật — thin client)
 
@@ -121,7 +126,7 @@ trả lời bằng giọng đã chọn.
 
 ## 🔒 Bảo mật
 
-- `config/secrets.py` (key thật) và `master_face.npy` (sinh trắc) nằm trong `.gitignore`.
+- `config/secrets.py`, model local và `data/private/master_face.npy` nằm trong `.gitignore`.
 - Chia sẻ code = chia sẻ `secrets.example.py`.
 - Model weights không push (repo nhẹ, tránh bản quyền nhị phân).
 

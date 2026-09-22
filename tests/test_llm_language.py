@@ -16,6 +16,11 @@ class ResponseLanguageTests(unittest.TestCase):
         self.assertEqual(llm.response_language(question), 'vi')
         self.assertIn('Chỉ trả lời bằng tiếng Việt', llm.response_language_instruction(question))
 
+    def test_japanese_turn_is_answered_in_japanese(self):
+        for question in ['こんにちは。今日の天気はどうですか？', '今日晴天？']:
+            self.assertEqual(llm.response_language(question), 'ja')
+            self.assertIn('日本語', llm.response_language_instruction(question))
+
     def test_mixed_or_ambiguous_turn_is_adaptive_not_duplicated(self):
         for question in ['Bạn know who I am?', 'Ronaldo?']:
             self.assertEqual(llm.response_language(question), 'adaptive')

@@ -1,5 +1,22 @@
 # config/settings.py
 import os
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+MODEL_ROOT = Path(os.environ.get("MOON_MODEL_ROOT", PROJECT_ROOT / "models")).expanduser().resolve()
+PRIVATE_DATA_ROOT = Path(
+    os.environ.get("MOON_PRIVATE_DATA_ROOT", PROJECT_ROOT / "data" / "private")
+).expanduser().resolve()
+VOICE_MODEL_DIR = Path(
+    os.environ.get("MOON_VOICE_MODEL_DIR", MODEL_ROOT / "voice")
+).expanduser().resolve()
+VISION_MODEL_DIR = Path(
+    os.environ.get("MOON_VISION_MODEL_DIR", MODEL_ROOT / "vision")
+).expanduser().resolve()
+VISION_DATA_DIR = Path(
+    os.environ.get("MOON_VISION_DATA_DIR", PRIVATE_DATA_ROOT)
+).expanduser().resolve()
 
 # ─── API keys: nạp từ config/secrets.py (KHÔNG push) hoặc biến môi trường ────
 # Xem secrets.example.py để biết cách tạo secrets.py
@@ -16,6 +33,8 @@ def _key(name: str) -> str:
 # Gemini Live native audio (dashboard Live Talk). Node cũng đọc cùng key này
 # trực tiếp từ config/secrets.py; key không bao giờ được gửi xuống trình duyệt.
 GEMINI_API_KEY = _key("GEMINI_API_KEY")
+LLM_PROVIDER = os.environ.get("MOON_LLM_PROVIDER", "auto").strip().lower()
+GEMINI_LLM_MODEL = os.environ.get("GEMINI_LLM_MODEL", "gemini-3.5-flash-lite")
 
 # MQTT Broker Configuration
 MQTT_BROKER = "localhost"
@@ -55,6 +74,7 @@ VISION_STREAM_FPS = 12
 VISION_POSE_FPS = 5
 VISION_IDENTITY_FPS = 1
 VISION_EMOTION_FPS = 3
+VISION_EMOTION_STALE_SEC = 1.5
 VISION_FACE_WIDTH = 320
 VISION_FACE_DETAILS_ENABLED = True
 VISION_FACE_DETAILS_MODEL = "face_landmarker.task"
@@ -130,13 +150,11 @@ QUICK_MODEL = "groq/compound-mini"
 # Lấy key tại: https://console.groq.com/keys  (điền vào config/secrets.py)
 GROQ_API_KEY = _key("GROQ_API_KEY")
 
-# Ngôn ngữ nhận dạng giọng nói (STT):
-#   "vi" = tiếng Việt (KHUYẾN DỤNG cho Moon — chính xác nhất và nhanh gấp đôi,
-#          đã đo: 0.48s so với 1.02s của auto; auto hay đoán nhầm sang tiếng khác
-#          với clip ngắn: "Moon ơi" → "Bonne t'en la vie!")
-#   None = tự động phát hiện (chỉ dùng nếu cần hội thoại tiếng Anh thật sự)
-#   "en" = luôn tiếng Anh
-STT_LANGUAGE = "vi"
+# Dashboard dùng Gemini Transcribe Live và chỉ gợi ý ba ngôn ngữ của dự án.
+# Groq/local fallback phải để auto-detect, không khóa tiếng Việt, để câu hỏi
+# tiếng Anh và tiếng Nhật vẫn được giữ nguyên.
+STT_LANGUAGES = ("vi-VN", "en-US", "ja-JP")
+STT_LANGUAGE = None
 
 # ─── Tinh chỉnh STT/VAD (kiểu Anki Vector) ────────────────────────────────────
 # Model Groq Whisper: large-v3-turbo = nhanh + chính xác nhất trên Groq
@@ -186,7 +204,7 @@ PERSON_LOST_GRACE_SEC = 10.0
 # Cấu hình key trong secrets.py/môi trường và model Moon .ppn đúng nền tảng.
 # Nếu chưa có, Voice Lab dùng Whisper một lượt, khớp đúng token Moon.
 PICOVOICE_ACCESS_KEY = _key("PICOVOICE_ACCESS_KEY")
-MOON_PPN_PATH = os.environ.get("MOON_PPN_PATH", "")   # để trống = mặc định server/moon.ppn
+MOON_PPN_PATH = os.environ.get("MOON_PPN_PATH", "")   # để trống = models/voice/moon.ppn
 
 
 # ─── Wake-word ───────────────────────────────────────────────────────────────

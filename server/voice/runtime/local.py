@@ -21,17 +21,12 @@ API công khai (brain.py + test_pipeline.py phụ thuộc):
   pause_listening() / resume_listening()
 """
 
-import io
 import os
-import re
 import sys
-import wave
 import time
 import queue
 import threading
-import tempfile
 import collections
-import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 
 # Fix Windows terminal encoding (giống brain.py) — tránh crash khi in emoji/Việt
@@ -46,9 +41,23 @@ if sys.stderr and hasattr(sys.stderr, "reconfigure"):
     except Exception:
         pass
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 from config import settings
+from server.voice.audio.processing import (
+    denoise_pcm as _denoise_pcm_impl,
+    rms_of_block as _rms_of_block_impl,
+    spectral_flatness as _spectral_flatness_impl,
+    wrap_wav as _wrap_wav_impl,
+)
+from server.voice.speech.filters import (
+    contains_wake_word as _contains_wake_word,
+    is_hallucination as _is_hallucination,
+    levenshtein as _levenshtein,
+    strip_diacritics as _strip_diacritics,
+)
+from server.voice.speech.transcription import UNSET as _UNSET
+from server.voice.speech.transcription import transcribe_bytes as _transcribe_bytes_impl
 
 # ─── MQTT để log transcript lên dashboard ─────────────────────────────────────
 try:
@@ -136,44 +145,16 @@ _on_wake_word_cbs  = []
 _on_wake_rescue_cbs = []   # sửa lỗi ASR để cứu wake khi bản thô trượt
 _wake_exec = ThreadPoolExecutor(max_workers=2)   # transcribe nền — tai không ngừng nghe
 
-# Compatibility normalizer used by the legacy Brain ASR helper.
-def _strip_diacritics(s: str) -> str:
-    """lower + bỏ dấu thanh + đ→d + nén khoảng trắng."""
-    s = unicodedata.normalize("NFD", s.lower())
-    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
-    s = s.replace("đ", "d")
-    s = re.sub(r"[^\w\s]", " ", s)
-    return re.sub(r"\s+", " ", s).strip()
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 #  CHỌN MICROPHONE — dò thiết bị có tín hiệu thật (bỏ qua mic bị mute)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _rms_of_block(data: bytes) -> float:
-    """Năng lượng RMS của 1 block int16 (0.0 → 1.0)."""
-    arr = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
-    if arr.size == 0:
-        return 0.0
-    return float(np.sqrt(np.mean(arr ** 2)))
+    return _rms_of_block_impl(data, np)
 
 
 def _spectral_flatness(data: bytes) -> float:
-    """
-    Độ phẳng phổ (0→1): giọng nói có hài âm → flatness THẤP (0.1–0.4);
-    tiếng quạt/gió/phím là ồn rộng băng thông → flatness CAO (0.6–0.9).
-    Dùng để gạt tiếng ồn bộc phát mà ngưỡng năng lượng không phân được.
-    """
-    arr = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
-    if arr.size == 0:
-        return 1.0
-    spec = np.abs(np.fft.rfft(arr * np.hanning(arr.size))) ** 2
-    spec = spec[1:]                      # bỏ bin DC
-    mean = float(np.mean(spec))
-    if mean <= 1e-12:
-        return 1.0
-    geo = float(np.exp(np.mean(np.log(spec + 1e-12))))
-    return min(1.0, geo / mean)
+    return _spectral_flatness_impl(data, np)
 
 
 def _probe_device_rms(dev_index: int, duration: float = 1.0) -> float:
@@ -416,91 +397,24 @@ def _record_until_silence(silence_sec: float = 2.0,
 #  TRANSCRIBE — Groq Whisper
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_UNSET = object()   # sentinel: language không được truyền → dùng STT_LANGUAGE
-
-
 def transcribe_bytes(data: bytes, filename: str = "moon_clip.wav",
                      language=_UNSET, prompt: str = None,
                      model: str = None) -> str:
-    """
-    Gửi audio bytes (WAV / WebM / MP3 — Groq Whisper hỗ trợ cả) lên Groq.
-    temperature=0.0 — KHÔNG dùng temperature fallback ladder (gây hallucination).
-    """
-    if not groq_client or not data:
-        return ""
-
-    t0 = time.time()
-    tmp_path = None
-    try:
-        # Groq SDK cần file object có name — ghi ra file tạm nhỏ cho chắc chắn
-        suffix = os.path.splitext(filename)[1] or ".wav"
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(data)
-            tmp_path = tmp.name
-
-        kwargs = {
-            "model": model or STT_MODEL,
-            "file": (filename, data),
-            "temperature": 0.0,
-            "response_format": "text",
-        }
-        lang = STT_LANGUAGE if language is _UNSET else language
-        if lang:
-            kwargs["language"] = lang
-        if prompt:
-            kwargs["prompt"] = prompt
-
-        text = groq_client.audio.transcriptions.create(**kwargs)
-        if hasattr(text, "text"):      # nếu trả về object thay vì str
-            text = text.text
-        text = (text or "").strip()
-
-        if text:
-            print(f"📝 [VOICE] STT ({time.time()-t0:.2f}s): \"{text}\"")
-        return text
-
-    except Exception as e:
-        print(f"❌ [VOICE] Lỗi Groq STT: {e}")
-        return ""
-    finally:
-        if tmp_path:
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
+    return _transcribe_bytes_impl(
+        groq_client, data, filename, language=language, prompt=prompt, model=model,
+        default_language=STT_LANGUAGE, default_model=STT_MODEL,
+    )
 
 
 def _denoise_pcm(audio: bytes) -> bytes:
-    """Khử ồn tĩnh (quạt) bằng spectral gating — CHỈ khi giọng yếu.
-    Giọng mạnh (peak ≥ 0.3 RMS) → bỏ qua để tiết kiệm CPU (Whisper tự lo ổn),
-    tránh cộng vài giây trễ vào mỗi chặng (bài học: denoise từng gây >10s)."""
-    if not _nr or not DENOISE_BEFORE_STT or np is None:
-        return audio
-    try:
-        arr = np.frombuffer(audio, dtype=np.int16).astype(np.float32) / 32768.0
-        n = 480
-        if len(arr) >= n:
-            blocks = arr[:(len(arr) // n) * n].reshape(-1, n)
-            peak = float(np.max(np.sqrt(np.mean(blocks ** 2, axis=1))))
-            if peak >= 0.3:
-                return audio   # giọng khoẻ → không tốn CPU khử ồn
-        t0 = time.time()
-        clean = _nr.reduce_noise(y=arr, sr=SAMPLE_RATE, stationary=True)
-        print(f"🧹 [VOICE] denoise {time.time() - t0:.2f}s (giọng yếu)")
-        return (np.clip(clean, -1.0, 1.0) * 32767.0).astype(np.int16).tobytes()
-    except Exception:
-        return audio
+    return _denoise_pcm_impl(
+        audio, np_module=np, reducer=_nr, enabled=DENOISE_BEFORE_STT,
+        sample_rate=SAMPLE_RATE,
+    )
 
 
 def _wrap_wav(audio: bytes) -> bytes:
-    """Đóng gói PCM int16 16kHz mono thành WAV bytes."""
-    buf = io.BytesIO()
-    with wave.open(buf, "wb") as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(SAMPLE_RATE)
-        wf.writeframes(audio)
-    return buf.getvalue()
+    return _wrap_wav_impl(audio, SAMPLE_RATE)
 
 
 def _transcribe(audio: bytes, model: str = None) -> str:
@@ -521,65 +435,6 @@ def _transcribe_dual(audio: bytes) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Whisper hay "bịa" các cụm này khi đầu vào là tiếng ồn
-_HALLUCINATION_BLACKLIST = {
-    "hello", "hello.", "hi", "hey", "you", "you.", "thank you", "thanks",
-    "thank you for watching", "thanks for watching", "subscribe",
-    "like and subscribe", "please subscribe", "see you next time",
-    "bye", "goodbye", "vâng", "dạ", "ừ", "oh", "uh", "hmm", "the", "a",
-    "subtitles by", "amara.org",
-    "okay", "ok", "okay.", "i know", "okay, i know", "you know", "i see",
-    "oh well", "right", "yes", "no", "good", "really", "really?",
-}
-
-# Khớp CONTAINS — Whisper bịa nguyên câu phụ đề YouTube từ tiếng ồn/im lặng
-_HALLUCINATION_TOKENS = (
-    "subscribe", "subtitles by", "amara.org", "thank you for watching",
-    "thanks for watching", "like and subscribe", "see you next time",
-    "đăng ký kênh", "cho kênh", "kênh ghiền",
-    # outro media tiếng Việt — tránh false wake khi TV/YouTube nói gần mic
-    "theo dõi", "hẹn gặp lại", "ủng hộ kênh", "cảm ơn các bạn",
-)
-
-# Chữ Nhật / Trung / Cyrillic / Ả Rập / Hàn — chắc chắn là hallucination
-_NON_LATIN_RE = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff\u0400-\u04ff\u0600-\u06ff\uac00-\ud7af]")
-
-
-def _is_hallucination(text: str) -> bool:
-    """Trả về True nếu transcript có dấu hiệu là hallucination của Whisper."""
-    if not text:
-        return True
-    t = text.strip()
-    if len(t) <= 2:
-        return True
-    low = t.lower()
-    if low.strip(".!? ") in _HALLUCINATION_BLACKLIST:
-        return True
-    if any(tok in low for tok in _HALLUCINATION_TOKENS):
-        return True
-    if _NON_LATIN_RE.search(t):
-        return True
-    return False
-
-
-def _levenshtein(a: str, b: str) -> int:
-    """Khoảng cách sửa đổi giữa 2 chuỗi (đủ nhỏ cho token ngắn)."""
-    if abs(len(a) - len(b)) > 2:
-        return 3
-    prev = list(range(len(b) + 1))
-    for i, ca in enumerate(a, 1):
-        cur = [i]
-        for j, cb in enumerate(b, 1):
-            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
-        prev = cur
-    return prev[-1]
-
-
-def _contains_wake_word(text: str) -> bool:
-    """Match the complete name Moon, without fuzzy or accent folding."""
-    from server.voice_core import wake_tail
-    return wake_tail(text or "") is not None
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 #  API CÔNG KHAI — brain.py sử dụng
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -839,7 +694,7 @@ def listen_for_question() -> str | None:
 #  TEST ĐỨNG MỘT MÌNH
 # ═══════════════════════════════════════════════════════════════════════════════
 
-if __name__ == "__main__":
+def main():
     print("=== Test Voice Module ===")
     print(f"Model: {STT_MODEL} | Language: {STT_LANGUAGE or 'auto'} | "
           f"Noise floor: {VAD_NOISE_FLOOR}")
@@ -853,3 +708,7 @@ if __name__ == "__main__":
         on_wake_word=lambda t: print(f"🐼 → WAKE-WORD: {t}"),
     )
     continuous_listen_loop()
+
+
+if __name__ == "__main__":
+    main()
