@@ -1,20 +1,26 @@
 # 🌙 Moon Robotics
 
-Robot bạn đồng hành hỗ trợ trẻ em học tiếng Anh — dự án PBL4, Đại học Đà Nẵng.
-Moon nghe được (wake-word "Moon" + câu hỏi tiếng Việt/Anh), nhìn được (nhận diện
-chủ nhân + cảm xúc), trả lời bằng giọng nói tự nhiên và "diễn" toàn bộ cảm xúc lên
-màn OLED theo phong cách robot Vector (Anki).
+Robot bạn đồng hành hỗ trợ trẻ em học tiếng Anh và tiếng Nhật — dự án PBL4,
+Đại học Đà Nẵng. Moon nghe và trò chuyện bằng tiếng Việt, Anh, Nhật; nhìn được
+chủ nhân, cảm xúc và cử chỉ; trả lời bằng giọng nói tự nhiên và thể hiện trạng
+thái trên màn OLED theo phong cách robot Vector (Anki).
 
 ## ✨ Tính năng nổi bật
 
-- **Live Voice trên dashboard**: bật hội thoại trực tiếp hoặc chờ wakeword Moon
-  bằng Porcupine/Whisper rồi tự chuyển sang hội thoại liên tục. Brain không còn
-  mở listener wakeword nền riêng. Xem [hướng dẫn Voice](docs/voice.md).
-- **Live Talk liên tục**: Gemini Live hiểu audio trực tiếp, hỗ trợ ngắt lời; có thể
-  trả lời bằng cùng giọng Fish của Moon (mặc định) hoặc giọng Gemini Native nhanh hơn.
-  API key chỉ nằm ở backend và OLED chỉ hiển thị biểu cảm do function call chọn.
-- **Não cloud**: Gemini Transcribe Live Việt/Anh/Nhật (STT) → LLM (trả lời)
-  → Fish Audio (TTS streaming từng câu) — độ trễ wake→tiếng đầu tiên ~2-3s.
+- **Live Voice trên dashboard**: bật hội thoại trực tiếp hoặc chờ wakeword Moon,
+  sau đó nói chuyện nhiều lượt tới khi bấm **Kết thúc**. Chỉ một tab được giữ
+  microphone và mic tạm dừng khi Moon đang phát âm thanh để chống tự nghe.
+- **Hai pipeline để thử nghiệm**:
+  - **Brain Pipeline**: Gemini Transcribe Live (STT Việt/Anh/Nhật) → Qwen local
+    qua Ollama → Fish Audio.
+  - **Gemini Live**: Gemini xử lý audio trực tiếp; đầu ra dùng Fish Voice hoặc
+    giọng Gemini Native. API key chỉ nằm ở backend.
+- **LLM local + kho bài học**: `moon-tutor` dùng Qwen 3.5 2B Q4, ưu tiên tốc độ
+  và không tốn quota sinh văn bản. RAG cung cấp 48 bài học Nhật–Anh–Việt đã xác
+  thực; Gemini mặc định chỉ dùng cho STT/Live Voice.
+- **Điều phối ngôn ngữ theo ý định**: Moon phân biệt ngôn ngữ của câu hỏi với từ
+  ngoại ngữ đang được hỏi. Ví dụ `こんにちは nghĩa là gì?` được trả lời bằng
+  tiếng Việt, còn `What does こんにちは mean?` được trả lời bằng tiếng Anh.
 - **Phân loại 24 chủ đề** (hybrid: keyword 0ms + LLM enum fallback, benchmark 15/15)
   → OLED hiển thị icon + caption + màu riêng từng chủ đề.
 - **Thị giác máy**: YuNet (face) + SFace (chủ nhân đã đăng ký) + FER+ (biểu cảm) +
@@ -29,21 +35,22 @@ màn OLED theo phong cách robot Vector (Anki).
 ## 🏗 Kiến trúc
 
 ```
- mic trình duyệt ─┬→ Gemini Live (audio trực tiếp)
-                  └→ voice/runtime/web.py (wake/VAD/STT) ─→ brain.py
- camera / ESP32-CAM    ─→ vision/ (YuNet/SFace/FER)          │
-                                                           ├─→ llm.py (Groq)
- dashboard web (OLED ảo, nút điều khiển) ←─ MQTT broker ←─┤
- robot ESP32 (OLED thật, motor, buzz)    ←─ MQTT broker ←─┴─→ tts.py (Fish Audio)
+ mic trình duyệt ─┬→ Gemini Live (audio trực tiếp) ───────────────┐
+                  └→ Gemini Transcribe Live (VI/EN/JA) → brain.py │
+ camera / ESP32-CAM → vision/ (face/body/hands/pipeline)          │
+                                                                ├→ Fish Audio / loa
+ brain.py → llm_language.py → llm.py → Qwen/Ollama + learning/ ──┘
+ dashboard web (OLED ảo, nút điều khiển) ↔ MQTT ↔ robot ESP32
 ```
 
 ## 📁 Cấu trúc thư mục
 
 ```
 config/      settings.py (cấu hình và đường dẫn), secrets.example.py (mẫu key)
-server/      brain.py (điều phối), llm.py, tts.py, mqtt_bridge.py
+server/      brain.py (điều phối), llm.py, llm_language.py, tts.py, mqtt_bridge.py
 server/voice/  audio/, speech/, wake/, runtime/ (chia theo chức năng)
 server/vision/ face/, body/, hands/, pipeline/, runtime/
+server/learning/  48 bài học, RAG ba tầng và Modelfile cho Qwen
 models/      voice/ và vision/ (model local, không commit)
 data/private/ dữ liệu sinh trắc local, không commit
 web/         server.js + public/ (dashboard OLED mô phỏng, idle behaviors)
@@ -56,34 +63,65 @@ model, tín hiệu hoặc transport mới.
 
 ## 🎙️ Test Live Voice trên dashboard
 
-Chạy `start.bat`, mở http://localhost:3000 và chọn **Bật trực tiếp** hoặc
-**Chờ “Hey Moon” rồi trò chuyện**. Sau khi wakeword được xác nhận, cùng microphone
-được chuyển sang Gemini Live hoặc Brain Pipeline và tiếp tục nghe nhiều lượt mà
-không cần gọi Moon lại. `start-voice.bat` chỉ phù hợp để kiểm tra transport/STT
-khi không cần Brain trả lời. Wake âm học tức thời cần model Moon `.ppn` và
-Picovoice key; nếu chưa có, dashboard dùng Whisper dự phòng.
-Moon trả lời theo ngôn ngữ chính của lượt hỏi mới nhất và code-switch tự nhiên:
-các thuật ngữ tiếng Anh quen thuộc được giữ lại khi rõ nghĩa hơn cách dịch.
+Chạy `start.bat`, mở <http://localhost:3000>, chọn **Hệ thống xử lý**, rồi chọn
+**Bật trực tiếp** hoặc **Chờ “Hey Moon” rồi trò chuyện**. Với Brain Pipeline,
+Gemini chỉ chuyển giọng nói thành văn bản; Qwen local tạo câu trả lời và Fish
+đọc câu trả lời đó. Sau khi wakeword được xác nhận, có thể hỏi nhiều lượt mà
+không cần gọi Moon lại.
+
+Wake âm học tức thời cần model Moon `.ppn` và Picovoice key; nếu chưa có,
+dashboard dùng STT dự phòng. `start-voice.bat` chỉ phù hợp để kiểm tra transport
+và STT khi không cần Brain trả lời. Xem [hướng dẫn Voice](docs/voice.md) và
+[hướng dẫn Qwen/RAG](server/learning/README.md).
 
 ## 🚀 Chạy thử (không cần phần cứng)
 
+Yêu cầu khuyên dùng trên Windows: Python 3.12/3.13, Node.js, Ollama và MQTT broker
+ở `localhost:1883`. Python 3.14 hiện chưa có wheel WebRTC VAD phù hợp trong môi
+trường của dự án.
+
 ```powershell
-# 1. Python env
-cd server; python -m venv venv; .\venv\Scripts\activate
-pip install -r requirements.txt
+# Chạy các lệnh tại thư mục gốc repository
+py -3.12 -m venv server\venv
+.\server\venv\Scripts\python.exe -m pip install -r server\requirements.txt -r requirements-voice.txt
+.\server\venv\Scripts\python.exe -m pip install fish-audio-sdk pyttsx3
+npm --prefix web install
 
-# 2. Key API
-copy config\secrets.example.py config\secrets.py   # rồi điền key
+# Tạo file key local; config/secrets.py đã được gitignore
+Copy-Item config\secrets.example.py config\secrets.py
 
-# 3. Model files (xem bảng dưới) vào models/vision/ hoặc models/voice/
+# Qwen local ưu tiên tốc độ
+ollama pull qwen3.5:2b-q4_K_M
+ollama create moon-tutor -f server\learning\Modelfile
 
-# 4. Chạy tất cả
-.\start.bat          # brain + web dashboard
+# Điền GEMINI_API_KEY và FISH_AUDIO_API_KEY vào config/secrets.py, rồi chạy
+.\start.bat
 # Dashboard: http://localhost:3000
 ```
 
-Chọn một chế độ Live Voice rồi hỏi bằng tiếng Việt — OLED diễn cảm xúc và Moon
-trả lời bằng giọng đã chọn.
+`GEMINI_API_KEY` dùng cho STT Việt/Anh/Nhật và Gemini Live;
+`FISH_AUDIO_API_KEY` dùng cho giọng Moon. `GROQ_API_KEY`, DeepSeek và Picovoice
+chỉ cần khi chủ động dùng các đường dự phòng tương ứng. Các file model Vision
+được đặt trong `models/vision/` theo bảng bên dưới.
+
+Sau khi thay đổi key, model hoặc cấu hình, cần dừng tiến trình cũ và chạy lại
+`start.bat`.
+
+## ✅ Kiểm thử nhanh
+
+```powershell
+# Language router, Qwen provider và RAG
+.\server\venv\Scripts\python.exe -m unittest tests.test_llm_language tests.test_llm_grounded_learning tests.test_learning_rag tests.test_ollama_llm_provider
+
+# Toàn bộ Python tests
+.\server\venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py"
+
+# Bridge/UI không gọi API thật
+node tests/test_gemini_live_bridge.cjs
+node tests/test_gemini_transcribe_bridge.cjs
+node tests/test_fish_tts.cjs
+node tests/test_vision_ui.cjs
+```
 
 ## 🔑 MQTT topics (hợp đồng giữa các module)
 
