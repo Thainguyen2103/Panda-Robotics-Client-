@@ -9,7 +9,8 @@ thái trên màn OLED theo phong cách robot Vector (Anki).
 
 - **Live Voice trên dashboard**: bật hội thoại trực tiếp hoặc chờ wakeword Moon,
   sau đó nói chuyện nhiều lượt tới khi bấm **Kết thúc**. Chỉ một tab được giữ
-  microphone và mic tạm dừng khi Moon đang phát âm thanh để chống tự nghe.
+  microphone và mic tạm dừng khi Moon đang phát âm thanh để chống tự nghe. Với
+  luồng wakeword, 60 giây không có hội thoại sẽ tự quay lại chờ tên Moon.
 - **Hai pipeline để thử nghiệm**:
   - **Brain Pipeline**: Gemini Transcribe Live (STT Việt/Anh/Nhật) → Qwen local
     qua Ollama → Fish Audio.

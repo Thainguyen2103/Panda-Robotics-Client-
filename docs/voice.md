@@ -33,7 +33,9 @@ Menu **Cách kích hoạt** có hai lựa chọn dùng chung một phiên Live V
 - **Chờ “Hey Moon” rồi trò chuyện**: microphone trước tiên chỉ chạy bộ nhận
   wakeword. Khi nhận đúng “Hey Moon”, dashboard phát hai tiếng tick xác nhận và
   chuyển chính microphone đó sang hội thoại liên tục. Sau lần kích hoạt này không
-  cần gọi Moon lại; bấm **Kết thúc** để đóng phiên.
+  cần gọi Moon lại. Nếu 60 giây không còn hoạt động hội thoại, dashboard đóng
+  phiên Live hiện tại và tự dùng lại microphone đó để quay về chờ wakeword;
+  người dùng chỉ cần gọi Moon để mở một phiên mới. Bấm **Kết thúc** để dừng hẳn.
 
 Sau khi bấm chế độ chờ, giữ im lặng trong lúc giao diện báo **Đang đo tiếng
 nền**. Chỉ gọi “Hey Moon” khi dòng trạng thái đổi thành **Sẵn sàng**; giai đoạn

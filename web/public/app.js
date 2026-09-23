@@ -484,14 +484,17 @@ window.addEventListener('moon-live', ({detail: msg}) => {
         liveTalkWaitingWake = true;
         setVoiceState('standby');
         setOledAiMode('neutral');
-        logToTerminal(msg.calibrating
-            ? 'LIVE: đang đo tiếng nền trước khi chờ wakeword'
-            : 'LIVE: đang chờ tên Moon', 'ai-state');
+        logToTerminal(msg.reason === 'idle_timeout'
+            ? 'LIVE: im lặng 1 phút — quay lại chờ tên Moon'
+            : (msg.calibrating
+                ? 'LIVE: đang đo tiếng nền trước khi chờ wakeword'
+                : 'LIVE: đang chờ tên Moon'), 'ai-state');
     } else if (msg.event === 'wake') {
         liveTalkActive = true;
         liveTalkWaitingWake = false;
         setVoiceState('listening');
         setOledAiMode('questioning');
+        if (liveTalkMode === 'brain') socket.emit('mic_live', '1');
         logToTerminal('WAKE: đã nghe tên Moon — mở Live Talk', 'log-voice');
     } else if (msg.event === 'wake_ack') {
         setVoiceState('speaking');
