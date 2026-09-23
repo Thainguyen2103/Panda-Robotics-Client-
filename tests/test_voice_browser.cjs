@@ -15,6 +15,7 @@ const {chromium} = require('playwright');
         page.on('pageerror', error => errors.push(error.message));
 
         await page.addInitScript(() => {
+            window.MOON_WAKE_IDLE_TIMEOUT_MS = 1200;
             window.wakeAckTexts = [];
             window.speechSynthesis.speak = utterance => {
                 window.wakeAckTexts.push(utterance.text);
@@ -106,6 +107,12 @@ const {chromium} = require('playwright');
         assert(liveFrames > 0);
         assert.equal(await page.evaluate(() => window.toneCount), 2);
         assert.deepEqual(await page.evaluate(() => window.wakeAckTexts), ['Moon nghe đây!']);
+        await page.waitForFunction(() =>
+            document.getElementById('live-state').textContent.includes('Sẵn sàng'));
+        assert.equal(wakeConnections, 2,
+            'wakeword mode must return to wake listening after inactivity');
+        assert.equal(liveConnections, 1,
+            'inactivity must close the current Live session instead of opening another one');
         await page.locator('#live-stop').click();
         assert.equal(await page.locator('#live-start').isEnabled(), true);
         assert.equal(await page.locator('#live-stop').isDisabled(), true);
@@ -117,14 +124,14 @@ const {chromium} = require('playwright');
         await page.waitForFunction(() => window.audioStartDelays.length > 0);
         assert((await page.evaluate(() => window.audioStartDelays.at(-1))) < .2,
             'Fish → Kore must reset the old AudioContext playback timeline');
-        assert.equal(wakeConnections, 1, 'manual mode must bypass wakeword service');
+        assert.equal(wakeConnections, 2, 'manual mode must bypass wakeword service');
         assert.equal(liveConnections, 2);
         await page.locator('#live-stop').click();
 
         await page.setViewportSize({width: 390, height: 844});
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
         await page.screenshot({path: '.voice-venv/voice-ui.png', fullPage: true});
-        assert.match(await page.locator('#terminal-log').innerText(), /WAKE: đã nhận/);
+        assert.match(await page.locator('#terminal-log').innerText(), /WAKE: đã nghe tên Moon/);
         assert(controls.includes('pause'), 'wake socket must pause before Live Talk handoff');
         assert(controls.includes('audio_stream_end'), 'manual Live Talk must close its audio stream cleanly');
         assert.deepEqual(errors, []);
