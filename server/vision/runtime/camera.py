@@ -63,7 +63,11 @@ def start_vision(callback, stop_event=None, publish=None):
                     if cv2 is None:
                         stop.wait(1)
                         continue
-                    cap = cv2.VideoCapture(camera_source())
+                    src = camera_source()
+                    if sys.platform == "win32" and isinstance(src, int):
+                        cap = cv2.VideoCapture(src, cv2.CAP_DSHOW)
+                    else:
+                        cap = cv2.VideoCapture(src)
                     if not cap.isOpened():
                         cap.release()
                         cap = None

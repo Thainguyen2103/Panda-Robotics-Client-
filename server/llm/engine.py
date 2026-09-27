@@ -169,7 +169,6 @@ _retrieve_learning_context = None
 _get_learning_display_info = None
 if LEARNING_RAG_ENABLED:
     try:
-        from server.llm.rag_engine import get_display_info as _get_learning_display_info
         from server.llm.rag_engine import retrieve_context as _retrieve_learning_context
     except Exception as e:
         print(f"⚠️ [RAG] Không thể nạp kho bài học: {e}")
