@@ -491,6 +491,21 @@ def _handle_wake_word(trigger_text: str):
         print(f"❓ [BRAIN] Câu hỏi: \"{question}\"")
         time.sleep(getattr(settings, "QUESTION_DISPLAY_SEC", 0.4))  # đủ để OLED hiện text, không gây lag
 
+        # Xử lý ngay lập tức ý định "Di chuyển" (MOVE) mà không cần gọi LLM
+        if _tid == "move":
+            answer = "Dạ, Moon tới liền đây ạ!"
+            print(f"✅ [BRAIN] Nhận lệnh di chuyển. Gửi MQTT {settings.TOPIC_MOVE} -> forward")
+            mqtt_bridge.publish(settings.TOPIC_MOVE, "forward")
+            
+            _set_voice_ai_state("speaking")
+            _publish_thinking("answer", answer)
+            tts.speak(answer)
+            
+            # Đọc xong thì về IDLE luôn
+            _set_voice_ai_state("standby")
+            change_state("IDLE")
+            return
+
         # ── BƯỚC 3: Chuyển sang chế độ suy nghĩ ──────────────────────────────
         # OLED GIỮ transcript đã nghe (mode 'hearing') trong suốt lúc thinking —
         # người dùng thấy Moon "đọc lại" những gì đã nghe; dots thinking chỉ
