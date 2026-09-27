@@ -169,8 +169,8 @@ _retrieve_learning_context = None
 _get_learning_display_info = None
 if LEARNING_RAG_ENABLED:
     try:
-        from server.learning import get_display_info as _get_learning_display_info
-        from server.learning import retrieve_context as _retrieve_learning_context
+        from server.llm.rag_engine import get_display_info as _get_learning_display_info
+        from server.llm.rag_engine import retrieve_context as _retrieve_learning_context
     except Exception as e:
         print(f"⚠️ [RAG] Không thể nạp kho bài học: {e}")
 
@@ -260,27 +260,26 @@ def realtime_answer(question: str) -> str | None:
     return f"Bây giờ là {now:%H:%M}, {_WEEKDAYS[now.weekday()]} ngày {now:%d/%m/%Y}."
 
 
-def grounded_learning_answer(question: str) -> str | None:
-    """Answer direct vocabulary lookups from verified lesson fields.
+from server.llm.dictionary_router import lookup_vocab
 
-    Small local models can omit a field or alter a Kanji even when the prompt
-    contains correct RAG data. Direct lookups therefore use a deterministic
-    sentence assembled from the lesson; Qwen remains responsible for normal
-    conversation and open-ended teaching.
+def grounded_learning_answer(question: str) -> str | None:
+    """Answer direct vocabulary lookups instantly via Hash Map (O(N) substring search).
+    Bỏ qua RAG/LLM nặng nề, trả về đáp án ngay lập tức từ data.json.
     """
     normalized = unicodedata.normalize("NFC", question or "").casefold()
     if not any(marker in normalized for marker in _VOCAB_LOOKUP_MARKERS):
         return None
 
-    info = learning_display_info(question)
+    info = lookup_vocab(question)
     if not info:
         return None
 
     kanji = str(info.get("kanji") or "").strip()
-    hiragana = str(info.get("hiragana") or "").strip()
-    romaji = str(info.get("romaji") or "").strip()
+    hiragana = str(info.get("japanese_hiragana") or info.get("hiragana") or "").strip()
+    romaji = str(info.get("japanese_romaji") or info.get("romaji") or "").strip()
     english = str(info.get("english") or "").strip()
     vietnamese = str(info.get("vietnamese") or "").strip()
+    
     if not all((kanji, hiragana, romaji, english, vietnamese)):
         return None
 
