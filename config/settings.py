@@ -1,5 +1,21 @@
 # config/settings.py
 import os
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+MODEL_ROOT = Path(os.environ.get("MOON_MODEL_ROOT", PROJECT_ROOT / "models")).expanduser().resolve()
+PRIVATE_DATA_ROOT = Path(
+    os.environ.get("MOON_PRIVATE_DATA_ROOT", PROJECT_ROOT / "data" / "private")
+).expanduser().resolve()
+VOICE_MODEL_DIR = Path(
+    os.environ.get("MOON_VOICE_MODEL_DIR", MODEL_ROOT / "voice")
+).expanduser().resolve()
+VISION_MODEL_DIR = Path(
+    os.environ.get("MOON_VISION_MODEL_DIR", MODEL_ROOT / "vision")
+).expanduser().resolve()
+VISION_DATA_DIR = Path(
+    os.environ.get("MOON_VISION_DATA_DIR", PRIVATE_DATA_ROOT)
+).expanduser().resolve()
 
 # ─── API keys: nạp từ config/secrets.py (KHÔNG push) hoặc biến môi trường ────
 # Xem secrets.example.py để biết cách tạo secrets.py
@@ -48,12 +64,36 @@ VISION_STREAM_FPS = 12
 VISION_POSE_FPS = 5
 VISION_IDENTITY_FPS = 1
 VISION_EMOTION_FPS = 3
+VISION_EMOTION_STALE_SEC = 1.5
 VISION_FACE_WIDTH = 320
 VISION_FACE_DETAILS_ENABLED = True
 VISION_FACE_DETAILS_MODEL = "face_landmarker.task"
 VISION_HEAD_NOD_DEGREES = 8.0
 VISION_HEAD_SHAKE_DEGREES = 10.0
+VISION_HEAD_TILT_DEGREES = 12.0
+VISION_HEAD_TURN_DEGREES = 16.0
+VISION_HEAD_LOOK_DEGREES = 13.0
 VISION_DRAW_SKELETON = True
+VISION_HANDS_ENABLED = True
+VISION_HANDS_MODEL = "hand_landmarker.task"
+VISION_HANDS_FPS = 7
+VISION_HANDS_CONFIDENCE = 0.45
+VISION_HANDS_STALE_SEC = 0.9
+VISION_FINGER_STRAIGHT_DEGREES = 135.0
+VISION_FINGER_EXTENSION_RATIO = 1.05
+VISION_THUMB_STRAIGHT_DEGREES = 135.0
+VISION_OBJECTS_ENABLED = True
+VISION_OBJECTS_MODEL = "yolov8n.pt"
+VISION_OBJECTS_FPS = 1
+VISION_OBJECTS_SIZE = 480
+VISION_OBJECTS_CONFIDENCE = 0.30
+VISION_OBJECTS_STALE_SEC = 2.5
+VISION_EAR_CLOSED = 0.19
+VISION_EAR_OPEN = 0.23
+VISION_EYES_CLOSED_SEC = 1.5
+VISION_CAMERA_HFOV = 60.0
+VISION_FACE_WIDTH_CM = 14.0
+VISION_DISTANCE_SCALE_CM = float(os.environ.get("MOON_DISTANCE_SCALE_CM", "0")) or None
 VISION_POSE_ENABLED = True
 VISION_POSE_SIZE = 320
 VISION_DEVICE = "cpu"  # CUDA: "0"
