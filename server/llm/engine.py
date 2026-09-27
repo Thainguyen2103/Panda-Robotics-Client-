@@ -260,7 +260,7 @@ def realtime_answer(question: str) -> str | None:
     return f"Bây giờ là {now:%H:%M}, {_WEEKDAYS[now.weekday()]} ngày {now:%d/%m/%Y}."
 
 
-from server.llm.dictionary_router import lookup_vocab
+from server.llm.dictionary_router import lookup_vocab, get_entertainment
 
 def grounded_learning_answer(question: str) -> str | None:
     """Answer direct vocabulary lookups instantly via Hash Map (O(N) substring search).
@@ -501,6 +501,19 @@ def chat(
             on_done(grounded_answer)
         print(f'✅ [RAG] Trả lời xác thực: "{grounded_answer[:80]}"')
         return grounded_answer
+        
+    # Xử lý các câu đố vui / sự thật giải trí từ Hash Map
+    entertain_answer = get_entertainment(model_question)
+    if entertain_answer:
+        if on_thinking:
+            on_thinking("answering")
+        if on_chunk:
+            on_chunk(entertain_answer)
+        _add_to_history(question, entertain_answer)
+        if on_done:
+            on_done(entertain_answer)
+        print(f'✅ [ENTERTAIN] Kể chuyện/Đố vui: "{entertain_answer[:80]}"')
+        return entertain_answer
 
     if not _client:
         error_msg = "Xin lỗi, Moon chưa kết nối được với Qwen. Vui lòng kiểm tra Ollama."

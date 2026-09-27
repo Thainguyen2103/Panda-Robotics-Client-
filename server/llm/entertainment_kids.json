@@ -1,0 +1,29 @@
+[
+  {
+    "type": "fact",
+    "content": "Bé có biết không, con sứa biển không hề có não, tim hay xương! Chúng giống như những miếng thạch bơi lội tung tăng trong nước vậy đó."
+  },
+  {
+    "type": "fact",
+    "content": "Một sự thật siêu thú vị: Mật ong là loại thực phẩm duy nhất trên thế giới không bao giờ bị hỏng. Người ta từng tìm thấy hũ mật ong 3000 năm tuổi ở Ai Cập và nó vẫn còn ăn được luôn!"
+  },
+  {
+    "type": "fact",
+    "content": "Các bạn hươu cao cổ có cái lưỡi dài đến mức có thể dùng để làm sạch lỗ tai của chính mình đấy! Lưỡi của hươu cao cổ còn có màu xanh đen để chống nắng nữa."
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé nhé: Con gì có mũi dài nhất nào?",
+    "answer": "Đó chính là chú Voi! Mũi voi rất khéo léo, có thể nhặt được cả hạt đậu đấy."
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Hành tinh nào lớn nhất trong Hệ Mặt Trời của chúng ta?",
+    "answer": "Là Sao Mộc nha! Nó to đến nỗi có thể chứa hơn 1300 Trái Đất bên trong luôn."
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Cây gì mọc từ dưới lên mà không bao giờ có lá?",
+    "answer": "Haha, đó là cây nến! Khi đốt lên thì nó mọc cao dần bằng ánh sáng."
+  }
+]
