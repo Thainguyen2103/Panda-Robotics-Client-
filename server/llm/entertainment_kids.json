@@ -12,6 +12,30 @@
     "content": "Các bạn hươu cao cổ có cái lưỡi dài đến mức có thể dùng để làm sạch lỗ tai của chính mình đấy! Lưỡi của hươu cao cổ còn có màu xanh đen để chống nắng nữa."
   },
   {
+    "type": "fact",
+    "content": "Trái tim của một chú tôm nằm ở trên đầu của nó. Bất ngờ chưa nào!"
+  },
+  {
+    "type": "fact",
+    "content": "Bạch tuộc có đến 3 trái tim và dòng máu của chúng lại có màu xanh lam chứ không phải màu đỏ đâu nhé!"
+  },
+  {
+    "type": "fact",
+    "content": "Cá heo không bao giờ ngủ hoàn toàn. Khi ngủ, chúng chỉ nhắm một mắt và cho một nửa não nghỉ ngơi, nửa não còn lại vẫn thức để canh chừng nguy hiểm."
+  },
+  {
+    "type": "fact",
+    "content": "Bé có biết ngón tay cái của chúng ta có độ dài bằng chính cái mũi của mình không? Nếu không tin, bé thử lấy ngón cái đo thử xem nào!"
+  },
+  {
+    "type": "fact",
+    "content": "Vũ trụ vô cùng tĩnh lặng vì ngoài không gian không có không khí để truyền âm thanh. Các phi hành gia phải nói chuyện bằng sóng radio đấy."
+  },
+  {
+    "type": "fact",
+    "content": "Con ốc sên có thể ngủ liên tục trong suốt 3 năm nếu thời tiết quá khô hạn. Tụi nó đúng là chúa tể ngủ nướng!"
+  },
+  {
     "type": "quiz",
     "question": "Moon đố bé nhé: Con gì có mũi dài nhất nào?",
     "answer": "Đó chính là chú Voi! Mũi voi rất khéo léo, có thể nhặt được cả hạt đậu đấy."
@@ -25,5 +49,35 @@
     "type": "quiz",
     "question": "Đố bạn nhỏ: Cây gì mọc từ dưới lên mà không bao giờ có lá?",
     "answer": "Haha, đó là cây nến! Khi đốt lên thì nó mọc cao dần bằng ánh sáng."
+  },
+  {
+    "type": "quiz",
+    "question": "Con gì đập thì sống, không đập thì chết?",
+    "answer": "Đó chính là con tim của chúng ta đó!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Cái gì mà bé càng kéo ra dài thì nó lại càng ngắn lại?",
+    "answer": "Đó là điếu thuốc lá hoặc cây nhang nha! Nhưng thuốc lá rất có hại, bé đừng bao giờ thử nhé."
+  },
+  {
+    "type": "quiz",
+    "question": "Có mũi mà không có mắt, có lưỡi mà không có miệng, đó là cái gì?",
+    "answer": "Là con dao đấy! Phần mũi dao và lưỡi dao rất sắc bén nên bé nhớ cẩn thận khi dùng nhé."
+  },
+  {
+    "type": "quiz",
+    "question": "Quả gì không phải để ăn, mà dùng để đá, để chuyền cho nhau?",
+    "answer": "Dễ ợt! Đó là quả bóng đó bé ơi!"
+  },
+  {
+    "type": "quiz",
+    "question": "Con gì hai mắt trong veo, thích nằm sưởi nắng, thích trèo cây cau?",
+    "answer": "Meo meo! Chính là chú mèo mướp lười biếng đó!"
+  },
+  {
+    "type": "quiz",
+    "question": "Để nguyên dùng nấu lẩu chua, thêm huyền thì để quét nhà quét sân. Đố bé là những chữ gì?",
+    "answer": "Là chữ 'Me' để nấu canh, và chữ 'Mè' (chổi đót) để quét nhà nha!"
   }
 ]
