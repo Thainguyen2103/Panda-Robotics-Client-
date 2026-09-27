@@ -55,8 +55,8 @@ from server.voice.speech.filters import (
 from server.voice.speech.validation import safe_asr_correction
 from server.voice.tts import speak, SentencePlayer
 from server.voice import tts   # module object — cho tts.play_beep()/play_tick()
-from server.llm.engine import engine as llm
-from server.topics import classify_topic, TOPIC_LABELS
+from server.llm import engine as llm
+from server.network.topics import classify_topic, TOPIC_LABELS
 
 
 # Mic trình duyệt chạy ở process riêng nên không thấy trực tiếp cờ
