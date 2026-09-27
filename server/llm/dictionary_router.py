@@ -50,8 +50,13 @@ def load_dictionary():
 # Tự động nạp lúc khởi động
 load_dictionary()
 
+from functools import lru_cache
+
+@lru_cache(maxsize=500)
 def lookup_vocab(question: str) -> dict | None:
-    """Tra cứu từ vựng siêu tốc O(N)."""
+    """Tra cứu từ vựng siêu tốc O(N) và Caching siêu tốc O(1).
+    Nếu cùng một câu hỏi lặp lại, trả kết quả thẳng từ RAM (không cần duyệt lặp).
+    """
     norm_q = _normalize(question)
     best_match = None
     best_kw_len = 0

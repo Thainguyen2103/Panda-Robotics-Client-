@@ -261,7 +261,9 @@ def realtime_answer(question: str) -> str | None:
 
 
 from server.llm.dictionary_router import lookup_vocab, get_entertainment
+from functools import lru_cache
 
+@lru_cache(maxsize=500)
 def grounded_learning_answer(question: str) -> str | None:
     """Answer direct vocabulary lookups instantly via Hash Map (O(N) substring search).
     Bỏ qua RAG/LLM nặng nề, trả về đáp án ngay lập tức từ data.json.
