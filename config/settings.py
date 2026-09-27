@@ -48,6 +48,7 @@ TOPIC_TTS_ACTIVE    = "moon/ai/tts_active"
 TOPIC_AI_TOPIC      = "moon/ai/topic"        # chủ đề câu hỏi → emoji OLED
 TOPIC_BROWSER_AUDIO = "moon/ai/voice_audio"   # push-to-talk từ dashboard (base64 webm)
 TOPIC_BROWSER_CLIP  = "moon/ai/clip"          # clip PCM từ live-mic trình duyệt
+TOPIC_BROWSER_QUESTION = "moon/ai/browser_question" # nhận text question từ dashboard
 TOPIC_MIC_LIVE      = "moon/ai/mic_live"      # trạng thái live-mic on/off
 TOPIC_CAMERA = "moon/camera"
 
