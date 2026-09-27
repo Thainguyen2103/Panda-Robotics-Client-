@@ -53,7 +53,7 @@ from server.voice.speech.filters import (
     strip_diacritics as _strip_diacritics,
 )
 from server.voice.speech.validation import safe_asr_correction
-from server.tts import speak, SentencePlayer
+from server.voice.tts import speak, SentencePlayer
 from server.voice import tts   # module object — cho tts.play_beep()/play_tick()
 from server.llm.engine import engine as llm
 from server.topics import classify_topic, TOPIC_LABELS
