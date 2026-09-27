@@ -35,7 +35,7 @@ def camera_source():
 def start_vision(callback, stop_event=None, publish=None):
     """Capture frames, run inference and publish stable robot/dashboard output."""
     if publish is None:
-        from server.mqtt_bridge import publish
+        from server.network.mqtt_bridge import publish
     stop = stop_event if stop_event is not None else threading.Event()
     mailbox = LatestFrame()
     result_lock = threading.Lock()
