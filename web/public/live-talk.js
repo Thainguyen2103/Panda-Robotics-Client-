@@ -320,7 +320,7 @@ function handleServer(message) {
         resetGeminiTurnDetector();
         if (pipeline === 'brain') {
             outputMode = 'brain';
-            $('model').textContent = 'Brain · Gemini STT (VI/EN/JA) · Qwen 3.5 2B · Fish';
+            $('model').textContent = 'Brain · Gemini STT (VI/EN/JA) · Qwen 3.5 4B · Fish';
             setState('listening', message.calibrating
                 ? 'Đang đo tiếng nền — hãy giữ im lặng' : 'Brain đang nghe — không cần gọi Moon');
             dispatch('ready', {engine: message.engine});

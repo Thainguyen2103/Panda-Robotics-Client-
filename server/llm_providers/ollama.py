@@ -62,8 +62,10 @@ class OllamaTextClient:
                 "think": False,
                 "keep_alive": "10m",
                 "options": {
+                    "num_ctx": 1024,
                     "num_predict": max_tokens,
                     "temperature": temperature,
+                    "num_gpu": 99,
                 },
             },
             stream=True,

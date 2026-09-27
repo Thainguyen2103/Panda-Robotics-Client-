@@ -54,6 +54,37 @@ app.get('/api/live-ack', async (_req, res) => {
     }
 });
 
+app.post('/api/preload-model', (req, res) => {
+    const postData = JSON.stringify({
+        model: 'moon-tutor',
+        prompt: '',
+        keep_alive: '60m', // Giữ trong RAM 60 phút
+        options: {
+            num_gpu: 99 // Ép Ollama nạp 100% các lớp của mô hình lên VRAM của Card rời
+        }
+    });
+    const options = {
+        hostname: '127.0.0.1',
+        port: 11434,
+        path: '/api/generate',
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postData)
+        }
+    };
+    const ollamaReq = http.request(options, (ollamaRes) => {
+        ollamaRes.on('data', () => {}); // Consume data
+        ollamaRes.on('end', () => res.json({success: true}));
+    });
+    ollamaReq.on('error', (e) => {
+        console.error(`⚠️ [WEB] Preload Error: ${e.message}`);
+        res.status(500).json({error: e.message});
+    });
+    ollamaReq.write(postData);
+    ollamaReq.end();
+});
+
 // Serve static files
 // index.html: KHÔNG cache — để mọi lần tải đều lấy bản mới (chống lỗi file cũ)
 app.get(['/', '/index.html'], (req, res) => {

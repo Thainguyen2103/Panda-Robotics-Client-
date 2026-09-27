@@ -98,7 +98,7 @@ VISION_FACE_WIDTH_CM = 14.0
 VISION_DISTANCE_SCALE_CM = float(os.environ.get("MOON_DISTANCE_SCALE_CM", "0")) or None
 VISION_POSE_ENABLED = True
 VISION_POSE_SIZE = 320
-VISION_DEVICE = "cpu"  # CUDA: "0"
+VISION_DEVICE = "0"  # Đổi sang "0" để bắt buộc chạy bằng Card rời RTX 4050
 VISION_CV_THREADS = 2
 VISION_STALE_SEC = 2.0
 VISION_FACE_THRESHOLD = 0.8
@@ -122,6 +122,11 @@ FISH_VOICE_ID = "381620020029495883d03b63850c862f"
 
 # Model TTS: 's2.1-pro-free' = miễn phí (khuyên dùng) | 's2.1-pro' / 's2-pro' / 's1' = trả phí
 FISH_TTS_MODEL = "s2.1-pro-free"
+
+# ─── Ollama Local LLM Configuration ───────────────────────────────────────────
+LLM_PROVIDER = "ollama"
+OLLAMA_LLM_MODEL = "qwen3.5:2b"
+OLLAMA_MAX_TOKENS = 128
 
 # ─── DeepSeek API (LLM) ─────────────────────────────────────────────────────
 # Lấy key tại: https://platform.deepseek.com/api_keys

@@ -360,7 +360,7 @@ _conversation_history: list[dict] = []
 _history_lock = threading.Lock()
 # Bốn lượt gần nhất đủ giữ mạch hội thoại nhưng không làm prompt local tăng dần
 # đến mức chậm rõ rệt sau một phút trò chuyện.
-MAX_HISTORY = 4
+MAX_HISTORY = 3
 
 
 def _get_messages(user_question: str) -> list[dict]:
@@ -451,6 +451,9 @@ def _generate_response(messages: list[dict], max_tokens: int, temperature: float
     return _strip_thinking(text)
 
 
+# ─── Semantic Cache ────────────────────────────────────────────────────────────
+_semantic_cache = {}
+
 # ─── Chat function ─────────────────────────────────────────────────────────────
 def chat(
     question: str,
@@ -476,6 +479,20 @@ def chat(
     model_question = normalize_user_question(question)
     if model_question != question:
         print(f'✍️ [LLM] Hiệu chỉnh chắc chắn: "{question}" → "{model_question}"')
+
+    # 1. BỘ NHỚ ĐỆM (SEMANTIC CACHE) - Tránh LLM chạy lại câu cũ
+    if model_question in _semantic_cache:
+        cached_ans = _semantic_cache[model_question]
+        print(f"⚡ [SEMANTIC CACHE] Lấy từ RAM (0 độ trễ): \"{cached_ans[:50]}...\"")
+        if on_thinking:
+            on_thinking("answering")
+        if on_chunk:
+            on_chunk(cached_ans)
+        _add_to_history(question, cached_ans)
+        if on_done:
+            on_done(cached_ans)
+        return cached_ans
+
 
     exact_answer = realtime_answer(model_question)
     if exact_answer:
@@ -541,31 +558,28 @@ def chat(
             OLLAMA_MAX_TOKENS if _provider_name == "ollama" else 512,
         )
         temperature = 0.25 if _provider_name == "ollama" else 0.7
-        full_response = _generate_response(messages, max_tokens, temperature)
+        
+        # Bật lại tính năng streaming để robot nói nhanh hơn (không chờ cả câu)
+        stream = _stream_provider(
+            _client,
+            _provider_name,
+            _model_name,
+            messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        
+        full_response_chunks = []
+        for chunk in stream:
+            full_response_chunks.append(chunk)
+            if on_chunk:
+                on_chunk(chunk)
+                
+        full_response = "".join(full_response_chunks)
+        full_response = _strip_thinking(full_response)
+        
         if not full_response:
             raise RuntimeError(f"{_provider_name} trả về nội dung rỗng")
-
-        expected_language = response_language(model_question)
-        if not response_language_matches(full_response, expected_language):
-            print(
-                "⚠️ [LLM] Câu trả lời sai ngôn ngữ; tạo lại trước khi gửi TTS "
-                f"(cần {expected_language})."
-            )
-            retry_messages = messages[:-1] + [
-                {
-                    "role": "system",
-                    "content": strict_retry_instruction(expected_language),
-                },
-                messages[-1],
-            ]
-            full_response = _generate_response(retry_messages, max_tokens, 0.1)
-            if not response_language_matches(full_response, expected_language):
-                full_response = language_failure_message(expected_language)
-
-        # Không phát bản nháp ra loa. Chỉ câu đã qua kiểm tra ngôn ngữ mới được
-        # chuyển cho bộ tách câu/TTS ở Brain.
-        if on_chunk:
-            on_chunk(full_response)
 
         elapsed = time.time() - t0
         print(
@@ -574,6 +588,9 @@ def chat(
         )
 
         _add_to_history(question, full_response)
+        
+        # Lưu vào cache cho lần hỏi sau
+        _semantic_cache[model_question] = full_response
 
         if on_done:
             on_done(full_response)
@@ -588,13 +605,50 @@ def chat(
         return error_msg
 
 
+_quick_cloud_client = None
+_quick_cloud_provider = None
+
+# Ưu tiên Gemini cho tác vụ phụ vì token miễn phí rất dư dả
+if GEMINI_API_KEY:
+    try:
+        from server.llm_providers.gemini import GeminiTextClient
+        _quick_cloud_client = GeminiTextClient(GEMINI_API_KEY, GEMINI_LLM_MODEL)
+        _quick_cloud_provider = "gemini"
+    except Exception:
+        pass
+# Nếu không có Gemini thì dự phòng bằng Groq
+elif GROQ_API_KEY:
+    try:
+        from groq import Groq
+        _quick_cloud_client = Groq(api_key=GROQ_API_KEY)
+        _quick_cloud_provider = "groq"
+    except Exception:
+        pass
+
 def quick(prompt: str, max_tokens: int = 200) -> str:
     """Completion cực ngắn, không lịch sử — dùng tạo caption OLED / sửa lỗi ASR /
     chọn cảm xúc. Dùng model INSTANT (nhanh gấp ~10 lần gpt-oss reasoning)."""
-    if not _client:
-        return ""
-
     try:
+        # Dùng Cloud (Gemini/Groq) cho tác vụ nhỏ để giải phóng Ollama
+        if _quick_cloud_provider == "gemini":
+            return _quick_cloud_client.complete(
+                prompt,
+                max_tokens=max_tokens,
+                temperature=0.2,
+            )
+        elif _quick_cloud_provider == "groq":
+            response = _quick_cloud_client.chat.completions.create(
+                model=QUICK_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+                temperature=0.2,
+                stream=False,
+            )
+            return (response.choices[0].message.content or "").strip()
+
+        if not _client:
+            return ""
+
         if _provider_name in {"gemini", "ollama"}:
             return _client.complete(
                 prompt,

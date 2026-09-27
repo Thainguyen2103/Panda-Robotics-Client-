@@ -530,3 +530,22 @@ window.addEventListener('moon-live', ({detail: msg}) => {
         logToTerminal(msg.event === 'error' ? `LIVE lỗi: ${msg.text || 'Mất kết nối'}` : 'LIVE: đã kết thúc', 'sys');
     }
 });
+
+// ─── Preload AI Model ─────────────────────────────────────────────────────────
+async function preloadModel() {
+    logToTerminal('Đang nạp AI model vào VRAM (Card đồ họa)...', 'sys');
+    const btn = document.getElementById('btn-preload');
+    if (btn) btn.disabled = true;
+    try {
+        const res = await fetch('/api/preload-model', { method: 'POST' });
+        if (res.ok) {
+            logToTerminal('✅ Nạp model thành công! Robot sẵn sàng phản hồi ngay lập tức.', 'sys');
+        } else {
+            logToTerminal('❌ Lỗi khi nạp model!', 'sys');
+        }
+    } catch (e) {
+        logToTerminal(`❌ Lỗi kết nối: ${e.message}`, 'sys');
+    }
+    if (btn) btn.disabled = false;
+}
+
