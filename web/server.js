@@ -66,18 +66,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 // MQTT Connection
 mqttClient.on('connect', () => {
     console.log('✅ [WEB] Connected to MQTT Broker');
-    mqttClient.subscribe('panda/status');
-    mqttClient.subscribe('panda/cmd/#');
-    mqttClient.subscribe('panda/log/voice');
-    mqttClient.subscribe('panda/log/voice_partial');
-    mqttClient.subscribe('panda/camera');
-    mqttClient.subscribe('panda/user_status');
-    mqttClient.subscribe('panda/vision/status');
-    mqttClient.subscribe('panda/ai/state');
-    mqttClient.subscribe('panda/ai/thinking');
-    mqttClient.subscribe('panda/ai/response');
-    mqttClient.subscribe('panda/ai/topic');
-    mqttClient.subscribe('panda/audio/tts_active');
+    mqttClient.subscribe('moon/status');
+    mqttClient.subscribe('moon/cmd/#');
+    mqttClient.subscribe('moon/log/voice');
+    mqttClient.subscribe('moon/log/voice_partial');
+    mqttClient.subscribe('moon/camera');
+    mqttClient.subscribe('moon/user_status');
+    mqttClient.subscribe('moon/vision/status');
+    mqttClient.subscribe('moon/ai/state');
+    mqttClient.subscribe('moon/ai/thinking');
+    mqttClient.subscribe('moon/ai/response');
+    mqttClient.subscribe('moon/ai/topic');
+    mqttClient.subscribe('moon/audio/tts_active');
 });
 
 mqttClient.on('message', (topic, message) => {
@@ -103,21 +103,21 @@ io.on('connection', (socket) => {
     // Browser push-to-talk: nhận base64 webm từ dashboard → chuyển sang MQTT cho brain
     socket.on('voice_audio', (b64) => {
         console.log(`🎤 [WEB] Browser audio received (${Math.round(b64.length / 1024)} KB b64) → MQTT`);
-        mqttClient.publish('panda/ai/voice_audio', b64);
+        mqttClient.publish('moon/ai/voice_audio', b64);
     });
 
     // Live-mic: clip PCM đã khử nhiễu từ trình duyệt → MQTT
     socket.on('voice_clip', (b64) => {
-        mqttClient.publish('panda/ai/clip', b64);
+        mqttClient.publish('moon/ai/clip', b64);
     });
     socket.on('mic_live', (st) => {
         console.log(`🎙️ [WEB] Live mic: ${st}`);
-        mqttClient.publish('panda/ai/mic_live', st);
+        mqttClient.publish('moon/ai/mic_live', st);
     });
     socket.on('voice_question', (text) => {
         if (typeof text !== 'string') return;
         text = text.trim().slice(0, 1000);
-        if (text) mqttClient.publish('panda/ai/question', text);
+        if (text) mqttClient.publish('moon/ai/question', text);
     });
 });
 

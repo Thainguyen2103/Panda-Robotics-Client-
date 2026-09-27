@@ -32,25 +32,25 @@ def _key(name: str) -> str:
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 
-# Topics (theo Phụ lục B đề cương) — prefix "panda/" khớp với dashboard web
-TOPIC_MOVE   = "panda/cmd/move"
-TOPIC_ARM    = "panda/cmd/arm"
-TOPIC_FACE   = "panda/cmd/face"
-TOPIC_TEXT   = "panda/cmd/text"
-TOPIC_BUZZ   = "panda/cmd/buzz"
-TOPIC_STATUS = "panda/status"
-TOPIC_VOICE_LOG     = "panda/log/voice"
-TOPIC_VOICE_PARTIAL = "panda/log/voice_partial"
-TOPIC_AI_THINKING   = "panda/ai/thinking"
-TOPIC_AI_RESPONSE   = "panda/ai/response"
-TOPIC_AI_STATE      = "panda/ai/state"
-TOPIC_TTS_ACTIVE    = "panda/audio/tts_active"
-TOPIC_AI_TOPIC      = "panda/ai/topic"        # chủ đề câu hỏi → emoji OLED
-TOPIC_BROWSER_AUDIO = "panda/ai/voice_audio"   # push-to-talk từ dashboard (base64 webm)
-TOPIC_BROWSER_CLIP  = "panda/ai/clip"          # clip PCM từ live-mic trình duyệt
-TOPIC_BROWSER_QUESTION = "panda/ai/browser_question" # nhận text question từ dashboard
-TOPIC_MIC_LIVE      = "panda/ai/mic_live"      # trạng thái live-mic on/off
-TOPIC_CAMERA = "panda/camera"
+# Topics (theo Phụ lục B đề cương) — prefix "moon/"
+TOPIC_MOVE   = "moon/cmd/move"
+TOPIC_ARM    = "moon/cmd/arm"
+TOPIC_FACE   = "moon/cmd/face"
+TOPIC_TEXT   = "moon/cmd/text"
+TOPIC_BUZZ   = "moon/cmd/buzz"
+TOPIC_STATUS = "moon/status"
+TOPIC_VOICE_LOG     = "moon/log/voice"
+TOPIC_VOICE_PARTIAL = "moon/log/voice_partial"
+TOPIC_AI_THINKING   = "moon/ai/thinking"
+TOPIC_AI_RESPONSE   = "moon/ai/response"
+TOPIC_AI_STATE      = "moon/ai/state"
+TOPIC_TTS_ACTIVE    = "moon/audio/tts_active"
+TOPIC_AI_TOPIC      = "moon/ai/topic"        # chủ đề câu hỏi → emoji OLED
+TOPIC_BROWSER_AUDIO = "moon/ai/voice_audio"   # push-to-talk từ dashboard (base64 webm)
+TOPIC_BROWSER_CLIP  = "moon/ai/clip"          # clip PCM từ live-mic trình duyệt
+TOPIC_BROWSER_QUESTION = "moon/ai/browser_question" # nhận text question từ dashboard
+TOPIC_MIC_LIVE      = "moon/ai/mic_live"      # trạng thái live-mic on/off
+TOPIC_CAMERA = "moon/camera"
 
 # AI Models Configuration
 WEBCAM_INDEX = 0
@@ -107,7 +107,7 @@ VISION_EMOTION_THRESHOLD = 0.55
 VISION_EMOTION_MARGIN = 0.15
 VISION_MIN_FACE_SIZE = 60
 VISION_KEYPOINT_THRESHOLD = 0.5
-TOPIC_VISION_STATUS = "panda/vision/status"
+TOPIC_VISION_STATUS = "moon/vision/status"
 
 # Other constants
 FPS_LIMIT = 15

@@ -710,7 +710,7 @@ def _process_command(text: str):
 def _handle_transcript(text: str):
     """
     Callback mỗi khi Voice runtime nhận được transcript từ Groq.
-    Note: Voice runtime đã tự publish lên panda/log/voice rồi —
+    Note: Voice runtime đã tự publish lên moon/log/voice rồi —
           ở đây chỉ xử lý lệnh điều khiển.
     """
     if voice_ai_state != "standby":

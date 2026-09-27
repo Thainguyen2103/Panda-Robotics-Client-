@@ -50,7 +50,7 @@ def start_vision(callback, stop_event=None, publish=None):
                 last_good_inference = time.monotonic()
         try:
             publish(settings.TOPIC_VISION_STATUS,result)
-            publish("panda/user_status",result)
+            publish("moon/user_status",result)
             callback(result["person_detected"],result["emotion"],result["action"])
         except Exception:
             LOG.exception("Vision output failed")
