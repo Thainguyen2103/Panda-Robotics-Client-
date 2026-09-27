@@ -1,4 +1,4 @@
-﻿"""
+"""
 --------------------------------------------------------------------------------
 TÀI LIỆU HƯỚNG DẪN CODE: moon_tutor.py (Bộ não LLM & Giao tiếp)
 --------------------------------------------------------------------------------
@@ -11,7 +11,7 @@ Nhiệm vụ: Giao tiếp với Ollama, đóng vai chú gấu trúc nhí nhảnh
 4. warmup_model(): Nạp trước mô hình 5GB vào RAM để chống lag cho câu hỏi đầu tiên.
 """
 # ==============================================================================
-# moon_tutor.py — Điều phối Trợ lý AI Moon (Ollama Qwen2.5 + RAG)
+# moon_tutor.py — Điều phối Trợ lý AI Moon (Ollama Qwen3.5 4B + RAG)
 # Chuyên hỗ trợ học Tiếng Nhật, Anh, Việt cho trẻ 7-10 tuổi trên Robot
 # ==============================================================================
 
@@ -40,6 +40,8 @@ except ImportError:
 # Khai báo địa chỉ IP và Port của Ollama chạy dưới máy local (mặc định là 11434)
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 # Tên của mô hình AI đang sử dụng
+# moon-tutor = wrapper của qwen3.5:4b đã nhúng sẵn system prompt (tính cách Moon, anti-hallucination...)
+# Nếu đổi base model thì chạy lại: ollama create moon-tutor -f server/llm/Modelfile
 MODEL_NAME  = "moon-tutor"
 
 # Khởi tạo bộ máy RAG để tra cứu sách giáo khoa

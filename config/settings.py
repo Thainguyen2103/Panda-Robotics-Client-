@@ -1,4 +1,4 @@
-﻿# config/settings.py
+# config/settings.py
 import os
 
 # ─── API keys: nạp từ config/secrets.py (KHÔNG push) hoặc biến môi trường ────
@@ -169,41 +169,46 @@ MOON_WAKE_WORDS = [
     "này moon",
     "ê moon",
     "ơi moon",
-    "pan đa",
-    "pan đa ơi",
-    "păng đa",
-    "păng đa ơi",
+    "moon à",
+
+    # ── Biến thể phiên âm "mun" (Whisper đọc /uː/ → /ʊ/) ────────────────
+    "mun",
+    "mun ơi",
+    "mun à",
+    "hey mun",
+    "hây mun",
+    "hê mun",
+    "ê mun",
+    "này mun",
+    "ơi mun",
+    "bé mun",
+    "bé mun ơi",
+    "muns",
+
+    # ── Biến thể phiên âm "mon" (Whisper đọc /uː/ → /ɔ/) ────────────────
+    "mon",
+    "mon ơi",
+    "mon à",
+    "hey mon",
+    "hây mon",
+    "hê mon",
+    "ê mon",
+    "này mon",
+    "ơi mon",
+    "bé mon",
+    "bé mon ơi",
+
     # ── Các biến thể phiên âm tiếng Việt Whisper hay nhận nhầm ───────────
-    "hai phan ta",
-    "hai phanta",
-    "hai phan đa",
     "hai moon",
-    "hai păng đa",
-    "hai bạn nàng",
-    "bạn nàng",
-    "ban nang",
+    "hai mun",
+    "hai mon",
     "hây moon",
     "hê moon",
-    "hây phan ta",
-    "hê phan ta",
-    "phan ta",
-    "phan da",
-    "phan đã",
-    "phanta",
-    "fanta",
-    "phan đa",
-    "fan đa",
-    "panta",
     "moons",
-    "ban đa",
-    "băng đa",
-    "băn đa",
+
     # ── Tên thân thiện tiếng Việt ────────────────────────────────────────
-    "gấu trúc ơi",
-    "gấu trúc",
     "bé moon ơi",
     "bé moon",
-    "bé gấu",
 ]
 
 
