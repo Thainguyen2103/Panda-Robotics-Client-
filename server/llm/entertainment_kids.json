@@ -79,5 +79,674 @@
     "type": "quiz",
     "question": "Để nguyên dùng nấu lẩu chua, thêm huyền thì để quét nhà quét sân. Đố bé là những chữ gì?",
     "answer": "Là chữ 'Me' để nấu canh, và chữ 'Mè' (chổi đót) để quét nhà nha!"
+  },
+  {
+    "type": "fact",
+    "content": "Nước Pháp xinh đẹp có thủ đô là Paris, nơi có ngọn tháp Eiffel cao chọc trời và được mệnh danh là 'Thành phố ánh sáng' đấy bé ạ!"
+  },
+  {
+    "type": "fact",
+    "content": "Châu Nam Cực là nơi lạnh giá nhất trên Trái Đất, và đây cũng là 'ngôi nhà' độc quyền của những chú chim cánh cụt đáng yêu không nơi nào khác có được."
+  },
+  {
+    "type": "fact",
+    "content": "Nước Nhật Bản (thủ đô Tokyo) được gọi là 'Đất nước mặt trời mọc' vì đây là một trong những nơi nhìn thấy ánh nắng bình minh sớm nhất châu Á."
+  },
+  {
+    "type": "fact",
+    "content": "Kim tự tháp Ai Cập khổng lồ ở thủ đô Cairo được xây dựng từ hàng ngàn năm trước bởi những khối đá nặng bằng cả một con voi lớn ghép lại đấy!"
+  },
+  {
+    "type": "fact",
+    "content": "Úc (Australia) với thủ đô Canberra không chỉ có những chú chuột túi Kangaroo nhảy nhót siêu tài năng mà còn là một quốc gia rộng lớn chiếm trọn cả một lục địa."
+  },
+  {
+    "type": "fact",
+    "content": "Nước Ý (thủ đô Rome) có một công trình kiến trúc cực kỳ nổi tiếng hình chiếc ủng trên bản đồ thế giới, và nơi đây có tòa tháp nghiêng Pisa kỳ lạ không chịu đổ."
+  },
+  {
+    "type": "fact",
+    "content": "Đảo quốc sư tử Singapore (thủ đô cũng tên là Singapore) dù rất nhỏ bé nhưng lại là một trong những quốc gia xanh, sạch và hiện đại bậc nhất thế giới."
+  },
+  {
+    "type": "fact",
+    "content": "Nước Anh có thủ đô London vô cùng náo nhiệt, nơi có chiếc đồng hồ khổng lồ Big Ben nổi tiếng phát ra tiếng chuông ngân vang mỗi giờ."
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Đất nước hình chiếc ủng nổi tiếng với bánh Pizza và mì Spaghetti có thủ đô tên là gì và ở châu nào?",
+    "answer": "Đó chính là nước Ý, thủ đô là Rome và nằm ở châu Âu đó bé ơi!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Thủ đô của đất nước Canada lạnh giá, nổi tiếng với lá phong đỏ rực trên quốc kỳ là gì nào?",
+    "answer": "Đó là thành phố Ottawa nha! Canada còn nổi tiếng với rất nhiều hồ nước ngọt trong veo nữa đấy."
+  },
+  {
+    "type": "quiz",
+    "question": "Con gì vừa biết bơi dưới nước, vừa biết chạy trên cạn, lại còn đeo chiếc ba lô tự nhiên trên lưng mang tên 'xứ sở chuột túi'?",
+    "answer": "Đó là chú chuột túi Kangaroo đến từ nước Úc (Australia)!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Ngọn núi lửa lớn nhất trong Hệ Mặt Trời của chúng ta có tên là Olympus Mons, nhưng nó lại nằm trên hành tinh đỏ nào?",
+    "answer": "Chính là Sao Hỏa (Mars)! Ngọn núi này to và cao gấp nhiều lần đỉnh Everest trên Trái Đất của chúng ta luôn."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Việt Nam là Hà Nội, nơi có Lăng Chủ tịch Hồ Chí Minh và Hồ Gươm gắn liền với truyền thuyết trả gươm thần cho Rùa Vàng."
+  },
+  {
+    "type": "fact",
+    "content": "Thành phố Hồ Chí Minh (trước đây gọi là Sài Gòn) là đô thị lớn nhất Việt Nam, nổi tiếng với tòa nhà Landmark 81 và Bến Nhà Rồng lịch sử."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của nước Mỹ (United States) là Washington, D.C., nơi đặt Nhà Trắng - nơi làm việc của Tổng thống Mỹ."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Trung Quốc là Bắc Kinh, nơi có Tử Cấm Thành rộng lớn và Vạn Lý Trường Thành kéo dài ngιên dặm."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Vương quốc Anh là London, nổi tiếng với cung điện Buckingham nơi Nữ hoàng/Vua Anh sinh sống và cầu Tháp London."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Pháp là Paris, được ví là 'Kinh đô thời trang' và là nơi tọa lạc của bảo tàng Louvre lưu giữ bức tranh nàng Mona Lisa."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Nhật Bản là Tokyo, một trong những thành phố hiện đại và đông đúc bậc nhất thế giới với tháp truyền hình Tokyo Skytree."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Hàn Quốc là Seoul, nổi tiếng với các cung điện hoàng gia cổ kính như Gyeongbokgung nằm giữa các tòa nhà chọc trời."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của nước Đức là Berlin, nổi tiếng với Cổng Brandenburg lịch sử và những mảng tường Berlin cũ được trang trí tranh nghệ thuật."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Nga là Moskva (Moscow), nổi tiếng với Quảng trường Đỏ và nhà thờ St. Basil có kiến trúc giống như những lâu đài truyện cổ tích."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Canada là Ottawa, nơi có Tòa nhà Quốc hội mang phong cách kiến trúc Gothic cổ kính rất đẹp mắt."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Úc (Australia) không phải là Sydney hay Melbourne mà là Canberra - một thành phố được quy hoạch xanh sạch đẹp."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Thái Lan là Bangkok, nổi tiếng với rất nhiều ngôi chùa vàng lộng lẫy và các khu chợ nổi nhộn nhịp."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Singapore cũng chính là Singapore, được mệnh danh là 'Thành phố trong rừng' vì có cực nhiều cây xanh và công viên."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Malaysia là Kuala Lumpur, nổi tiếng với tòa tháp đôi Petronas từng là tòa nhà cao nhất thế giới."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Indonesia là Jakarta, một siêu đô thị nằm trên đảo Java và đang chuẩn bị chuyển thủ đô mới tới Nusantara."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Philippines là Manila, thành phố ven biển nằm ở khu vực Đông Nam Á với vịnh Manila ngắm hoàng hôn cực đẹp."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Tây Ban Nha là Madrid, thành phố sôi động nổi tiếng với các câu lạc bộ bóng đá lớn và bảo tàng nghệ thuật Prado."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Ý là Rome, nơi có Đấu trường La Mã cổ đại và quốc gia thu nhỏ Vatican nằm ngay trong lòng thành phố."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Hy Lạp là Athens, cái nôi của nền văn minh phương Tây với ngôi đền Parthenon huyền thoại trên đỉnh đồi Acropolis."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Ai Cập là Cairo, nằm bên con sông Nile dài nhất thế giới và ngay sát các kim tự tháp Giza khổng lồ."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Nam Phi có tới ba thành phố đóng các vai trò khác nhau, trong đó Pretoria là thủ đô hành chính."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Ấn Độ là New Delhi, nổi tiếng với các công trình kiến trúc hoàng gia màu đỏ và đền Taj Mahal ở thành phố lân cận."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Brazil là Brasília, một thành phố hiện đại có hình dáng nhìn từ trên cao giống hệt một chiếc máy bay."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Argentina là Buenos Aires, nơi sinh ra điệu nhảy Tango quyến rũ và là quê hương của danh thủ bóng đá Messi."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Thụy Sĩ là Bern, thành phố cổ kính nằm bên dòng sông Aare với biểu tượng là những chú gấu dễ thương."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Hà Lan là Amsterdam, nổi tiếng với những con kênh chằng chịt, xe đạp khắp nơi và những chiếc cối xay gió khổng lồ."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Thụy Điển là Stockholm, được xây dựng trên 14 hòn đảo lớn nhỏ kết nối với nhau bằng hơn 50 cây cầu."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Na Uy là Oslo, thành phố xanh nơi trao giải Nobel Hòa Bình hằng năm."
+  },
+  {
+    "type": "fact",
+    "content": "Thủ đô của Đan Mạch là Copenhagen, nơi gắn liền với câu chuyện cổ tích Nàng tiên cá bé nhỏ của nhà văn Hans Christian Andersen."
+  },
+  {
+    "type": "fact",
+    "content": "Đảo Greenland tuy có tên là 'Đất xanh' nhưng thực tế lại phủ đầy băng tuyết trắng xóa quanh năm, thuộc chủ quyền của Đan Mạch."
+  },
+  {
+    "type": "fact",
+    "content": "Châu Á là châu lục lớn nhất và đông dân nhất trên Trái Đất, chiếm hơn một nửa dân số toàn cầu đấy bé ạ."
+  },
+  {
+    "type": "fact",
+    "content": "Châu Phi là lục địa nóng bỏng với sa mạc Sahara rộng lớn - sa mạc cát lớn nhất thế giới."
+  },
+  {
+    "type": "fact",
+    "content": "Châu Đại Dương là châu lục nhỏ nhất thế giới, bao gồm lục địa Úc và hàng ngàn hòn đảo lớn nhỏ ở Thái Bình Dương."
+  },
+  {
+    "type": "fact",
+    "content": "Đỉnh núi Everest thuộc dãy Himalaya là ngọn núi cao nhất thế giới, nằm giữa biên giới Nepal và Trung Quốc."
+  },
+  {
+    "type": "fact",
+    "content": "Sông Nile ở châu Phi là con sông dài nhất thế giới, cung cấp nước sinh hoạt và phù sa cho nền văn minh Ai Cập cổ đại."
+  },
+  {
+    "type": "fact",
+    "content": "Sông Amazon ở Nam Mỹ là con sông có lượng nước lớn nhất thế giới, chảy qua khu rừng nhiệt đới lớn nhất hành tinh."
+  },
+  {
+    "type": "fact",
+    "content": "Đại Tây Dương là đại dương ngăn cách châu Mỹ với châu Âu và châu Phi, là vùng biển từng có con tàu Titanic huyền thoại đi qua."
+  },
+  {
+    "type": "fact",
+    "content": "Thái Bình Dương là đại dương lớn nhất và sâu nhất trên Trái Đất, cái tên của nó có nghĩa là 'Biển bình yên'."
+  },
+  {
+    "type": "fact",
+    "content": "Bắc Băng Dương là đại dương nhỏ nhất và lạnh nhất, nằm ở cực bắc của Trái Đất và đóng băng gần như quanh năm."
+  },
+  {
+    "type": "fact",
+    "content": "Ấn Độ Dương là đại dương nằm ở phía nam châu Á và phía đông châu Phi, nổi tiếng với vùng nước ấm áp và nhiều loài sinh vật biển độc đáo."
+  },
+  {
+    "type": "fact",
+    "content": "Sa mạc Atacama ở Chile là nơi khô hạn nhất trên Trái Đất, có những nơi hàng chục năm trời không hề có một giọt mưa."
+  },
+  {
+    "type": "fact",
+    "content": "Hồ Baikal ở Nga là hồ nước ngọt sâu nhất và chứa lượng nước ngọt không đóng băng lớn nhất thế giới."
+  },
+  {
+    "type": "fact",
+    "content": "Biển Chết (Dead Sea) nằm giữa Jordan và Israel mặn khủng khiếp đến mức con người có thể nằm ngửa đọc báo trên mặt nước mà không sợ bị chìm."
+  },
+  {
+    "type": "fact",
+    "content": "Quần đảo Hawaii của Mỹ hoàn toàn được hình thành từ các ngọn núi lửa phun trào từ dưới đáy đại dương từ hàng triệu năm trước."
+  },
+  {
+    "type": "fact",
+    "content": "Nhật Bản có hơn 6.800 hòn đảo lớn nhỏ khác nhau, trong đó có 4 hòn đảo chính là Honshu, Hokkaido, Kyushu và Shikoku."
+  },
+  {
+    "type": "fact",
+    "content": "Vương quốc Anh thực chất là liên hiệp của 4 xứ sở: Anh (England), Scotland, xứ Wales và Bắc Ireland."
+  },
+  {
+    "type": "fact",
+    "content": "Nước Nga rộng lớn đến mức trải dài qua 11 múi giờ khác nhau; nơi này trời sáng ở miền tây thì miền đông đã chìm vào giấc ngủ."
+  },
+  {
+    "type": "fact",
+    "content": "Thành phố Vatican nằm lọt thỏm bên trong thủ đô Rome của Ý là quốc gia có diện tích nhỏ nhất thế giới."
+  },
+  {
+    "type": "fact",
+    "content": "Monaco là quốc gia nhỏ thứ hai thế giới nhưng lại nổi tiếng là nơi sinh sống của rất nhiều người giàu có và các giải đua xe Công thức 1."
+  },
+  {
+    "type": "fact",
+    "content": "Đảo quốc Maldives trên Ấn Độ Dương nổi tiếng với những resort nhà gỗ trên mặt nước biển trong vắt nhìn thấy cả đàn cá bơi lội."
+  },
+  {
+    "type": "fact",
+    "content": "Iceland được mệnh danh là 'Đất nước của băng và lửa' vì vừa có những sông băng khổng lồ, vừa có rất nhiều núi lửa hoạt động."
+  },
+  {
+    "type": "fact",
+    "content": "New Zealand là quốc gia nằm ở Nam Bích cầu, nổi tiếng với phong cảnh thiên nhiên hoang sơ trong bộ phim 'Chúa tể những chiếc nhẫn'."
+  },
+  {
+    "type": "fact",
+    "content": "Cây bao báp (Baobab) ở châu Phi có phần thân cực kỳ phình to để trữ nước trong mùa hạn hán, trông giống như cây mọc ngược."
+  },
+  {
+    "type": "fact",
+    "content": "Cá voi xanh là loài động vật lớn nhất từng tồn tại trên Trái Đất, một chiếc lưỡi của nó nặng bằng cả một con voi trưởng thành."
+  },
+  {
+    "type": "fact",
+    "content": "Báo hoa mai (Cheetah) là loài động vật chạy nhanh nhất trên cạn, có thể tăng tốc từ 0 lên 100km/h chỉ trong vòng chưa đầy 3 giây."
+  },
+  {
+    "type": "fact",
+    "content": "Chim ruồi (Hummingbird) là loài chim duy nhất trên thế giới có thể bay lùi và bay đứng giữa không trung nhờ vỗ cánh cực nhanh."
+  },
+  {
+    "type": "fact",
+    "content": "Gấu trúc khổng lồ dành tới 12 tiếng mỗi ngày chỉ để ngồi ăn lá và thân cây tre trúc."
+  },
+  {
+    "type": "fact",
+    "content": "Cá mập đã xuất hiện trên Trái Đất từ trước cả khi những chú khủng long đầu tiên xuất hiện hàng triệu năm."
+  },
+  {
+    "type": "fact",
+    "content": "Kiến có sức mạnh siêu phàm, chúng có thể khiêng những vật nặng gấp từ 20 đến 50 lần trọng lượng cơ thể của chính mình."
+  },
+  {
+    "type": "fact",
+    "content": "Ngựa vằn không có các sọc giống hệt nhau; mỗi con ngựa vằn sở hữu một bộ vân sọc độc nhất vô nhị giống như dấu vân tay của con người."
+  },
+  {
+    "type": "fact",
+    "content": "Cánh cụt hoàng đế bố chịu đói và đứng giữ trứng trong cái lạnh âm vài chục độ suốt mùa đông để bảo vệ con trong khi mẹ đi kiếm ăn."
+  },
+  {
+    "type": "fact",
+    "content": "Tắc kè hoa có thể đổi màu da không chỉ để ngụy trang trốn kẻ thù mà còn để thể hiện cảm xúc hoặc giao tiếp với nhau."
+  },
+  {
+    "type": "fact",
+    "content": "Hải ly được mệnh danh là 'kỹ sư thiên nhiên' vì chúng biết tự chặt cây xây đập ngăn dòng nước để tạo thành nhà ở an toàn."
+  },
+  {
+    "type": "fact",
+    "content": "Sao Mộc (Jupiter) là hành tinh lớn nhất trong Hệ Mặt Trời, có một cơn bão khổng lồ mang tên 'Vết Đỏ Lớn' đã hoành hành hàng trăm năm."
+  },
+  {
+    "type": "fact",
+    "content": "Sao Thổ (Saturn) có hệ thống vành đai rực rỡ và đẹp mắt nhất, được cấu tạo từ hàng tỷ viên đá băng và bụi nhỏ."
+  },
+  {
+    "type": "fact",
+    "content": "Sao Hỏa (Mars) được gọi là 'Hành tinh đỏ' vì bề mặt của nó phủ đầy bụi đất chứa sắt gỉ màu đỏ cam."
+  },
+  {
+    "type": "fact",
+    "content": "Sao Kim (Venus) là hành tinh sáng nhất trên bầu trời đêm sau Mặt Trăng, và đây cũng là hành tinh nóng nhất Hệ Mặt Trời."
+  },
+  {
+    "type": "fact",
+    "content": "Mặt Trời là một ngôi sao khổng lồ ở trung tâm Hệ Mặt Trời, tỏa ra ánh sáng và nhiệt lượng giữ cho Trái Đất ấm áp."
+  },
+  {
+    "type": "fact",
+    "content": "Ánh sáng từ Mặt Trời phải mất khoảng 8 phút 20 giây mới bay tới được bề mặt của Trái Đất chúng ta."
+  },
+  {
+    "type": "fact",
+    "content": "Hố đen vũ trụ (Black Hole) có lực hấp dẫn mạnh khủng khiếp đến mức ngay cả ánh sáng bay qua cũng bị hút vào trong và không thể thoát ra."
+  },
+  {
+    "type": "fact",
+    "content": "Trạm Không gian Quốc tế (ISS) bay quanh Trái Đất ở độ cao khoảng 400 km và các phi hành gia ngắm nhìn mặt trời mọc 16 lần mỗi ngày."
+  },
+  {
+    "type": "fact",
+    "content": "Vệ tinh tự nhiên duy nhất của Trái Đất chính là Mặt Trăng, nơi các phi hành gia từng đặt chân đến bằng tàu Apollo."
+  },
+  {
+    "type": "fact",
+    "content": "Kim tự tháp lớn Giza ở Ai Cập là kỳ quan cổ đại duy nhất còn tồn tại gần như nguyên vẹn cho đến tận ngày nay."
+  },
+  {
+    "type": "fact",
+    "content": "Vạn Lý Trường Thành của Trung Quốc là công trình phòng thủ quân sự dài nhất thế giới, có thể nhìn thấy từ không gian xa."
+  },
+  {
+    "type": "fact",
+    "content": "Đấu trường Colosseum ở Rome (Ý) xưa kia là nơi diễn ra các trận đấu của các dũng sĩ giác đấu và các loài thú dữ."
+  },
+  {
+    "type": "fact",
+    "content": "Đền Taj Mahal ở Ấn Độ được xây dựng hoàn toàn bằng đá cẩm thạch trắng tinh khiết để làm lăng mộ vô cùng tráng lệ."
+  },
+  {
+    "type": "fact",
+    "content": "Tháp Eiffel ở Paris (Pháp) ban đầu được xây dựng làm cổng chào cho Triển lãm Thế giới năm 1889 và suýt bị đem đi dỡ bỏ."
+  },
+  {
+    "type": "fact",
+    "content": "Tượng Nữ thần Tự do ở New York (Mỹ) là món quà hữu nghị do nhân dân nước Pháp gửi tặng nước Mỹ vào thế kỷ 19."
+  },
+  {
+    "type": "fact",
+    "content": "Thành cổ Petra ở Jordan được đẽo gọt trực tiếp và khéo léo vào những vách đá sa thạch màu hồng đỏ hùng vĩ."
+  },
+  {
+    "type": "fact",
+    "content": "Thành phố cổ Machu Picchu của người Inca nằm ẩn mình trên đỉnh núi cao chót vót của dãy Andes ở Peru."
+  },
+  {
+    "type": "fact",
+    "content": "Cầu biểu tượng Golden Gate ở San Francisco (Mỹ) nổi tiếng với sắc cam đỏ đặc trưng bắc qua vịnh biển lộng gió."
+  },
+  {
+    "type": "fact",
+    "content": "Cối xay gió Kinderdijk ở Hà Lan là di sản thế giới UNESCO, giúp bơm nước ra khỏi các vùng đất thấp để bảo vệ đồng ruộng."
+  },
+  {
+    "type": "fact",
+    "content": "Cá voi sát thủ (Orca) thực ra là loài cá heo lớn nhất trong họ đại dương, chúng sống theo bầy đàn và cực kỳ thông minh."
+  },
+  {
+    "type": "fact",
+    "content": "Bạch tuộc có khả năng đổi màu siêu đẳng và chui qua những chiếc lỗ nhỏ xíu bằng đồng xu chỉ vì chúng không có xương sống."
+  },
+  {
+    "type": "fact",
+    "content": "Chim cánh cụt hoàng đế có thể lặn sâu dưới đại dương hơn 500 mét để săn bắt cá và mực nước lạnh."
+  },
+  {
+    "type": "fact",
+    "content": "Gấu Bắc cực có lớp lông màu trắng giúp ngụy trang trong tuyết, nhưng thực chất lớp da bên dưới của chúng lại có màu đen đấy."
+  },
+  {
+    "type": "fact",
+    "content": "Lạc đà trữ chất béo ở phần bướu trên lưng chứ không phải trữ nước như nhiều người vẫn thường lầm tưởng đâu nhé."
+  },
+  {
+    "type": "fact",
+    "content": "Đom đóm phát sáng nhờ một phản ứng hóa học tự nhiên ngay bên trong cơ thể để thu hút bạn tình trong đêm tối."
+  },
+  {
+    "type": "fact",
+    "content": "Cây thông Noel truyền thống thường dùng là cây linh sam hoặc cây thông tươi có khả năng giữ lá xanh quanh năm kể cả mùa đông lạnh."
+  },
+  {
+    "type": "fact",
+    "content": "Quả chuối trên cây thực chất mọc hướng ngược lên trời về phía ánh sáng mặt trời chứ không hề chúc xuống đất."
+  },
+  {
+    "type": "fact",
+    "content": "Cà chua và dưa leo theo khoa học thực ra được xếp vào nhóm các loại quả (trái cây) chứ không phải rau củ."
+  },
+  {
+    "type": "fact",
+    "content": "Sô-cô-la được làm từ hạt của cây ca cao, và loài cây này ban đầu được trồng nhiều ở các khu rừng nhiệt đới châu Mỹ."
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Thủ đô của đất nước hình chiếc nón lá và tà áo dài Việt Nam tên là gì?",
+    "answer": "Đó chính là thủ đô Hà Nội ngàn năm văn hiến!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Thành phố nào nổi tiếng với ngọn tháp Eiffel cao chọc trời và là thủ đô của nước Pháp?",
+    "answer": "Chính là thành phố Paris hoa lệ!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Đất nước Nhật Bản xinh đẹp với hoa anh đào có thủ đô tên là gì?",
+    "answer": "Là Tokyo nha bé ơi! Đây là một siêu đô thị cực kỳ hiện đại."
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Thủ đô của nước Mỹ (United States), nơi có tòa Nhà Trắng nổi tiếng là gì nào?",
+    "answer": "Đó là thành phố Washington, D.C.!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Đất nước đông dân thứ hai thế giới nổi tiếng với ngôi đền Taj Mahal tuyệt đẹp có thủ đô là gì?",
+    "answer": "Đó là New Delhi của đất nước Ấn Độ!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Thành phố nào là thủ đô của nước Anh, nơi có chiếc đồng hồ Big Ben ngân vang mỗi giờ?",
+    "answer": "Chính là thủ đô London!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Đất nước nào rộng lớn nhất thế giới, trải dài qua tận 11 múi giờ và có thủ đô là Moskva?",
+    "answer": "Đó là nước Nga vĩ đại!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Thủ đô của Hàn Quốc, nơi có các nhóm nhạc K-pop nổi tiếng và cung điện cổ kính là gì?",
+    "answer": "Đó là thủ đô Seoul năng động!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Đất nước Canada nổi tiếng với lá phong đỏ trên quốc kỳ có thủ đô tên là gì?",
+    "answer": "Là thành phố Ottawa nha bé!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Đảo quốc sư tử Singapore xanh sạch đẹp có thủ đô tên là gì?",
+    "answer": "Thủ đô của Singapore cũng có tên là Singapore luôn đó bé!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Đất nước nào ở châu Đại Dương nổi tiếng với chuột túi Kangaroo và có thủ đô là Canberra?",
+    "answer": "Đó chính là nước Úc (Australia)!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Thủ đô của Thái Lan, nơi có rất nhiều ngôi chùa vàng linh thiêng và chợ nổi là gì?",
+    "answer": "Đó là thủ đô Bangkok nhộn nhịp!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Quốc gia nào có hình dáng giống hệt chiếc ủng trên bản đồ châu Âu và thủ đô là Rome?",
+    "answer": "Đó là đất nước Ý (Italy) xinh đẹp!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Đất nước Trung Quốc láng giềng có thủ đô là gì, nơi có Tử Cấm Thành rộng lớn?",
+    "answer": "Chính là thủ đô Bắc Kinh!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Quốc gia nào nhỏ nhất thế giới nằm lọt thỏm ngay trong lòng thủ đô Rome của Ý?",
+    "answer": "Đó là Thành quốc Vatican!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Con sông nào dài nhất thế giới, chảy qua vùng đất kim tự tháp Ai Cập ở châu Phi?",
+    "answer": "Đó là dòng sông Nile huyền thoại!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Ngọn núi nào cao nhất thế giới nằm trên dãy Himalaya hùng vĩ?",
+    "answer": "Chính là đỉnh núi Everest!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Châu lục nào lạnh giá nhất thế giới, quanh năm phủ đầy băng tuyết và là nhà của chim cánh cụt?",
+    "answer": "Đó là Châu Nam Cực (Antarctica)!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Hành tinh nào trong Hệ Mặt Trời được mệnh danh là 'Hành tinh đỏ'?",
+    "answer": "Đó là Sao Hỏa (Mars)!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Hành tinh nào lớn nhất trong Hệ Mặt Trời của chúng ta?",
+    "answer": "Đó là Sao Mộc (Jupiter) khổng lồ!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Loài động vật nào chạy nhanh nhất trên cạn với những đốm đen trên bộ lông vàng?",
+    "answer": "Đó là chú báo hoa mai (Cheetah)!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Loài động vật nào to lớn nhất đang sống dưới đại dương xanh thẳm?",
+    "answer": "Đó chính là chú cá voi xanh khổng lồ!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Loài gấu nào thích ăn lá tre trúc và có quầng thâm đen tròn quanh mắt?",
+    "answer": "Meo meo... à nhầm, đó là gấu trúc khổng lồ siêu dễ thương!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Con gì có chiếc cổ dài ngoằn ngoèo giúp với tới những chiếc lá ở ngọn cây cao nhất?",
+    "answer": "Đó là chú hươu cao cổ thông minh!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Đảo quốc nào ở Nam Bích cầu nổi tiếng với bộ phim 'Chúa tể những chiếc nhẫn' và những chú cừu non?",
+    "answer": "Đó là đất nước New Zealand xanh mướt!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Cây gì nổi tiếng ở Hà Lan với những cánh đồng rực rỡ sắc màu và những chiếc cối xay gió?",
+    "answer": "Đó là hoa tulip nha bé!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Kênh đào nào nối liền Đại Tây Dương và Thái Bình Dương, giúp tàu thuyền qua lại giữa các đại dương mà không phải đi vòng qua Nam Mỹ?",
+    "answer": "Đó là kênh đào Panama!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Đại dương nào có diện tích lớn nhất trên hành tinh xanh của chúng ta?",
+    "answer": "Chính là Thái Bình Dương mênh mông!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Kim tự tháp nổi tiếng nào của Ai Cập được xây dựng để làm lăng mộ cho các vị Pharaoh?",
+    "answer": "Đó là các Kim tự tháp Giza kỳ vĩ!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Công trình kiến trúc nào của Trung Quốc dài đến mức có thể nhìn thấy từ trên vũ trụ?",
+    "answer": "Đó là Vạn Lý Trường Thành!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Thủ đô của Malaysia, nơi có tòa tháp đôi Petronas chọc trời tên là gì?",
+    "answer": "Đó là thành phố Kuala Lumpur!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Đất nước nào nổi tiếng với các trận bóng đá cuồng nhiệt, vũ điệu Samba sôi động và thủ đô Brasília?",
+    "answer": "Đó chính là đất nước Brazil!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Thành phố nào của Argentina là quê hương của vũ điệu Tango và cầu thủ huyền thoại Lionel Messi?",
+    "answer": "Đó là thủ đô Buenos Aires!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Đất nước Hy Lạp cổ đại có thủ đô là gì, nơi có đền Parthenon nổi tiếng?",
+    "answer": "Đó là thành phố Athens lịch sử!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Đất nước Thụy Sĩ nổi tiếng với đồng hồ cao cấp, sô-cô-la ngon và dãy núi Alps có thủ đô tên là gì?",
+    "answer": "Đó là thủ đô Bern xinh đẹp!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Thành phố nào của Đức nổi tiếng với bức tường lịch sử từng chia cắt thành phố và Cổng Brandenburg?",
+    "answer": "Đó là thủ đô Berlin!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Quốc gia nào ở Bắc Âu nổi tiếng với những vị thần Odin, Thor và có thủ đô là Oslo?",
+    "answer": "Đó là đất nước Na Uy!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Thủ đô của Đan Mạch, nơi có bức tượng Nàng tiên cá bên bờ biển là thành phố nào?",
+    "answer": "Đó là Copenhagen!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Vùng đất nào ở phía bắc cực địa cầu nổi tiếng với những khối băng trôi khổng lồ và gấu Bắc cực?",
+    "answer": "Đó là vùng Bắc Cực (Arctic)!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Loài chim nào không thể bay lên trời nhưng lại bơi lội siêu giỏi dưới vùng nước băng giá ở Nam Cực?",
+    "answer": "Đó là những chú chim cánh cụt đáng yêu!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Loài côn trùng nhỏ xíu nào chăm chỉ làm việc suốt ngày và tạo ra mật ngọt cho đời?",
+    "answer": "Đó chính là chú ong mật chăm chỉ!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Con gì có tám chiếc vòi dài, có ba trái tim và dòng máu kỳ lạ mang màu xanh lam?",
+    "answer": "Đó là chú bạch tuộc thông minh dưới đáy biển!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Hành tinh nào ở gần Mặt Trời nhất trong Hệ Mặt Trời của chúng ta?",
+    "answer": "Đó là Sao Thủy (Mercury)!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Hành tinh nào có hệ thống vành đai lấp lánh đẹp nhất được nhìn qua kính thiên văn?",
+    "answer": "Đó chính là Sao Thổ (Saturn)!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Tên gọi của vệ tinh tự nhiên quay quanh Trái Đất vào mỗi đêm trăng sáng là gì?",
+    "answer": "Đó là Mặt Trăng (Moon)!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Nơi nào trên Trái Đất có sa mạc cát nóng bỏng lớn nhất thế giới mang tên Sahara?",
+    "answer": "Đó là ở lục địa châu Phi rộng lớn!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bạn nhỏ: Con sông nào chảy qua khu rừng nhiệt đới lớn nhất Nam Mỹ với lượng nước khổng lồ?",
+    "answer": "Đó là dòng sông Amazon!"
+  },
+  {
+    "type": "quiz",
+    "question": "Đố bé: Đất nước nào có hình chiếc ủng nổi tiếng với món mì Spaghetti và tháp nghiêng Pisa?",
+    "answer": "Đó là nước Ý (Italy)!"
+  },
+  {
+    "type": "quiz",
+    "question": "Moon đố bé: Thủ đô của nước Tây Ban Nha, nơi nổi tiếng với các đội bóng đá mạnh và vũ điệu sôi động là gì?",
+    "answer": "Đó là thành phố Madrid!"
   }
 ]
