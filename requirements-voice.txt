@@ -1,0 +1,4 @@
+aiohttp>=3.10,<4
+groq>=0.11,<1
+webrtcvad-wheels>=2.0.14,<3
+# Optional acoustic Moon wakeword: pip install pvporcupine

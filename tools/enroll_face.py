@@ -6,7 +6,7 @@ import os
 import tempfile
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from server.vision import BASE, cv2
+from server.vision import DATA_DIR, MODEL_DIR, cv2
 from config import settings
 import numpy as np
 
@@ -16,15 +16,16 @@ def main():
     parser.add_argument("photos",nargs="+",help="At least 3 sharp, well-lit photos of the same person")
     parser.add_argument("--replace",action="store_true",help="Replace existing owner embedding")
     args = parser.parse_args()
-    target = BASE/"master_face.npy"
+    DATA_DIR.mkdir(parents=True,exist_ok=True)
+    target = DATA_DIR/"master_face.npy"
     if target.exists() and not args.replace:
         parser.error("An owner already exists; pass --replace to register again")
     if len(set(map(str,map(Path,args.photos)))) < 3:
         parser.error("Provide at least 3 different photos")
     if cv2 is None:
         parser.error("OpenCV is not installed")
-    detector = cv2.FaceDetectorYN_create(str(BASE/"face_detection_yunet_2023mar.onnx"),"",(320,320),.9)
-    recognizer = cv2.FaceRecognizerSF_create(str(BASE/"face_recognition_sface_2021dec.onnx"),"")
+    detector = cv2.FaceDetectorYN_create(str(MODEL_DIR/"face_detection_yunet_2023mar.onnx"),"",(320,320),.9)
+    recognizer = cv2.FaceRecognizerSF_create(str(MODEL_DIR/"face_recognition_sface_2021dec.onnx"),"")
     features = []
     for filename in args.photos:
         frame = cv2.imdecode(np.fromfile(filename,dtype=np.uint8),cv2.IMREAD_COLOR)
@@ -45,7 +46,7 @@ def main():
     mean = np.mean(features,axis=0)
     mean = (mean/np.linalg.norm(mean)).astype(np.float32).reshape(1,128)
     # Replace only after all photos have passed; original enrollment survives failures.
-    descriptor,temp = tempfile.mkstemp(dir=BASE,suffix=".npy")
+    descriptor,temp = tempfile.mkstemp(dir=DATA_DIR,suffix=".npy")
     try:
         with os.fdopen(descriptor,"wb") as output:
             np.save(output,mean,allow_pickle=False)

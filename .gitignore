@@ -4,6 +4,8 @@ __pycache__/
 *.pyo
 server/venv/
 venv/
+.voice-venv/
+*.ppn
 
 # ═══ Node ═══
 web/node_modules/
