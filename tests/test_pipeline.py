@@ -1,4 +1,4 @@
-﻿"""
+"""
 test_pipeline.py — Kiểm tra toàn bộ pipeline Voice → LLM → TTS
 ================================================================
 Chạy từng test một để xác nhận từng module hoạt động đúng.
@@ -60,7 +60,7 @@ def assert_ok(condition, msg_pass, msg_fail):
 
 def test_llm():
     section("TEST 1 — LLM (DeepSeek API)")
-    from server import llm
+    from server.llm.engine import engine as llm
 
     assert_ok(llm._client is not None,
               "LLM client khởi tạo OK",
@@ -107,7 +107,7 @@ def test_llm():
 
 def test_tts():
     section("TEST 2 — TTS (Fish Audio)")
-    from server import tts
+    from server.voice import tts
 
     assert_ok(tts.fish_client is not None,
               "Fish Audio client OK",
@@ -237,7 +237,9 @@ def test_wake_word():
 
 def test_full_pipeline():
     section("TEST 5 — Pipeline đầy đủ: Voice → LLM → TTS")
-    from server import voice, llm, tts
+    from server import voice
+    from server.llm import engine as llm
+    from server.voice import tts
 
     if not all([voice.groq_client, voice.sd, llm._client, tts.fish_client]):
         warn("Bỏ qua — 1 hoặc nhiều module chưa sẵn sàng"); return

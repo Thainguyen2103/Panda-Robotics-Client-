@@ -26,7 +26,7 @@ import threading
 import unicodedata
 from datetime import datetime
 
-from server.llm_language import (
+from server.llm.language import (
     language_failure_message,
     normalize_user_question,
     response_language,

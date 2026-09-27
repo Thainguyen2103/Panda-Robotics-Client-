@@ -1,4 +1,4 @@
-﻿# tools/dev_mic_bridge.py — GIẢ LẬP mic robot bằng mic laptop
+# tools/dev_mic_bridge.py — GIẢ LẬP mic robot bằng mic laptop
 # ============================================================
 # Bắt clip giọng từ mic laptop (cùng VAD 3 lớp của voice.py) rồi publish
 # base64 PCM 16kHz lên đúng topic mà robot ESP32 sẽ dùng sau này
@@ -31,7 +31,8 @@ if sys.stdout and hasattr(sys.stdout, "reconfigure"):
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import settings
-from server import voice, mqtt_bridge
+from server import voice
+from server.network import mqtt_bridge
 
 
 def main():

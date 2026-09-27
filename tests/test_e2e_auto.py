@@ -1,4 +1,4 @@
-﻿"""
+"""
 test_e2e_auto.py — Kiểm thử E2E KHÔNG tương tác cho Robot Moon
 ================================================================
 Xác minh 4 module lõi không cần người nói vào mic:
@@ -34,7 +34,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import paho.mqtt.client as mqtt
 
 from config import settings
-from server import voice, llm, tts, brain
+from server import voice, brain
+from server.llm import engine as llm
+from server.voice import tts
 
 GREEN  = "\033[92m"
 RED    = "\033[91m"

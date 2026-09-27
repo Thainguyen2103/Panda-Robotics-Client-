@@ -39,7 +39,7 @@ if sys.stderr and hasattr(sys.stderr, "reconfigure"):
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import settings
-from server import mqtt_bridge
+from server.network import mqtt_bridge
 from server.vision import start_vision
 from server import voice
 from server.voice.runtime.local import (
@@ -54,8 +54,8 @@ from server.voice.speech.filters import (
 )
 from server.voice.speech.validation import safe_asr_correction
 from server.tts import speak, SentencePlayer
-from server import tts   # module object — cho tts.play_beep()/play_tick()
-from server import llm
+from server.voice import tts   # module object — cho tts.play_beep()/play_tick()
+from server.llm.engine import engine as llm
 from server.topics import classify_topic, TOPIC_LABELS
 
 

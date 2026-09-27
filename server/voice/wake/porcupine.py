@@ -89,7 +89,7 @@ def run_loop(on_wake, should_listen=None, stop_event=None):
 
     import numpy as np
     import sounddevice as sd
-    from server import tts
+    from server.voice import tts
 
     h = _porcupine
     print("🔔 [WAKEWORD] Porcupine đang nghe 'Moon' (on-device, mọi ngôn ngữ)...")

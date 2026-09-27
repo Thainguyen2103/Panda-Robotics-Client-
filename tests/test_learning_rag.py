@@ -1,6 +1,6 @@
 import unittest
 
-from server import llm
+from server.llm.engine import engine as llm
 from server.learning.rag_engine import MoonRAG
 from server.learning.service import get_display_info, retrieve_context
 
