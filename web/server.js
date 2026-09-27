@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const mqtt = require('mqtt');
@@ -7,10 +7,52 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
+const {attachVoice, startVoiceService} = require('./voice-bridge');
+const {attachGeminiLive} = require('./gemini-live-bridge');
+const {attachGeminiTranscribe} = require('./gemini-transcribe-bridge');
+const {readFishConfig, synthesizeFishWithRetry} = require('./fish-tts');
 
 // Define MQTT settings
 const MQTT_BROKER = 'mqtt://localhost:1883';
 const mqttClient = mqtt.connect(MQTT_BROKER);
+attachVoice(server);
+attachGeminiLive(server, mqttClient);
+attachGeminiTranscribe(server);
+startVoiceService();
+
+// Tạo một lần rồi giữ trong RAM để lời xác nhận wakeword phát gần như tức thì.
+// API key chỉ được dùng ở server, không bao giờ gửi xuống trình duyệt.
+const fishConfig = readFishConfig();
+let wakeAckAudio = null;
+let wakeAckPending = null;
+
+async function getWakeAckAudio() {
+    if (wakeAckAudio) return wakeAckAudio;
+    if (!wakeAckPending) {
+        wakeAckPending = synthesizeFishWithRetry('Moon nghe đây!', fishConfig, {
+            attempts: 1,
+            timeoutMs: 6000,
+        }).then(audio => {
+            wakeAckAudio = audio;
+            return audio;
+        }).finally(() => {
+            wakeAckPending = null;
+        });
+    }
+    return wakeAckPending;
+}
+
+app.get('/api/live-ack', async (_req, res) => {
+    try {
+        const audio = await getWakeAckAudio();
+        res.set('Content-Type', 'audio/mpeg');
+        res.set('Cache-Control', 'private, max-age=3600');
+        res.send(audio);
+    } catch (error) {
+        console.warn(`⚠️ [WEB] Không tạo được lời xác nhận Fish: ${error.message}`);
+        res.status(503).json({error: 'Fish acknowledgement unavailable'});
+    }
+});
 
 // Serve static files
 // index.html: KHÔNG cache — để mọi lần tải đều lấy bản mới (chống lỗi file cũ)
@@ -24,17 +66,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 // MQTT Connection
 mqttClient.on('connect', () => {
     console.log('✅ [WEB] Connected to MQTT Broker');
-    mqttClient.subscribe('moon/status');
-    mqttClient.subscribe('moon/cmd/#');
-    mqttClient.subscribe('moon/log/voice');
-    mqttClient.subscribe('moon/log/voice_partial');
-    mqttClient.subscribe('moon/camera');
-    mqttClient.subscribe('moon/user_status');
-    mqttClient.subscribe('moon/vision/status');
-    mqttClient.subscribe('moon/ai/state');
-    mqttClient.subscribe('moon/ai/thinking');
-    mqttClient.subscribe('moon/ai/response');
-    mqttClient.subscribe('moon/ai/topic');
+    mqttClient.subscribe('panda/status');
+    mqttClient.subscribe('panda/cmd/#');
+    mqttClient.subscribe('panda/log/voice');
+    mqttClient.subscribe('panda/log/voice_partial');
+    mqttClient.subscribe('panda/camera');
+    mqttClient.subscribe('panda/user_status');
+    mqttClient.subscribe('panda/vision/status');
+    mqttClient.subscribe('panda/ai/state');
+    mqttClient.subscribe('panda/ai/thinking');
+    mqttClient.subscribe('panda/ai/response');
+    mqttClient.subscribe('panda/ai/topic');
+    mqttClient.subscribe('panda/audio/tts_active');
 });
 
 mqttClient.on('message', (topic, message) => {
@@ -60,16 +103,21 @@ io.on('connection', (socket) => {
     // Browser push-to-talk: nhận base64 webm từ dashboard → chuyển sang MQTT cho brain
     socket.on('voice_audio', (b64) => {
         console.log(`🎤 [WEB] Browser audio received (${Math.round(b64.length / 1024)} KB b64) → MQTT`);
-        mqttClient.publish('moon/ai/voice_audio', b64);
+        mqttClient.publish('panda/ai/voice_audio', b64);
     });
 
     // Live-mic: clip PCM đã khử nhiễu từ trình duyệt → MQTT
     socket.on('voice_clip', (b64) => {
-        mqttClient.publish('moon/ai/clip', b64);
+        mqttClient.publish('panda/ai/clip', b64);
     });
     socket.on('mic_live', (st) => {
         console.log(`🎙️ [WEB] Live mic: ${st}`);
-        mqttClient.publish('moon/ai/mic_live', st);
+        mqttClient.publish('panda/ai/mic_live', st);
+    });
+    socket.on('voice_question', (text) => {
+        if (typeof text !== 'string') return;
+        text = text.trim().slice(0, 1000);
+        if (text) mqttClient.publish('panda/ai/question', text);
     });
 });
 
