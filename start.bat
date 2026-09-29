@@ -11,7 +11,7 @@ echo [1/3] Khoi dong Web Dashboard...
 start /B "" cmd /c "cd web && node server.js"
 
 echo [2/3] Khoi dong Virtual Robot...
-start /B "" cmd /c "cd server && .\venv\Scripts\activate.bat && python virtual_robot.py"
+:: [REMOVED] Khoi dong Virtual Robot...
 
 echo [3/3] Khoi dong AI Brain...
 :: Doi 2 giay de robot len mang truoc khi AI ket noi
@@ -32,5 +32,5 @@ echo 2. CLICK DUP VAO FILE stop.bat de dam bao tat sach tien trinh ngam.
 echo ---------------------------------------------------
 echo.
 
-:: Giữ cửa sổ mở
+:: Gi? c?a s? m?
 cmd /k

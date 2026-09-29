@@ -83,8 +83,8 @@ function startVoiceService() {
     probe.once('connect', () => probe.end()); // Reuse a running Voice service.
     probe.once('error', () => {
         const root = path.resolve(__dirname, '..');
-        const python = [path.join(root, '.voice-venv', 'Scripts', 'python.exe'),
-            path.join(root, '.voice-venv', 'bin', 'python')].find(p => fs.existsSync(p)) || 'python';
+        const python = [path.join(root, 'server', 'venv', 'Scripts', 'python.exe'),
+            path.join(root, 'server', 'venv', 'bin', 'python')].find(p => fs.existsSync(p)) || 'python';
         child = spawn(python, ['-m', 'server.voice.runtime.web'], {cwd: root, windowsHide: true, stdio: 'inherit'});
         child.on('error', err => console.error('[VOICE] Cannot start:', err.message));
         child.on('exit', code => console.log('[VOICE] Service exited:', code));

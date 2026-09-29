@@ -77,7 +77,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
     }));
 
     const publishFace = expression => {
-        if (mqttClient?.connected) mqttClient.publish('panda/cmd/face', expression);
+        if (mqttClient?.connected) mqttClient.publish('moon/cmd/face', expression);
     };
 
     server.on('upgrade', (req, socket, head) => {

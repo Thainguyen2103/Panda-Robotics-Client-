@@ -2,7 +2,7 @@ import unittest
 import time
 from unittest.mock import patch
 
-from server import tts
+from server.voice import tts
 
 
 class SentencePlayerTests(unittest.TestCase):

@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from server import llm
+from server.llm.engine import engine as llm
 
 
 class ResponseLanguageTests(unittest.TestCase):

@@ -35,7 +35,7 @@ def camera_source():
 def start_vision(callback, stop_event=None, publish=None):
     """Capture frames, run inference and publish stable robot/dashboard output."""
     if publish is None:
-        from server.mqtt_bridge import publish
+        from server.network.mqtt_bridge import publish
     stop = stop_event if stop_event is not None else threading.Event()
     mailbox = LatestFrame()
     result_lock = threading.Lock()
@@ -50,7 +50,7 @@ def start_vision(callback, stop_event=None, publish=None):
                 last_good_inference = time.monotonic()
         try:
             publish(settings.TOPIC_VISION_STATUS,result)
-            publish("panda/user_status",result)
+            publish("moon/user_status",result)
             callback(result["person_detected"],result["emotion"],result["action"])
         except Exception:
             LOG.exception("Vision output failed")
@@ -63,7 +63,11 @@ def start_vision(callback, stop_event=None, publish=None):
                     if cv2 is None:
                         stop.wait(1)
                         continue
-                    cap = cv2.VideoCapture(camera_source())
+                    src = camera_source()
+                    if sys.platform == "win32" and isinstance(src, int):
+                        cap = cv2.VideoCapture(src, cv2.CAP_DSHOW)
+                    else:
+                        cap = cv2.VideoCapture(src)
                     if not cap.isOpened():
                         cap.release()
                         cap = None

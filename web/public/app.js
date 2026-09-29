@@ -229,17 +229,17 @@ function finalizeMoonResponse() {
 // ─── MQTT message handler ─────────────────────────────────────────────────────
 socket.on('mqtt_message', (data) => {
     const { topic, payload } = data;
-    if (liveTalkMode === 'brain' && topic === 'panda/ai/state') {
+    if (liveTalkMode === 'brain' && topic === 'moon/ai/state') {
         window.dispatchEvent(new CustomEvent('moon-brain-pipeline', {
             detail: {event: 'state', state: payload},
         }));
     }
     // Live Talk có phiên audio/LLM riêng. Trạng thái AI từ Brain cũ không được
     // ghi đè giao diện trong lúc phiên Gemini Live đang hoạt động.
-    if (liveTalkWaitingWake && topic.startsWith('panda/ai/')) return;
-    if (liveTalkActive && liveTalkMode === 'gemini' && topic.startsWith('panda/ai/')) return;
+    if (liveTalkWaitingWake && topic.startsWith('moon/ai/')) return;
+    if (liveTalkActive && liveTalkMode === 'gemini' && topic.startsWith('moon/ai/')) return;
     // ── Sensor status ─────────────────────────────────────────────────────────
-    if (topic === 'panda/status') {
+    if (topic === 'moon/status') {
         try {
             const status = JSON.parse(payload);
             distVal.textContent = status.dist + ' cm';
@@ -248,7 +248,7 @@ socket.on('mqtt_message', (data) => {
         } catch(e) {}
 
     // ── Voice transcript (đầy đủ, sau khi Groq xử lý) ───────────────────────
-    } else if (topic === 'panda/log/voice') {
+    } else if (topic === 'moon/log/voice') {
         if (voiceText) {
             voiceText.textContent = `"${payload}"`;
             voiceText.classList.add('flash');
@@ -257,11 +257,11 @@ socket.on('mqtt_message', (data) => {
         logToTerminal(`VOICE: ${payload}`, 'log-voice');
 
     // ── Voice partial (real-time, hiện thị ngay) ─────────────────────────────
-    } else if (topic === 'panda/log/voice_partial') {
+    } else if (topic === 'moon/log/voice_partial') {
         if (voiceText) voiceText.textContent = payload;
 
     // ── Camera feed ───────────────────────────────────────────────────────────
-    } else if (topic === 'panda/camera') {
+    } else if (topic === 'moon/camera') {
         lastCameraFrame = Date.now();
         visionPanel.cameraFrame();
         const camImg         = document.getElementById('cam-image');
@@ -271,20 +271,20 @@ socket.on('mqtt_message', (data) => {
         if (camPlaceholder) camPlaceholder.style.display = 'none';
 
     // ── Face command ──────────────────────────────────────────────────────────
-    } else if (topic === 'panda/cmd/face') {
+    } else if (topic === 'moon/cmd/face') {
         if (liveTalkWaitingWake || (liveTalkActive && liveTalkMode === 'gemini')) return;
         drawFace(payload);
         logToTerminal(`RX: ${topic} → ${payload}`, 'status');
 
     // ── CV user status ────────────────────────────────────────────────────────
-    } else if (topic === 'panda/vision/status') {
+    } else if (topic === 'moon/vision/status') {
         try { visionPanel.receive(JSON.parse(payload)); } catch(e) {}
 
-    } else if (topic === 'panda/user_status') {
+    } else if (topic === 'moon/user_status') {
         // Legacy duplicate of vision/status: do not flood Activity Log every frame.
 
     // ── Topic emoji + caption cho OLED (JSON: {id, cap}) ───────────────────
-    } else if (topic === 'panda/ai/topic') {
+    } else if (topic === 'moon/ai/topic') {
         try {
             const t = JSON.parse(payload);
             if (oledTopicEl) {
@@ -309,7 +309,7 @@ socket.on('mqtt_message', (data) => {
         } catch(e) {}
 
     // ── Voice AI global state ────────────────────────────────────────────────────────────────
-    } else if (topic === 'panda/ai/state') {
+    } else if (topic === 'moon/ai/state') {
         setVoiceState(payload);
         // Đồng bộ OLED face theo AI state
         // (thinking: OLED GIỮ transcript đã nghe — mode 'hearing' — không đổi sang dots)
@@ -328,7 +328,7 @@ socket.on('mqtt_message', (data) => {
         logToTerminal(`AI State: ${payload}`, 'ai-state');
 
     // ── AI thinking / stages ────────────────────────────────────────────────────────────────
-    } else if (topic === 'panda/ai/thinking') {
+    } else if (topic === 'moon/ai/thinking') {
         try {
             const msg = JSON.parse(payload);
             switch (msg.stage) {
@@ -394,7 +394,7 @@ socket.on('mqtt_message', (data) => {
         } catch(e) {}
 
     // ── AI response stream ────────────────────────────────────────────────────
-    } else if (topic === 'panda/ai/response') {
+    } else if (topic === 'moon/ai/response') {
         try {
             const msg = JSON.parse(payload);
             if (typeof msg.text !== 'string') return;
@@ -422,6 +422,16 @@ socket.on('mqtt_message', (data) => {
             }
         } catch(e) {}
 
+    } else if (topic === 'moon/ai/led') {
+        const kanjiDiv = document.getElementById('oled-kanji');
+        if (kanjiDiv) {
+            kanjiDiv.textContent = payload;
+            kanjiDiv.classList.add('show');
+            // Ẩn đi sau 6 giây
+            setTimeout(() => {
+                kanjiDiv.classList.remove('show');
+            }, 6000);
+        }
     } else {
         logToTerminal(`RX: ${topic} → ${payload}`, 'status');
     }
@@ -530,3 +540,22 @@ window.addEventListener('moon-live', ({detail: msg}) => {
         logToTerminal(msg.event === 'error' ? `LIVE lỗi: ${msg.text || 'Mất kết nối'}` : 'LIVE: đã kết thúc', 'sys');
     }
 });
+
+// ─── Preload AI Model ─────────────────────────────────────────────────────────
+async function preloadModel() {
+    logToTerminal('Đang nạp AI model vào VRAM (Card đồ họa)...', 'sys');
+    const btn = document.getElementById('btn-preload');
+    if (btn) btn.disabled = true;
+    try {
+        const res = await fetch('/api/preload-model', { method: 'POST' });
+        if (res.ok) {
+            logToTerminal('✅ Nạp model thành công! Robot sẵn sàng phản hồi ngay lập tức.', 'sys');
+        } else {
+            logToTerminal('❌ Lỗi khi nạp model!', 'sys');
+        }
+    } catch (e) {
+        logToTerminal(`❌ Lỗi kết nối: ${e.message}`, 'sys');
+    }
+    if (btn) btn.disabled = false;
+}
+

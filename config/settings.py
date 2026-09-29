@@ -2,7 +2,6 @@
 import os
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MODEL_ROOT = Path(os.environ.get("MOON_MODEL_ROOT", PROJECT_ROOT / "models")).expanduser().resolve()
 PRIVATE_DATA_ROOT = Path(
@@ -29,42 +28,29 @@ except Exception:
 def _key(name: str) -> str:
     return _SEC.get(name, "") or os.environ.get(name, "")
 
-
-# Gemini Live native audio (dashboard Live Talk). Node cũng đọc cùng key này
-# trực tiếp từ config/secrets.py; key không bao giờ được gửi xuống trình duyệt.
-GEMINI_API_KEY = _key("GEMINI_API_KEY")
-LLM_PROVIDER = os.environ.get("MOON_LLM_PROVIDER", "ollama").strip().lower()
-GEMINI_LLM_MODEL = os.environ.get("GEMINI_LLM_MODEL", "gemini-3.5-flash-lite")
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
-OLLAMA_LLM_MODEL = os.environ.get("OLLAMA_LLM_MODEL", "moon-tutor")
-OLLAMA_MAX_TOKENS = int(os.environ.get("OLLAMA_MAX_TOKENS", "128"))
-LEARNING_RAG_ENABLED = os.environ.get("MOON_LEARNING_RAG", "1").strip().lower() not in {
-    "0", "false", "no", "off",
-}
-
 # MQTT Broker Configuration
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 
-# Topics (theo Phụ lục B đề cương)
-TOPIC_MOVE   = "panda/cmd/move"
-TOPIC_ARM    = "panda/cmd/arm"
-TOPIC_FACE   = "panda/cmd/face"
-TOPIC_TEXT   = "panda/cmd/text"
-TOPIC_BUZZ   = "panda/cmd/buzz"
-TOPIC_STATUS = "panda/status"
-TOPIC_VOICE_LOG     = "panda/log/voice"
-TOPIC_VOICE_PARTIAL = "panda/log/voice_partial"
-TOPIC_AI_THINKING   = "panda/ai/thinking"
-TOPIC_AI_RESPONSE   = "panda/ai/response"
-TOPIC_AI_STATE      = "panda/ai/state"
-TOPIC_AI_TOPIC      = "panda/ai/topic"        # chủ đề câu hỏi → emoji OLED
-TOPIC_BROWSER_AUDIO = "panda/ai/voice_audio"   # push-to-talk từ dashboard (base64 webm)
-TOPIC_BROWSER_CLIP  = "panda/ai/clip"          # clip PCM từ live-mic trình duyệt
-TOPIC_MIC_LIVE      = "panda/ai/mic_live"      # trạng thái live-mic on/off
-TOPIC_BROWSER_QUESTION = "panda/ai/question"    # text đã STT từ Moon Voice → Brain
-TOPIC_TTS_ACTIVE    = "panda/audio/tts_active"  # 1/0: chặn mic web tự nghe loa Moon
-TOPIC_CAMERA = "panda/camera"
+# Topics (theo Phụ lục B đề cương) — prefix "moon/"
+TOPIC_MOVE   = "moon/cmd/move"
+TOPIC_ARM    = "moon/cmd/arm"
+TOPIC_FACE   = "moon/cmd/face"
+TOPIC_TEXT   = "moon/cmd/text"
+TOPIC_BUZZ   = "moon/cmd/buzz"
+TOPIC_STATUS = "moon/status"
+TOPIC_VOICE_LOG     = "moon/log/voice"
+TOPIC_VOICE_PARTIAL = "moon/log/voice_partial"
+TOPIC_AI_THINKING   = "moon/ai/thinking"
+TOPIC_AI_RESPONSE   = "moon/ai/response"
+TOPIC_AI_STATE      = "moon/ai/state"
+TOPIC_TTS_ACTIVE    = "moon/audio/tts_active"
+TOPIC_AI_TOPIC      = "moon/ai/topic"        # chủ đề câu hỏi → emoji OLED
+TOPIC_BROWSER_AUDIO = "moon/ai/voice_audio"   # push-to-talk từ dashboard (base64 webm)
+TOPIC_BROWSER_CLIP  = "moon/ai/clip"          # clip PCM từ live-mic trình duyệt
+TOPIC_BROWSER_QUESTION = "moon/ai/browser_question" # nhận text question từ dashboard
+TOPIC_MIC_LIVE      = "moon/ai/mic_live"      # trạng thái live-mic on/off
+TOPIC_CAMERA = "moon/camera"
 
 # AI Models Configuration
 WEBCAM_INDEX = 0
@@ -99,7 +85,7 @@ VISION_FINGER_STRAIGHT_DEGREES = 135.0
 VISION_FINGER_EXTENSION_RATIO = 1.05
 VISION_THUMB_STRAIGHT_DEGREES = 135.0
 VISION_OBJECTS_ENABLED = True
-VISION_OBJECTS_MODEL = "yolov8n.pt"
+VISION_OBJECTS_MODEL = "best.pt"
 VISION_OBJECTS_FPS = 1
 VISION_OBJECTS_SIZE = 480
 VISION_OBJECTS_CONFIDENCE = 0.30
@@ -107,14 +93,12 @@ VISION_OBJECTS_STALE_SEC = 2.5
 VISION_EAR_CLOSED = 0.19
 VISION_EAR_OPEN = 0.23
 VISION_EYES_CLOSED_SEC = 1.5
-# Approximate distance until calibrated: assumed camera HFOV and face width.
 VISION_CAMERA_HFOV = 60.0
 VISION_FACE_WIDTH_CM = 14.0
-# Calibration: known distance_cm * detected_face_width_px / frame_width_px.
 VISION_DISTANCE_SCALE_CM = float(os.environ.get("MOON_DISTANCE_SCALE_CM", "0")) or None
 VISION_POSE_ENABLED = True
 VISION_POSE_SIZE = 320
-VISION_DEVICE = "cpu"  # CUDA: "0"
+VISION_DEVICE = "0"  # Đổi sang "0" để bắt buộc chạy bằng Card rời RTX 4050
 VISION_CV_THREADS = 2
 VISION_STALE_SEC = 2.0
 VISION_FACE_THRESHOLD = 0.8
@@ -123,7 +107,7 @@ VISION_EMOTION_THRESHOLD = 0.55
 VISION_EMOTION_MARGIN = 0.15
 VISION_MIN_FACE_SIZE = 60
 VISION_KEYPOINT_THRESHOLD = 0.5
-TOPIC_VISION_STATUS = "panda/vision/status"
+TOPIC_VISION_STATUS = "moon/vision/status"
 
 # Other constants
 FPS_LIMIT = 15
@@ -138,7 +122,11 @@ FISH_VOICE_ID = "381620020029495883d03b63850c862f"
 
 # Model TTS: 's2.1-pro-free' = miễn phí (khuyên dùng) | 's2.1-pro' / 's2-pro' / 's1' = trả phí
 FISH_TTS_MODEL = "s2.1-pro-free"
-FISH_SENTENCE_TIMEOUT_SEC = 12.0  # Fish treo/chậm → chuyển ngay sang giọng offline
+
+# ─── Ollama Local LLM Configuration ───────────────────────────────────────────
+LLM_PROVIDER = "ollama"
+OLLAMA_LLM_MODEL = "qwen3.5:2b"
+OLLAMA_MAX_TOKENS = 128
 
 # ─── DeepSeek API (LLM) ─────────────────────────────────────────────────────
 # Lấy key tại: https://platform.deepseek.com/api_keys
@@ -156,11 +144,13 @@ QUICK_MODEL = "groq/compound-mini"
 # Lấy key tại: https://console.groq.com/keys  (điền vào config/secrets.py)
 GROQ_API_KEY = _key("GROQ_API_KEY")
 
-# Dashboard dùng Gemini Transcribe Live và chỉ gợi ý ba ngôn ngữ của dự án.
-# Groq/local fallback phải để auto-detect, không khóa tiếng Việt, để câu hỏi
-# tiếng Anh và tiếng Nhật vẫn được giữ nguyên.
-STT_LANGUAGES = ("vi-VN", "en-US", "ja-JP")
-STT_LANGUAGE = None
+# Ngôn ngữ nhận dạng giọng nói (STT):
+#   "vi" = tiếng Việt (KHUYẾN DỤNG cho Moon — chính xác nhất và nhanh gấp đôi,
+#          đã đo: 0.48s so với 1.02s của auto; auto hay đoán nhầm sang tiếng khác
+#          với clip ngắn: "Moon ơi" → "Bonne t'en la vie!")
+#   None = tự động phát hiện (chỉ dùng nếu cần hội thoại tiếng Anh thật sự)
+#   "en" = luôn tiếng Anh
+STT_LANGUAGE = "vi"
 
 # ─── Tinh chỉnh STT/VAD (kiểu Anki Vector) ────────────────────────────────────
 # Model Groq Whisper: large-v3-turbo = nhanh + chính xác nhất trên Groq
@@ -174,7 +164,7 @@ STT_MODEL_QUESTION = "whisper-large-v3-turbo"
 # ⚠️ CHỈ BẬT khi tín hiệu THÔ và MẠNH (giọng ≥0.3 RMS — đã tắt Enhance Voice
 # Recognition): spectral gating xóa ồn quạt mà KHÔNG nuốt giọng.
 # Nếu mic lại bị hãng bóp (giọng yếu 0.03–0.06) → trả về False kẻo nuốt giọng.
-DENOISE_BEFORE_STT = False
+DENOISE_BEFORE_STT = True
 
 # Ngưỡng năng lượng RMS tối thiểu để coi là tiếng nói (lọc ồn nền: quạt, điều hòa).
 # Tăng lên (vd 0.05) nếu môi trường quá ồn gây false-trigger; giảm (0.02) nếu nói nhỏ.
@@ -207,16 +197,66 @@ PERSON_LOST_GRACE_SEC = 10.0
 
 # ─── Wake-word on-device (Porcupine — tùy chọn, kiểu Anki Vector) ─────────────
 # Bắt "Moon" bằng âm học trên máy, không phụ thuộc ngôn ngữ & không cần mạng.
-# Cấu hình key trong secrets.py/môi trường và model Moon .ppn đúng nền tảng.
-# Nếu chưa có, Voice Lab dùng Whisper một lượt, khớp đúng token Moon.
-PICOVOICE_ACCESS_KEY = _key("PICOVOICE_ACCESS_KEY")
-MOON_PPN_PATH = os.environ.get("MOON_PPN_PATH", "")   # để trống = models/voice/moon.ppn
+# LƯU Ý: console.picovoice.ai hiện CHỈ nhận email công ty — người dùng cá nhân
+# (Gmail...) không đăng ký được. Khi đó cứ để trống: hệ thống tự dùng
+# fallback Whisper dual-pass + fuzzy matching (vẫn bắt tốt "Moon").
+# Cách kích hoạt (nếu có email công ty): xem server/wakeword.py
+PICOVOICE_ACCESS_KEY = ""
+MOON_PPN_PATH = ""   # để trống = mặc định server/moon.ppn
 
 
 # ─── Wake-word ───────────────────────────────────────────────────────────────
 # Groq Whisper large-v3-turbo nhận dạng rất chính xác nên chỉ cần
 # các dạng phổ biến. Thêm vào nếu thấy bị sót trong thực tế.
-MOON_WAKE_WORDS = ["moon", "hey moon", "moon ơi"]
+MOON_WAKE_WORDS = [
+    # ── Chuẩn tiếng Anh & Việt ───────────────────────────────────────────
+    "moon",
+    "hey moon",
+    "moon ơi",
+    "này moon",
+    "ê moon",
+    "ơi moon",
+    "moon à",
+
+    # ── Biến thể phiên âm "mun" (Whisper đọc /uː/ → /ʊ/) ────────────────
+    "mun",
+    "mun ơi",
+    "mun à",
+    "hey mun",
+    "hây mun",
+    "hê mun",
+    "ê mun",
+    "này mun",
+    "ơi mun",
+    "bé mun",
+    "bé mun ơi",
+    "muns",
+
+    # ── Biến thể phiên âm "mon" (Whisper đọc /uː/ → /ɔ/) ────────────────
+    "mon",
+    "mon ơi",
+    "mon à",
+    "hey mon",
+    "hây mon",
+    "hê mon",
+    "ê mon",
+    "này mon",
+    "ơi mon",
+    "bé mon",
+    "bé mon ơi",
+
+    # ── Các biến thể phiên âm tiếng Việt Whisper hay nhận nhầm ───────────
+    "hai moon",
+    "hai mun",
+    "hai mon",
+    "hây moon",
+    "hê moon",
+    "moons",
+
+    # ── Tên thân thiện tiếng Việt ────────────────────────────────────────
+    "bé moon ơi",
+    "bé moon",
+]
 
 
 # Mirror cảm xúc người dùng lên OLED khi idle:
@@ -240,15 +280,3 @@ MIC_DEVICE_INDEX = None
 #   "remote" = CHỈ clip qua MQTT — khi não lên cloud, hoặc khi test đường
 #              robot bằng dev_mic_bridge (mic laptop giả lập mic robot)
 MIC_SOURCE = "auto"
-
-# Browser DSP + WebRTC VAD + STT; accepted questions can be handed to Brain.
-VOICE_VAD_MODE = 2
-VOICE_MIN_RMS = 0.003
-VOICE_WAKE_SILENCE_SEC = 0.45
-VOICE_QUESTION_SILENCE_SEC = 1.2
-VOICE_WAIT_SEC = 20.0
-VOICE_MAX_SEC = 15.0
-VOICE_WAKE_VERIFY_MAX_SEC = 3.0
-VOICE_WAKE_VERIFY_MAX_WORDS = 3
-VOICE_WAKE_VERIFY_TIMEOUT_SEC = 4.0
-WAKE_SENSITIVITY = 0.6

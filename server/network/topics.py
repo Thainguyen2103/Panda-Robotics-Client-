@@ -52,6 +52,8 @@ TOPICS = [
     ("health",   ["đau", "bệnh", "bác sĩ", "thuốc", "sức khỏe",
                   "health"]),
     ("movie",    ["phim", "anime", "diễn viên", "đạo diễn", "movie", "cartoon"]),
+    ("move",     ["lại đây", "tới đây", "đi tới", "chạy tới", "lại gần", 
+                  "come here", "move here", "tới chỗ"]),
     ("identity", ["tên gì", "bạn là", "bao nhiêu tuổi", "who are you",
                   "your name"]),
 ]
@@ -67,7 +69,7 @@ TOPIC_LABELS = {
     "study": "HỌC TẬP", "tech": "CÔNG NGHỆ", "people": "CON NGƯỜI",
     "game": "GAME", "science": "KHOA HỌC", "history": "LỊCH SỬ",
     "geography": "ĐỊA LÝ", "space": "VŨ TRỤ", "health": "SỨC KHỎE",
-    "money": "TIỀN", "movie": "PHIM",
+    "money": "TIỀN", "movie": "PHIM", "move": "DI CHUYỂN",
 }
 
 

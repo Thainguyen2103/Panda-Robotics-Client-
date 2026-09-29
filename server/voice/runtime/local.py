@@ -61,7 +61,7 @@ from server.voice.speech.transcription import transcribe_bytes as _transcribe_by
 
 # ─── MQTT để log transcript lên dashboard ─────────────────────────────────────
 try:
-    from server import mqtt_bridge
+    from server.network import mqtt_bridge
 except Exception:
     mqtt_bridge = None
 

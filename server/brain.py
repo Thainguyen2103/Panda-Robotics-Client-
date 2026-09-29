@@ -39,7 +39,7 @@ if sys.stderr and hasattr(sys.stderr, "reconfigure"):
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import settings
-from server import mqtt_bridge
+from server.network import mqtt_bridge
 from server.vision import start_vision
 from server import voice
 from server.voice.runtime.local import (
@@ -53,10 +53,10 @@ from server.voice.speech.filters import (
     strip_diacritics as _strip_diacritics,
 )
 from server.voice.speech.validation import safe_asr_correction
-from server.tts import speak, SentencePlayer
-from server import tts   # module object — cho tts.play_beep()/play_tick()
-from server import llm
-from server.topics import classify_topic, TOPIC_LABELS
+from server.voice.tts import speak, SentencePlayer
+from server.voice import tts   # module object — cho tts.play_beep()/play_tick()
+from server.llm import engine as llm
+from server.network.topics import classify_topic, TOPIC_LABELS
 
 
 # Mic trình duyệt chạy ở process riêng nên không thấy trực tiếp cờ
@@ -491,6 +491,58 @@ def _handle_wake_word(trigger_text: str):
         print(f"❓ [BRAIN] Câu hỏi: \"{question}\"")
         time.sleep(getattr(settings, "QUESTION_DISPLAY_SEC", 0.4))  # đủ để OLED hiện text, không gây lag
 
+        # Xử lý ngay lập tức ý định "Di chuyển" (MOVE) mà không cần gọi LLM
+        if _tid == "move":
+            answer = "Dạ, Moon tới liền đây ạ!"
+            print(f"✅ [BRAIN] Nhận lệnh di chuyển. Gửi MQTT {settings.TOPIC_MOVE} -> forward")
+            mqtt_bridge.publish(settings.TOPIC_MOVE, "forward")
+            
+            _set_voice_ai_state("speaking")
+            _publish_thinking("answer", answer)
+            tts.speak(answer)
+            
+            # Đọc xong thì về IDLE luôn
+            _set_voice_ai_state("standby")
+            change_state("IDLE")
+            return
+
+        # ── FAST PATH: KIỂM TRA ROUTER TỪ VỰNG / ĐỐ VUI (BYPASS LLM) ──────────
+        from server.llm.dictionary_router import lookup_vocab, get_entertainment
+        
+        fast_vocab = lookup_vocab(question)
+        fast_entertain = get_entertainment(question)
+        fast_answer = None
+
+        if fast_vocab:
+            # Tạo câu trả lời cứng, nhanh và chính xác 100%
+            vi = fast_vocab.get("vietnamese", "")
+            en = fast_vocab.get("english", "")
+            jp = fast_vocab.get("japanese_hiragana", "")
+            if vi and en and jp:
+                fast_answer = f"Từ {vi}, tiếng Anh là {en}, tiếng Nhật là {jp} bé nha!"
+                
+        elif fast_entertain:
+            fast_answer = fast_entertain
+
+        if fast_answer:
+            print(f"⚡ [BRAIN] FAST PATH BYPASS! (0 độ trễ): {fast_answer}")
+            _set_voice_ai_state("speaking")
+            _publish_thinking("answer", fast_answer)
+            
+            # Update nhanh màn hình OLED (Hiển thị chữ Tiếng Anh lên LED)
+            if fast_vocab:
+                mqtt_bridge.publish(settings.TOPIC_AI_TOPIC, json.dumps({
+                    "id": _tid, "cap": fast_vocab.get("english", "")
+                }))
+                
+            tts.speak(fast_answer)
+            
+            # Xong việc thì reset ngay lập tức
+            _publish_thinking("done")
+            _set_voice_ai_state("standby")
+            return
+        # ──────────────────────────────────────────────────────────────────────
+
         # ── BƯỚC 3: Chuyển sang chế độ suy nghĩ ──────────────────────────────
         # OLED GIỮ transcript đã nghe (mode 'hearing') trong suốt lúc thinking —
         # người dùng thấy Moon "đọc lại" những gì đã nghe; dots thinking chỉ
@@ -695,7 +747,7 @@ def _process_command(text: str):
 def _handle_transcript(text: str):
     """
     Callback mỗi khi Voice runtime nhận được transcript từ Groq.
-    Note: Voice runtime đã tự publish lên panda/log/voice rồi —
+    Note: Voice runtime đã tự publish lên moon/log/voice rồi —
           ở đây chỉ xử lý lệnh điều khiển.
     """
     if voice_ai_state != "standby":

@@ -490,6 +490,26 @@ button:active { transform: translateY(0); }
 @keyframes cute-glow { 0%, 100% { transform: scale(1); box-shadow: 0 0 15px rgba(255,118,117,0.7); } 50% { transform: scale(1.08); box-shadow: 0 0 25px rgba(255,118,117,1); } }
 .oled-face.cute .eye { width: 58px; height: 75px; border-radius: 28px; background: #ff7675; animation: cute-glow 2s infinite ease-in-out; }
 
+/* ─── OLED Kanji ─────────────────────────────────────────────────────────── */
+.oled-kanji {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 80px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 0 20px #00f2fe, 0 0 40px #00f2fe;
+    z-index: 10;
+    font-family: 'Noto Sans JP', sans-serif;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.oled-kanji.show {
+    opacity: 1;
+}
+
 /* ─── Camera Box ─────────────────────────────────────────────────────────── */
 .camera-box {
     background: #000;
