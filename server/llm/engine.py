@@ -58,7 +58,7 @@ try:
     GROQ_LLM_MODEL   = getattr(settings, "GROQ_LLM_MODEL", "deepseek-r1-distill-llama-70b")
     GEMINI_LLM_MODEL = getattr(settings, "GEMINI_LLM_MODEL", "gemini-3.5-flash-lite")
     OLLAMA_HOST       = getattr(settings, "OLLAMA_HOST", "http://127.0.0.1:11434")
-    OLLAMA_LLM_MODEL  = getattr(settings, "OLLAMA_LLM_MODEL", "moon-tutor")
+    OLLAMA_LLM_MODEL  = getattr(settings, "OLLAMA_LLM_MODEL", "qwen3.5:2b")
     OLLAMA_MAX_TOKENS = getattr(settings, "OLLAMA_MAX_TOKENS", 128)
     LLM_PROVIDER     = getattr(settings, "LLM_PROVIDER", "ollama")
     LEARNING_RAG_ENABLED = getattr(settings, "LEARNING_RAG_ENABLED", True)
@@ -70,7 +70,7 @@ except Exception:
     GROQ_LLM_MODEL   = "deepseek-r1-distill-llama-70b"
     GEMINI_LLM_MODEL = "gemini-3.5-flash-lite"
     OLLAMA_HOST = "http://127.0.0.1:11434"
-    OLLAMA_LLM_MODEL = "moon-tutor"
+    OLLAMA_LLM_MODEL = "qwen3.5:2b"
     OLLAMA_MAX_TOKENS = 128
     LLM_PROVIDER     = "ollama"
     LEARNING_RAG_ENABLED = True
@@ -170,6 +170,7 @@ _get_learning_display_info = None
 if LEARNING_RAG_ENABLED:
     try:
         from server.llm.rag_engine import retrieve_context as _retrieve_learning_context
+        from server.llm.rag_engine import get_display_info as _get_learning_display_info
     except Exception as e:
         print(f"⚠️ [RAG] Không thể nạp kho bài học: {e}")
 
@@ -510,6 +511,15 @@ def chat(
     # Nhánh này vừa nhanh vừa tránh để model nhỏ làm sai Kanji/Hiragana/Romaji.
     grounded_answer = grounded_learning_answer(model_question)
     if grounded_answer:
+        # Publish Kanji lên MQTT để web hiển thị
+        info = lookup_vocab(model_question)
+        if info and info.get("kanji"):
+            try:
+                from server.network.mqtt_bridge import publish
+                publish("moon/ai/led", info["kanji"])
+            except Exception:
+                pass
+                
         if on_thinking:
             on_thinking("answering")
         if on_chunk:

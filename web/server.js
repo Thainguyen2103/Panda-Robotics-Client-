@@ -56,7 +56,7 @@ app.get('/api/live-ack', async (_req, res) => {
 
 app.post('/api/preload-model', (req, res) => {
     const postData = JSON.stringify({
-        model: 'moon-tutor',
+        model: 'qwen3.5:2b',
         prompt: '',
         keep_alive: '60m', // Giữ trong RAM 60 phút
         options: {
@@ -155,4 +155,30 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`🚀 [WEB] Dashboard running at http://localhost:${PORT}`);
+    
+    // Tự động nạp model Ollama lên VRAM lúc khởi động Server
+    console.log('🤖 [WEB] Đang tự động nạp AI model vào VRAM...');
+    const postData = JSON.stringify({
+        model: 'qwen3.5:2b',
+        prompt: '',
+        keep_alive: '60m',
+        options: { num_gpu: 99 }
+    });
+    const options = {
+        hostname: '127.0.0.1',
+        port: 11434,
+        path: '/api/generate',
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postData)
+        }
+    };
+    const req = http.request(options, (res) => {
+        res.on('data', () => {}); 
+        res.on('end', () => console.log('✅ [WEB] Nạp model tự động thành công! Robot phản hồi không độ trễ.'));
+    });
+    req.on('error', (e) => console.log(`⚠️ [WEB] Lỗi nạp model tự động (Có thể Ollama chưa bật): ${e.message}`));
+    req.write(postData);
+    req.end();
 });

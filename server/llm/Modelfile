@@ -1,14 +1,12 @@
 # ==============================================================================
 # Modelfile: Robot Moon - Gia sư hỗ trợ học Tiếng Nhật, Anh, Việt
-# Base Model: qwen3.5:4b
+# Base Model: qwen3.5:2b
 # Đối tượng: Trẻ em 7-10 tuổi (Hiển thị Text / Màn hình LED / OLED)
 # Tối ưu hóa: Chống ảo giác tối đa (Anti-Hallucination) + Chuẩn Chữ Hán (Kanji)
 # ==============================================================================
-
-FROM qwen3.5:4b
-
+FROM qwen3.5:2b
 # Cấu hình chống ảo giác: nhiệt độ thấp để model bám sát sự thật và dữ liệu RAG
-# Qwen3.5 4B nhẹ hơn 7B nên giảm num_ctx để tiết kiệm RAM
+# Qwen3.5 2B rất nhẹ nên giảm num_ctx để tiết kiệm RAM
 PARAMETER temperature 0.2
 PARAMETER top_p 0.85
 PARAMETER top_k 30

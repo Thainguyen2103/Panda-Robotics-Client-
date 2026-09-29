@@ -422,6 +422,16 @@ socket.on('mqtt_message', (data) => {
             }
         } catch(e) {}
 
+    } else if (topic === 'moon/ai/led') {
+        const kanjiDiv = document.getElementById('oled-kanji');
+        if (kanjiDiv) {
+            kanjiDiv.textContent = payload;
+            kanjiDiv.classList.add('show');
+            // Ẩn đi sau 6 giây
+            setTimeout(() => {
+                kanjiDiv.classList.remove('show');
+            }, 6000);
+        }
     } else {
         logToTerminal(`RX: ${topic} → ${payload}`, 'status');
     }

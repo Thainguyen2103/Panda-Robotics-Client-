@@ -11,7 +11,7 @@ Nhiệm vụ: Giao tiếp với Ollama, đóng vai chú gấu trúc nhí nhảnh
 4. warmup_model(): Nạp trước mô hình 5GB vào RAM để chống lag cho câu hỏi đầu tiên.
 """
 # ==============================================================================
-# moon_tutor.py — Điều phối Trợ lý AI Moon (Ollama Qwen3.5 4B + RAG)
+# moon_tutor.py — Điều phối Trợ lý AI Moon (Ollama Qwen3.5 2B + RAG)
 # Chuyên hỗ trợ học Tiếng Nhật, Anh, Việt cho trẻ 7-10 tuổi trên Robot
 # ==============================================================================
 
@@ -40,7 +40,7 @@ except ImportError:
 # Khai báo địa chỉ IP và Port của Ollama chạy dưới máy local (mặc định là 11434)
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 # Tên của mô hình AI đang sử dụng
-# moon-tutor = wrapper của qwen3.5:4b đã nhúng sẵn system prompt (tính cách Moon, anti-hallucination...)
+# moon-tutor = wrapper của qwen3.5:2b đã nhúng sẵn system prompt (tính cách Moon, anti-hallucination...)
 # Nếu đổi base model thì chạy lại: ollama create moon-tutor -f server/llm/Modelfile
 MODEL_NAME  = "moon-tutor"
 
@@ -170,17 +170,15 @@ Quy tắc cốt lõi:
     # Nhét câu hỏi mới nhất của bé vào cuối cùng
     full_prompt += f"Câu hỏi của bé: {question}"
 
-    # Lấy cấu hình số GPU từ môi trường (Nếu chạy CPU thì num_gpu = 0)
-    num_gpu = int(os.environ.get("OLLAMA_NUM_GPU", "0"))
+    # Lấy cấu hình số GPU từ môi trường (Mặc định 99 để chạy Full Card Rời)
+    num_gpu = int(os.environ.get("OLLAMA_NUM_GPU", "99"))
     # Các thông số tinh chỉnh tính cách AI
     opts = {
-        "temperature": 0.45,  # Mức 0.45: Cân bằng hoàn hảo giữa tính chính xác (RAG) và tính sáng tạo (chơi đùa)
+        "temperature": 0.1,  # Mức 0.1: Chống bịa đặt tối đa, ưu tiên tính chính xác (RAG)
         "top_p": 0.85,        # Lọc bớt các từ ngữ quá kỳ quặc
         "num_predict": 256,   # Giới hạn số từ trả về tối đa (tránh nói quá dài)
+        "num_gpu": num_gpu,   # Ép Ollama xài card rời RTX 4050
     }
-    # Nếu môi trường ép chạy CPU, đưa thẳng thông số num_gpu vào
-    if num_gpu == 0:
-        opts["num_gpu"] = 0
 
     # Đóng gói toàn bộ cấu hình, Prompt thành dạng Dictionary (JSON)
     payload = {

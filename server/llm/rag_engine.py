@@ -1,4 +1,4 @@
-﻿"""
+"""
 --------------------------------------------------------------------------------
 TÀI LIỆU HƯỚNG DẪN CODE: rag_engine.py (Bộ máy tìm kiếm kiến thức RAG)
 --------------------------------------------------------------------------------
@@ -20,6 +20,7 @@ import json
 import re
 import math
 import unicodedata
+import functools
 from typing import List, Dict, Any, Optional, Tuple
 
 # Cấu hình UTF-8 cho Windows Terminal để in tiếng Việt chuẩn
@@ -76,6 +77,8 @@ class MoonRAG:
         self.data_file = data_file
         # Biến chứa toàn bộ sách giáo khoa (dạng mảng các Dictionary)
         self.knowledge_base: List[Dict[str, Any]] = []
+        # Mục lục ngược (Inverted Index) tra cứu siêu tốc
+        self.inverted_index: Dict[str, List[Dict[str, Any]]] = {}
         # Tự động nạp dữ liệu khi khởi tạo class
         self.load_data()
 
@@ -90,7 +93,31 @@ class MoonRAG:
             # Đọc file với bảng mã utf-8
             with open(self.data_file, "r", encoding="utf-8") as f:
                 self.knowledge_base = json.load(f)
-            print(f"✅ [RAG] Đã nạp thành công {len(self.knowledge_base)} bài học vào bộ nhớ.")
+            
+            # --- CẢI TIẾN: TIỀN XỬ LÝ (PRE-COMPUTING) & MỤC LỤC NGƯỢC (INVERTED INDEX) ---
+            self.inverted_index = {}
+            for item in self.knowledge_base:
+                # 1. Tiền xử lý Tầng 3 (Semantic): Xóa dấu & chặt từ sẵn
+                fact_unacc = strip_accents(self._normalize(item.get("fun_fact", "")))
+                quiz_unacc = strip_accents(self._normalize(item.get("quiz", "")))
+                ex_vi_unacc = strip_accents(self._normalize(item.get("example_vi", "")))
+                doc_text = f"{fact_unacc} {quiz_unacc} {ex_vi_unacc}"
+                item["_precomputed_words"] = set(doc_text.split())
+
+                # 2. Xây dựng Mục lục ngược cho Tầng 1 (Keyword, English, Romaji)
+                index_keys = [self._normalize(kw) for kw in item.get("keywords", [])]
+                en = self._normalize(item.get("english", ""))
+                romaji = self._normalize(item.get("japanese_romaji", ""))
+                if en: index_keys.append(en)
+                if romaji: index_keys.append(romaji)
+                
+                for key in index_keys:
+                    if key not in self.inverted_index:
+                        self.inverted_index[key] = []
+                    if item not in self.inverted_index[key]:
+                        self.inverted_index[key].append(item)
+
+            print(f"✅ [RAG] Đã nạp thành công {len(self.knowledge_base)} bài học vào bộ nhớ (Đã đánh Index).")
         except Exception as e:
             print(f"❌ [RAG] Lỗi đọc file data.json: {e}")
             self.knowledge_base = []
@@ -135,32 +162,31 @@ class MoonRAG:
         q_tokens = set(q_norm.split())
 
         matches = []
+        seen_items = set()
+
+        # 1. Khớp chữ Hán (Kanji): Lặp qua toàn bộ vì nó là tìm kiếm từng ký tự
         for item in self.knowledge_base:
-            # 1. Khớp chữ Hán (Kanji): Quét từng ký tự Kanji xem có lọt vào câu hỏi không
             kanji = item.get("kanji", "")
             if kanji and any(k_char in query for k_char in kanji if k_char.strip()):
-                # Trúng Kanji thì cho điểm tuyệt đối 10.0
-                matches.append((10.0, item))
-                continue
+                if id(item) not in seen_items:
+                    matches.append((10.0, item))
+                    seen_items.add(id(item))
 
-            # 2. Khớp từ khóa chuẩn trong keywords list
-            keywords = item.get("keywords", [])
-            exact_hit = False
-            for kw in keywords:
-                kw_norm = self._normalize(kw)
-                # Kiểm tra xem từ khóa có nằm y hệt trong câu không
-                if kw_norm == q_norm or f" {kw_norm} " in f" {q_norm} ":
+        # 2. Khớp siêu tốc bằng Mục lục ngược (Inverted Index)
+        # 2.1 Cụm từ dài (Nguyên câu hỏi)
+        if q_norm in self.inverted_index:
+            for item in self.inverted_index[q_norm]:
+                if id(item) not in seen_items:
                     matches.append((9.0, item))
-                    exact_hit = True
-                    break
-            if exact_hit:
-                continue
-
-            # 3. Khớp tên tiếng Anh hoặc Romaji dạng nguyên từ (Ví dụ: 'cat', 'inu')
-            en = self._normalize(item.get("english", ""))
-            romaji = self._normalize(item.get("japanese_romaji", ""))
-            if (en and en in q_tokens) or (romaji and romaji in q_tokens):
-                matches.append((8.0, item))
+                    seen_items.add(id(item))
+                    
+        # 2.2 Từng từ đơn (Ví dụ: "cat", "apple")
+        for token in q_tokens:
+            if token in self.inverted_index:
+                for item in self.inverted_index[token]:
+                    if id(item) not in seen_items:
+                        matches.append((8.0, item))
+                        seen_items.add(id(item))
 
         # Nếu có kết quả ở Tầng 1
         if matches:
@@ -248,13 +274,8 @@ class MoonRAG:
 
         scored_items = []
         for item in self.knowledge_base:
-            # Gom toàn bộ chữ từ các trường fact, quiz, example của bài học đó
-            fact_unacc = strip_accents(self._normalize(item.get("fun_fact", "")))
-            quiz_unacc = strip_accents(self._normalize(item.get("quiz", "")))
-            ex_vi_unacc = strip_accents(self._normalize(item.get("example_vi", "")))
-
-            doc_text = f"{fact_unacc} {quiz_unacc} {ex_vi_unacc}"
-            doc_words = set(doc_text.split())
+            # Lấy mảng từ đã được tiền xử lý sẵn từ RAM (O(1)) - Rất nhanh!
+            doc_words = item.get("_precomputed_words", set())
 
             # Tính độ giao nhau của 2 tập hợp chữ (Jaccard Similarity)
             matched_words = content_words.intersection(doc_words)
@@ -271,6 +292,7 @@ class MoonRAG:
     # ══════════════════════════════════════════════════════════════════════════
     #  HÀM TÌM KIẾM ĐIỀU PHỐI 3 TẦNG (CASCADING DISPATCHER)
     # ══════════════════════════════════════════════════════════════════════════
+    @functools.lru_cache(maxsize=100)
     def search(self, query: str, top_k: int = 2) -> List[Dict[str, Any]]:
         """
         Hàm chính được gọi từ bên ngoài. Nó sẽ cho chạy lần lượt qua 3 Tầng:
@@ -334,6 +356,24 @@ class MoonRAG:
         # Nối tất cả mảng thành 1 chuỗi lớn
         return "\n".join(context_lines)
 
+
+_global_rag = None
+
+def _get_rag():
+    global _global_rag
+    if not _global_rag:
+        _global_rag = MoonRAG()
+    return _global_rag
+
+def retrieve_context(query: str, top_k: int = 2) -> str:
+    rag = _get_rag()
+    results = rag.search(query, top_k=top_k)
+    return rag.format_context_for_prompt(results) if results else ""
+
+def get_display_info(query: str) -> dict | None:
+    rag = _get_rag()
+    results = rag.search(query, top_k=1)
+    return results[0] if results else None
 
 # ─── Script chạy thử nghiệm độc lập (Tự động chạy khi gọi thẳng file này) ────
 if __name__ == "__main__":
