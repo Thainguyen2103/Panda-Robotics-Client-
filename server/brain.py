@@ -905,10 +905,17 @@ def main():
     # Listener nền cũ sẽ tạo hai pipeline song song và làm giao diện bị kẹt.
     print("ℹ️  [BRAIN] Wakeword nền đã tắt — Live Voice quản lý microphone.")
 
-    # Vision (blocking — chạy trên main thread)
-    print("✅ [BRAIN] Khởi động Vision module...")
-    start_vision(on_vision_update)
+    # Vision (chạy độc lập trên Thread riêng để không block Voice/LLM)
+    print("✅ [BRAIN] Khởi động Vision module (Background Thread)...")
+    vision_thread = threading.Thread(target=start_vision, args=(on_vision_update,), daemon=True)
+    vision_thread.start()
 
+    # Vòng lặp chính giữ cho chương trình sống
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("🛑 [BRAIN] Đang tắt hệ thống...")
 
 if __name__ == "__main__":
     main()

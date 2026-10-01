@@ -1,4 +1,13 @@
-"""Small Ollama REST adapter with the same interface as the Gemini adapter."""
+"""Small Ollama REST adapter with the same interface as the Gemini adapter.
+
+Tối ưu hóa cho RTX 4050:
+- num_gpu=99: Offload 100% layers vào VRAM (RTX 4050 có 6GB, Qwen 2B ~1.5GB FP16)
+- num_ctx=2048: Context window đủ cho RAG prompt + history mà không phí VRAM
+- num_batch=256: Batch size lớn hơn cho prompt processing nhanh hơn trên GPU
+- mmap=True: Memory-mapped model loading, giảm startup time
+- keep_alive=30m: Giữ model trong VRAM 30 phút, tránh reload khi bé hỏi liên tục
+- f16_kv=True: KV cache dùng FP16 thay FP32, tiết kiệm 50% VRAM cho cache
+"""
 
 import json
 
@@ -39,6 +48,22 @@ class OllamaTextClient:
                 f"Chưa có model Ollama {self.model!r}; model hiện có: {installed}"
             )
 
+        # ── Pre-load model vào VRAM để câu hỏi đầu tiên không bị lag ────────
+        try:
+            self.session.post(
+                f"{self.host}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": "",
+                    "keep_alive": "30m",
+                    "options": {"num_gpu": 99},
+                },
+                timeout=(5, 30),
+            ).close()
+            print(f"🚀 [Ollama] Pre-loaded {self.model} vào VRAM (keep_alive=30m)")
+        except Exception as e:
+            print(f"⚠️ [Ollama] Pre-load warning: {e}")
+
     @staticmethod
     def _messages(messages):
         result = []
@@ -60,12 +85,23 @@ class OllamaTextClient:
                 "messages": self._messages(messages),
                 "stream": True,
                 "think": False,
-                "keep_alive": "10m",
+                "keep_alive": "30m",
                 "options": {
-                    "num_ctx": 1024,
+                    # ── GPU Offloading ────────────────────────────────
+                    "num_gpu": 99,          # Offload TẤT CẢ layers vào GPU
+                    # ── Context & Generation ─────────────────────────
+                    "num_ctx": 2048,        # Context window (RAG + history + system)
                     "num_predict": max_tokens,
+                    "num_batch": 256,       # Prompt eval batch size (GPU nhanh hơn)
+                    # ── Sampling ─────────────────────────────────────
                     "temperature": temperature,
-                    "num_gpu": 99,
+                    "top_p": 0.85,          # Nucleus sampling
+                    "top_k": 30,            # Giới hạn token candidates
+                    "repeat_penalty": 1.15, # Chống lặp từ
+                    # ── Performance ──────────────────────────────────
+                    "f16_kv": True,         # KV cache FP16 → tiết kiệm 50% VRAM
+                    "mmap": True,           # Memory-mapped loading
+                    "num_thread": 4,        # CPU threads cho phần không GPU
                 },
             },
             stream=True,

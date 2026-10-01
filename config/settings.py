@@ -84,8 +84,9 @@ VISION_HANDS_STALE_SEC = 0.9
 VISION_FINGER_STRAIGHT_DEGREES = 135.0
 VISION_FINGER_EXTENSION_RATIO = 1.05
 VISION_THUMB_STRAIGHT_DEGREES = 135.0
+VISION_FACE_MODEL = "face.pt"  # Model YOLO khuôn mặt tự train/finetune
 VISION_OBJECTS_ENABLED = True
-VISION_OBJECTS_MODEL = "best.pt"
+VISION_OBJECTS_MODEL = "object.pt"
 VISION_OBJECTS_FPS = 1
 VISION_OBJECTS_SIZE = 480
 VISION_OBJECTS_CONFIDENCE = 0.30
@@ -119,6 +120,8 @@ FISH_AUDIO_API_KEY = _key("FISH_AUDIO_API_KEY")
 # Tùy chọn: Reference ID của giọng muốn dùng (để trống = giọng mặc định)
 # Tìm giọng Việt đẹp tại: https://fish.audio/  → copy Reference ID
 FISH_VOICE_ID = "381620020029495883d03b63850c862f"
+# Giọng riêng dành cho tiếng Nhật
+FISH_VOICE_ID_JP = "cai_id_giong_tieng_nhat_cua_ban_vao_day"
 
 # Model TTS: 's2.1-pro-free' = miễn phí (khuyên dùng) | 's2.1-pro' / 's2-pro' / 's1' = trả phí
 FISH_TTS_MODEL = "s2.1-pro-free"
