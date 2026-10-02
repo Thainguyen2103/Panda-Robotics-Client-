@@ -43,10 +43,12 @@ try:
     from config import settings
     FISH_API_KEY  = getattr(settings, "FISH_AUDIO_API_KEY", None)
     FISH_VOICE_ID = getattr(settings, "FISH_VOICE_ID", None)
+    FISH_VOICE_ID_JP = getattr(settings, "FISH_VOICE_ID_JP", None)
     FISH_TTS_MODEL = getattr(settings, "FISH_TTS_MODEL", "s2.1-pro-free")
 except Exception:
     FISH_API_KEY  = None
     FISH_VOICE_ID = None
+    FISH_VOICE_ID_JP = None
     FISH_TTS_MODEL = "s2.1-pro-free"
 
 # ─── Load Fish Audio SDK ──────────────────────────────────────────────────────
@@ -311,11 +313,18 @@ def _synth_fish(text: str) -> bytes | None:
 
     text = _normalize_tts_text(text)   # số → chữ Việt (tránh 'zero three zero seven')
     try:
-        print(f"🐟 [TTS] Fish Audio đang tổng hợp: \"{text}\"")
+        # Tự động phát hiện tiếng Nhật để đổi giọng
+        import re
+        has_japanese = bool(re.search(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]', text))
+        
+        # Chọn ID Giọng
+        chosen_voice_id = FISH_VOICE_ID_JP if (has_japanese and FISH_VOICE_ID_JP and FISH_VOICE_ID_JP != "cai_id_giong_tieng_nhat_cua_ban_vao_day") else FISH_VOICE_ID
+        
+        print(f"🐟 [TTS] Fish Audio đang tổng hợp: \"{text}\" (Voice: {'JP' if chosen_voice_id == FISH_VOICE_ID_JP else 'Default'})")
 
         tts_request = TTSRequest(
             text=text,
-            reference_id=FISH_VOICE_ID,
+            reference_id=chosen_voice_id,
         )
 
         # Stream audio bytes về memory
