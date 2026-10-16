@@ -7,7 +7,7 @@ Xác minh 4 module lõi không cần người nói vào mic:
             - transcribe file ghi âm có sẵn (_test_vi.wav)
             - round-trip: TTS tổng hợp "Moon ơi..." → STT đọc lại → phải bắt được wake-word
   2. LLM  : text → AI phản hồi (stream + done)
-  3. TTS  : text → speech (tổng hợp Fish Audio + phát ra loa thật)
+  3. TTS  : text → speech (Edge TTS Neural + phát ra loa thật)
  4. OLED  : chạy pipeline wake-word giả lập, subscribe MQTT để kiểm chứng
             chuỗi hoạt ảnh: questioning → ai-thinking → speaking → neutral
             và chuỗi state:  listening → thinking → speaking → standby
@@ -81,10 +81,10 @@ def test_stt():
         info("Không có _test_vi.wav — bỏ qua phần 1a")
 
     # 1b. Round-trip TTS → STT (kiểm tra độ chính xác + wake-word)
-    info("Tổng hợp câu test bằng Fish Audio: \"Moon ơi, bạn tên là gì?\"")
-    audio = tts._synth_fish("Moon ơi, bạn tên là gì?")
+    info("Tổng hợp câu test bằng Edge TTS: \"Moon ơi, bạn tên là gì?\"")
+    audio = tts._synth_speech("Moon ơi, bạn tên là gì?")
     if not audio:
-        fail("Fish Audio không tổng hợp được audio round-trip")
+        fail("Edge TTS không tổng hợp được audio round-trip")
         return
     t0 = time.time()
     text = voice.transcribe_bytes(audio, filename="roundtrip.mp3")
@@ -148,15 +148,15 @@ def test_llm():
 def test_tts():
     section("TEST 3 — TTS: text → speech (bạn sẽ NGHE thấy loa)")
 
-    audio = tts._synth_fish("Xin chào! Mình là Moon, đang kiểm tra giọng nói.")
+    audio = tts._synth_speech("Xin chào! Mình là Moon, đang kiểm tra giọng nói.")
     if audio and len(audio) > 1024:
-        ok(f"Fish Audio tổng hợp OK ({len(audio)//1024} KB)")
+        ok(f"Edge TTS tổng hợp OK ({len(audio)//1024} KB)")
     else:
-        fail("Fish Audio tổng hợp thất bại")
+        fail("Edge TTS tổng hợp thất bại")
         return
 
     t0 = time.time()
-    played = tts._speak_fish("Kiểm tra một hai ba bốn năm.")
+    played = tts._speak_preferred("Kiểm tra một hai ba bốn năm.")
     if played:
         ok(f"Audio đã phát ra loa ({time.time()-t0:.1f}s) — bạn có nghe thấy không?")
     else:

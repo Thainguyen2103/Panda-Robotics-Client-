@@ -1197,6 +1197,11 @@ button:active { transform: translateY(0); }
     font-weight: 600;
 }
 .live-talk-badge[data-state="listening"] { color: var(--green); border-color: rgba(46, 213, 115, .5); }
+.live-talk-badge[data-state="requesting_permission"] { color: #facc15; border-color: rgba(250, 204, 21, .5); }
+.live-talk-badge[data-state="speech_detected"] { color: var(--green); border-color: rgba(46, 213, 115, .7); }
+.live-talk-badge[data-state="transcribing"] { color: var(--purple); border-color: rgba(162, 155, 254, .7); }
+.live-talk-badge[data-state="recognized"] { color: var(--accent); border-color: rgba(0, 210, 255, .7); }
+.live-talk-badge[data-state="stopped"] { color: var(--text-muted); border-color: var(--border); }
 .live-talk-badge[data-state="waiting"] { color: #facc15; border-color: rgba(250, 204, 21, .5); }
 .live-talk-badge[data-state="thinking"] { color: var(--purple); border-color: rgba(162, 155, 254, .5); }
 .live-talk-badge[data-state="speaking"] { color: var(--accent); border-color: rgba(0, 210, 255, .55); }
@@ -1240,8 +1245,11 @@ button:active { transform: translateY(0); }
 }
 .live-talk-core svg { width: 24px; height: 24px; }
 .live-talk-orb[data-state="connecting"] > span,
-.live-talk-orb[data-state="thinking"] > span { animation: live-orbit 2.2s linear infinite; }
-.live-talk-orb[data-state="listening"] .live-talk-core {
+.live-talk-orb[data-state="requesting_permission"] > span,
+.live-talk-orb[data-state="thinking"] > span,
+.live-talk-orb[data-state="transcribing"] > span { animation: live-orbit 2.2s linear infinite; }
+.live-talk-orb[data-state="listening"] .live-talk-core,
+.live-talk-orb[data-state="speech_detected"] .live-talk-core {
     color: var(--green);
     border-color: rgba(46, 213, 115, .65);
     box-shadow: 0 0 25px rgba(46, 213, 115, .18);
@@ -1329,6 +1337,8 @@ button:active { transform: translateY(0); }
 .btn-live-stop { color: #d9e6f2; background: #182233; border: 1px solid #475569; }
 .btn-live-talk:disabled { opacity: .42; cursor: default; }
 .live-talk-error { min-height: 18px; margin: 10px 0 0; color: #fca5a5; font-size: 12px; }
+.live-talk-unmute { margin-top: 8px; padding: 9px 14px; color: #071017; background: var(--accent); border: 0; border-radius: 8px; font: inherit; font-weight: 700; cursor: pointer; }
+.live-talk-unmute[hidden] { display: none; }
 .live-talk-setup { position: relative; color: var(--text-muted); font-size: 12px; }
 .live-talk-setup summary { cursor: pointer; color: #9bacc0; }
 .live-talk-setup code { color: #b9f2ff; overflow-wrap: anywhere; }
@@ -1365,3 +1375,26 @@ button:active { transform: translateY(0); }
 .oled-face.answering .oled-text::after { content: none; }
 .oled-face.hearing,
 .oled-face.answering { animation: none; }
+
+/* Vocabulary/Kanji mode replaces the animated face and topic art entirely. */
+.oled-face:has(.oled-kanji.show) .oled-eyes,
+.oled-face:has(.oled-kanji.show) .oled-overlay,
+.oled-face:has(.oled-kanji.show) .oled-text,
+.oled-face:has(.oled-kanji.show) .oled-topic {
+    display: none !important;
+}
+.oled-kanji.show {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 12px;
+    transform: none;
+    text-align: center;
+    overflow-wrap: anywhere;
+    font-size: clamp(34px, 18vw, 80px);
+    z-index: 20;
+}

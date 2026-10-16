@@ -1,21 +1,14 @@
 """
-TTS (Text-to-Speech) module — Fish Audio API
-Fallback: pyttsx3 (offline) nếu Fish Audio không khả dụng
+TTS (Text-to-Speech) module — Microsoft Edge neural voices
 
 Phát audio bằng sounddevice (không dùng pygame — tương thích Python 3.14).
 
 Setup:
-    pip install fish-audio-sdk sounddevice numpy
-
-    Đặt API key vào config/settings.py:
-        FISH_AUDIO_API_KEY = "your_key_here"
-        FISH_VOICE_ID = "your_voice_id"   # Tùy chọn, None = giọng mặc định
-
-    Lấy API key : https://fish.audio/app/api-keys/
-    Chọn giọng   : https://fish.audio/  (copy Reference ID)
+    Install requirements-voice.txt; Edge TTS uses an online service.
 """
 
 import io
+import asyncio
 import os
 import sys
 import queue
@@ -23,6 +16,7 @@ import threading
 import time
 import tempfile
 import subprocess
+import re
 
 # Fix Windows terminal encoding (giống brain.py) — tránh crash khi in emoji/Việt
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
@@ -38,32 +32,17 @@ if sys.stderr and hasattr(sys.stderr, "reconfigure"):
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# ─── Cấu hình từ settings ─────────────────────────────────────────────────────
+# ─── Cấu hình ────────────────────────────────────────────────────────────────
 try:
     from config import settings
-    FISH_API_KEY  = getattr(settings, "FISH_AUDIO_API_KEY", None)
-    FISH_VOICE_ID = getattr(settings, "FISH_VOICE_ID", None)
-    FISH_VOICE_ID_JP = getattr(settings, "FISH_VOICE_ID_JP", None)
-    FISH_TTS_MODEL = getattr(settings, "FISH_TTS_MODEL", "s2.1-pro-free")
 except Exception:
-    FISH_API_KEY  = None
-    FISH_VOICE_ID = None
-    FISH_VOICE_ID_JP = None
-    FISH_TTS_MODEL = "s2.1-pro-free"
+    settings = None
 
-# ─── Load Fish Audio SDK ──────────────────────────────────────────────────────
-fish_client = None
-try:
-    from fish_audio_sdk import Session, TTSRequest
-    if FISH_API_KEY:
-        fish_client = Session(apikey=FISH_API_KEY)
-        print("✅ [TTS] Fish Audio SDK sẵn sàng.")
-    else:
-        print("⚠️ [TTS] Chưa có FISH_AUDIO_API_KEY trong settings.py — dùng fallback.")
-except ImportError:
-    print("⚠️ [TTS] fish-audio-sdk chưa cài. Chạy: pip install fish-audio-sdk")
-except Exception as e:
-    print(f"⚠️ [TTS] Lỗi khởi tạo Fish Audio: {e}")
+# Edge voice mapping; Edge is the sole configured TTS provider.
+EDGE_TTS_JA_VOICE = os.getenv("MOON_EDGE_TTS_JA_VOICE", "ja-JP-NanamiNeural")
+EDGE_TTS_EN_VOICE = os.getenv("MOON_EDGE_TTS_EN_VOICE", "en-US-AnaNeural")
+EDGE_TTS_VI_VOICE = os.getenv("MOON_EDGE_TTS_VI_VOICE", "vi-VN-HoaiMyNeural")
+EDGE_TTS_TIMEOUT_SEC = float(os.getenv("MOON_EDGE_TTS_TIMEOUT_SEC", "15"))
 
 # ─── Phát audio — dùng sounddevice + scipy (không cần pygame) ────────────────
 _sd  = None
@@ -82,27 +61,11 @@ try:
 except ImportError:
     pass
 
-# ─── Fallback: pyttsx3 (offline) ─────────────────────────────────────────────
-pyttsx3_engine = None
-try:
-    import pyttsx3
-    pyttsx3_engine = pyttsx3.init()
-    _voices = pyttsx3_engine.getProperty('voices')
-    for _v in _voices:
-        if 'vietnam' in _v.name.lower() or 'vi' in _v.id.lower():
-            pyttsx3_engine.setProperty('voice', _v.id)
-            break
-    pyttsx3_engine.setProperty('rate', 150)
-    print("✅ [TTS] pyttsx3 sẵn sàng (fallback).")
-except Exception:
-    pass
-
 # ─── Lock để tránh nói chồng nhau ────────────────────────────────────────────
 _tts_lock = threading.Lock()
 
 # ─── Text normalization: số → chữ Việt trước khi tổng hợp ───────────────────
-# Fish Audio (giọng tham chiếu có prior tiếng Anh) đọc "03:07" thành
-# "zero three zero seven". Chuẩn ngành TTS: quy đổi số → chữ trước.
+# Chuẩn hóa số tiếng Việt trước khi phát âm, ví dụ giờ và ngày.
 _DIGITS = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"]
 
 
@@ -303,69 +266,96 @@ def _stop_mci_playback():
         pass
 
 
-def _synth_fish(text: str) -> bytes | None:
-    """
-    Tổng hợp text → MP3 bytes bằng Fish Audio.
-    Trả về bytes nếu thành công, None nếu lỗi (caller tự fallback).
-    """
-    if not fish_client:
-        return None
+def _contains_japanese(text: str) -> bool:
+    return bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", text or ""))
 
-    text = _normalize_tts_text(text)   # số → chữ Việt (tránh 'zero three zero seven')
+
+def _edge_voice_for_text(text: str) -> str | None:
+    """Choose a matching Edge voice for Japanese, English, or Vietnamese."""
     try:
-        # Tự động phát hiện tiếng Nhật để đổi giọng
-        import re
-        has_japanese = bool(re.search(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]', text))
-        
-        # Chọn ID Giọng
-        chosen_voice_id = FISH_VOICE_ID_JP if (has_japanese and FISH_VOICE_ID_JP and FISH_VOICE_ID_JP != "cai_id_giong_tieng_nhat_cua_ban_vao_day") else FISH_VOICE_ID
-        
-        print(f"🐟 [TTS] Fish Audio đang tổng hợp: \"{text}\" (Voice: {'JP' if chosen_voice_id == FISH_VOICE_ID_JP else 'Default'})")
+        from llm.language import response_language_matches
+        if response_language_matches(text, "vi"):
+            return EDGE_TTS_VI_VOICE
+        if response_language_matches(text, "en"):
+            return EDGE_TTS_EN_VOICE
+        if response_language_matches(text, "ja"):
+            return EDGE_TTS_JA_VOICE
+    except Exception:
+        pass
+    if _contains_japanese(text):
+        return EDGE_TTS_JA_VOICE
+    return EDGE_TTS_EN_VOICE
 
-        tts_request = TTSRequest(
-            text=text,
-            reference_id=chosen_voice_id,
-        )
 
-        # Stream audio bytes về memory
-        # backend: 's2.1-pro-free' = gói miễn phí (S2.1 Pro Free tier)
-        audio_bytes = b""
-        for chunk in fish_client.tts(tts_request, backend=FISH_TTS_MODEL):
-            audio_bytes += chunk
+async def _synth_edge_async(text: str, voice: str) -> bytes:
+    """Generate MP3 bytes with edge-tts without writing a temporary audio file."""
+    import edge_tts
 
-        if not audio_bytes:
-            print("⚠️ [TTS] Fish Audio trả về rỗng.")
-            return None
-        return audio_bytes
+    communicator = edge_tts.Communicate(text, voice)
+    chunks = bytearray()
+    async for item in communicator.stream():
+        if item.get("type") == "audio":
+            chunks.extend(item.get("data", b""))
+    if not chunks:
+        raise RuntimeError("Edge TTS returned no audio")
+    return bytes(chunks)
 
-    except Exception as e:
-        print(f"❌ [TTS] Lỗi Fish Audio: {e}")
+
+def _synth_edge(text: str, voice: str | None = None) -> bytes | None:
+    """Bound Edge's async request while preserving the synchronous TTS API."""
+    voice = voice or _edge_voice_for_text(text)
+    if not voice:
         return None
-
-
-def _speak_fish(text: str) -> bool:
-    """Tổng hợp + phát 1 câu. Trả về True nếu thành công."""
-    audio_bytes = _synth_fish(text)
-    if not audio_bytes:
-        return False
-    print(f"🔊 [TTS] Phát audio ({len(audio_bytes)//1024} KB)...")
-    return _play_mp3_bytes(audio_bytes)
-
-
-def _speak_fallback(text: str):
-    """Phát âm bằng pyttsx3 (offline fallback)."""
-    text = _normalize_tts_text(text)
-    if pyttsx3_engine:
+    timeout = max(0.1, EDGE_TTS_TIMEOUT_SEC)
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
         try:
-            pyttsx3_engine.say(text)
-            pyttsx3_engine.runAndWait()
-            return
-        except Exception as e:
-            print(f"❌ [TTS] Lỗi pyttsx3: {e}")
+            return asyncio.run(asyncio.wait_for(
+                _synth_edge_async(text, voice), timeout=timeout
+            ))
+        except Exception as exc:
+            print(f"⚠️ [TTS] Edge TTS unavailable ({type(exc).__name__}).")
+            return None
 
-    # Không có engine nào — chỉ log
-    print(f"🔇 [TTS] Không có engine TTS khả dụng. Text: \"{text}\"")
-    time.sleep(1)
+    result = queue.Queue(maxsize=1)
+
+    def run():
+        try:
+            audio = asyncio.run(asyncio.wait_for(
+                _synth_edge_async(text, voice),
+                timeout=timeout,
+            ))
+            result.put((audio, None), block=False)
+        except Exception as exc:
+            try:
+                result.put((None, type(exc).__name__), block=False)
+            except queue.Full:
+                pass
+
+    threading.Thread(target=run, daemon=True, name="moon-edge-tts").start()
+    try:
+        audio, error = result.get(timeout=timeout + 0.5)
+    except queue.Empty:
+        print("⚠️ [TTS] Edge TTS timeout.")
+        return None
+    if error:
+        # Do not include utterance text or provider details in diagnostic output.
+        print(f"⚠️ [TTS] Edge TTS unavailable ({error}).")
+    return audio
+
+
+def _synth_speech(text: str) -> bytes | None:
+    """Synthesize with the matching Edge neural voice; no provider fallback."""
+    voice = _edge_voice_for_text(text)
+    return _synth_edge(_normalize_tts_text(text), voice)
+
+
+def _speak_preferred(text: str) -> bool:
+    audio = _synth_speech(text)
+    if not audio:
+        return False
+    return _play_mp3_bytes(audio)
 
 
 def speak(text: str, blocking: bool = True):
@@ -383,10 +373,9 @@ def speak(text: str, blocking: bool = True):
         with _tts_lock:
             _set_speaking(True)
             try:
-                success = _speak_fish(text)
+                success = _speak_preferred(text)
                 if not success:
-                    print("⚠️ [TTS] Chuyển sang pyttsx3 fallback...")
-                    _speak_fallback(text)
+                    print("⚠️ [TTS] Edge TTS không khả dụng; câu này chưa được phát.")
             finally:
                 _set_speaking(False)
                 global _speech_end_t
@@ -405,7 +394,7 @@ _SENTINEL = object()
 class SentencePlayer:
     """
     Phát câu trả lời theo TỪNG CÂU thay vì chờ toàn bộ text:
-      - Thread tổng hợp: gọi Fish Audio cho câu N+1 trong khi câu N đang phát
+      - Thread tổng hợp: gọi Edge TTS cho câu N+1 trong khi câu N đang phát
         → audio đầu tiên vang lên ngay khi LLM vừa xong câu đầu.
       - Thread phát: phát tuần tự, giữ _tts_lock để không chồng với speak().
 
@@ -424,9 +413,9 @@ class SentencePlayer:
         self._on_fallback = on_fallback
         self._synth_timeout = float(
             synth_timeout if synth_timeout is not None
-            else getattr(settings, "FISH_SENTENCE_TIMEOUT_SEC", 12.0)
+            else getattr(settings, "EDGE_TTS_TIMEOUT_SEC", EDGE_TTS_TIMEOUT_SEC)
         )
-        self._fish_disabled = False
+        self._edge_disabled = False
         self._stopped = False
         self._synth_thread = threading.Thread(target=self._synth_worker, daemon=True)
         self._play_thread  = threading.Thread(target=self._play_worker, daemon=True)
@@ -447,14 +436,14 @@ class SentencePlayer:
             self._audio_q.put((item, audio, reason))
 
     def _synth_with_timeout(self, text):
-        """Bound a blocking Fish SDK call; one timeout disables Fish this turn."""
-        if self._fish_disabled:
-            return None, "Fish Audio đã được bỏ qua sau lần quá thời gian trước"
+        """Bound provider synthesis; one timeout disables remote synthesis this turn."""
+        if self._edge_disabled:
+            return None, "Edge TTS đã bị bỏ qua sau lần quá thời gian trước"
         result = queue.Queue(maxsize=1)
 
         def run():
             try:
-                result.put((_synth_fish(text), None), block=False)
+                result.put((_synth_speech(text), None), block=False)
             except Exception as exc:
                 try:
                     result.put((None, str(exc)), block=False)
@@ -465,9 +454,9 @@ class SentencePlayer:
         try:
             audio, reason = result.get(timeout=max(.1, self._synth_timeout))
         except queue.Empty:
-            self._fish_disabled = True
-            return None, f"Fish Audio quá {self._synth_timeout:g} giây"
-        return audio, reason or (None if audio else "Fish Audio không trả về âm thanh")
+            self._edge_disabled = True
+            return None, f"TTS quá {self._synth_timeout:g} giây"
+        return audio, reason or (None if audio else "Edge TTS không trả về âm thanh")
 
     def _play_worker(self):
         """Phát tuần tự các câu đã tổng hợp."""
@@ -482,6 +471,14 @@ class SentencePlayer:
                     if self._stopped:
                         continue   # xả hàng đợi, không phát nữa
                     text, audio, reason = item
+                    if not audio:
+                        print(f"⚠️ [TTS] {reason or 'Edge TTS lỗi'} — câu này không được phát.")
+                        if self._on_fallback:
+                            try:
+                                self._on_fallback(text, reason or "Edge TTS lỗi")
+                            except Exception:
+                                pass
+                        continue
                     if first:
                         first = False
                         _set_speaking(True)   # báo mọi nguồn mic: loa đang bật
@@ -490,16 +487,11 @@ class SentencePlayer:
                                 self._on_play_start()
                             except Exception:
                                 pass
-                    if audio:
-                        _play_mp3_bytes(audio)
-                    else:
-                        print(f"⚠️ [TTS] {reason or 'Fish Audio lỗi'} — dùng pyttsx3 fallback.")
-                        if self._on_fallback:
-                            try:
-                                self._on_fallback(text, reason or "Fish Audio lỗi")
-                            except Exception:
-                                pass
-                        _speak_fallback(text)
+                    if not _play_mp3_bytes(audio) and self._on_fallback:
+                        try:
+                            self._on_fallback(text, "Không phát được audio Edge TTS")
+                        except Exception:
+                            pass
         finally:
             _set_speaking(False)
             _speech_end_t = time.time()

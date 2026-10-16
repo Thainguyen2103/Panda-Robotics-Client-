@@ -51,6 +51,7 @@ class OllamaTextClient:
         # ── Pre-load model vào VRAM để câu hỏi đầu tiên không bị lag ────────
         try:
             self.session.post(
+                
                 f"{self.host}/api/generate",
                 json={
                     "model": self.model,
@@ -60,9 +61,9 @@ class OllamaTextClient:
                 },
                 timeout=(5, 30),
             ).close()
-            print(f"🚀 [Ollama] Pre-loaded {self.model} vào VRAM (keep_alive=30m)")
+            print(f"[Ollama] Pre-loaded {self.model} vào VRAM (keep_alive=30m)")
         except Exception as e:
-            print(f"⚠️ [Ollama] Pre-load warning: {e}")
+            print(f"[Ollama] Pre-load warning: {e}")
 
     @staticmethod
     def _messages(messages):

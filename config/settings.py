@@ -46,6 +46,7 @@ TOPIC_AI_RESPONSE   = "moon/ai/response"
 TOPIC_AI_STATE      = "moon/ai/state"
 TOPIC_TTS_ACTIVE    = "moon/audio/tts_active"
 TOPIC_AI_TOPIC      = "moon/ai/topic"        # chủ đề câu hỏi → emoji OLED
+TOPIC_AI_LED        = "moon/ai/led"          # hiển thị ký tự (Kanji/Từ vựng) OLED
 TOPIC_BROWSER_AUDIO = "moon/ai/voice_audio"   # push-to-talk từ dashboard (base64 webm)
 TOPIC_BROWSER_CLIP  = "moon/ai/clip"          # clip PCM từ live-mic trình duyệt
 TOPIC_BROWSER_QUESTION = "moon/ai/browser_question" # nhận text question từ dashboard
@@ -84,9 +85,9 @@ VISION_HANDS_STALE_SEC = 0.9
 VISION_FINGER_STRAIGHT_DEGREES = 135.0
 VISION_FINGER_EXTENSION_RATIO = 1.05
 VISION_THUMB_STRAIGHT_DEGREES = 135.0
-VISION_FACE_MODEL = "face.pt"  # Model YOLO khuôn mặt tự train/finetune
+VISION_FACE_MODEL = "face_detection_yunet_2023mar.onnx"  # Chuyển qua dùng OpenCV YuNet có sẵn
 VISION_OBJECTS_ENABLED = True
-VISION_OBJECTS_MODEL = "object.pt"
+VISION_OBJECTS_MODEL = "yolov8n.pt"
 VISION_OBJECTS_FPS = 1
 VISION_OBJECTS_SIZE = 480
 VISION_OBJECTS_CONFIDENCE = 0.30
@@ -121,7 +122,7 @@ FISH_AUDIO_API_KEY = _key("FISH_AUDIO_API_KEY")
 # Tìm giọng Việt đẹp tại: https://fish.audio/  → copy Reference ID
 FISH_VOICE_ID = "381620020029495883d03b63850c862f"
 # Giọng riêng dành cho tiếng Nhật
-FISH_VOICE_ID_JP = "cai_id_giong_tieng_nhat_cua_ban_vao_day"
+FISH_VOICE_ID_JP = "d91e17ccd70e4f45895860bbcb2a3db0"
 
 # Model TTS: 's2.1-pro-free' = miễn phí (khuyên dùng) | 's2.1-pro' / 's2-pro' / 's1' = trả phí
 FISH_TTS_MODEL = "s2.1-pro-free"
@@ -138,8 +139,9 @@ DEEPSEEK_API_KEY = _key("DEEPSEEK_API_KEY")   # ← hết credit, dùng Groq tha
 GROQ_LLM_MODEL   = "openai/gpt-oss-120b"  # Model Groq: phản hồi trực tiếp, tiếng Việt chuẩn, không bị kẹt think tags
 
 # Model cho tác vụ NHỎ (sửa lỗi ASR, caption OLED, chọn cảm xúc):
-# groq/compound-mini = nhanh, trả lời trực tiếp không reasoning leak (đo 1.6s vs 2-4s của gpt-oss)
-QUICK_MODEL = "groq/compound-mini"
+# llama-3.3-70b-versatile = model Groq API khả thi thay cho llama-3.1-8b-instant đã bị gỡ bỏ
+# Tự động fallback sang local Ollama nếu Cloud API không gọi được hoặc lỗi 404
+QUICK_MODEL = "llama-3.3-70b-versatile"
 
 # ─── Groq API (Whisper STT) ──────────────────────────────────────────────────
 # ─── STT (Speech-to-Text) ────────────────────────────────────────────────────
@@ -169,12 +171,12 @@ STT_MODEL_QUESTION = "whisper-large-v3-turbo"
 # Nếu mic lại bị hãng bóp (giọng yếu 0.03–0.06) → trả về False kẻo nuốt giọng.
 DENOISE_BEFORE_STT = True
 
-# Ngưỡng năng lượng RMS tối thiểu để coi là tiếng nói (lọc ồn nền: quạt, điều hòa).
-# Tăng lên (vd 0.05) nếu môi trường quá ồn gây false-trigger; giảm (0.02) nếu nói nhỏ.
-VAD_NOISE_FLOOR = 0.03
+# Ngưỡng năng lượng RMS tối thiểu để coi là tiếng nói. Hạ floor để giữ được
+# giọng nói nhỏ; ngưỡng thích nghi theo ồn nền vẫn giúp hạn chế false-trigger.
+VAD_NOISE_FLOOR = 0.01
 
 # Hệ số nhân ồn nền cho ngưỡng thích nghi: 2.0 = nhạy (giọng xa), 3.0 = chống ồn mạnh.
-VAD_AMBIENT_MULT = 2.0
+VAD_AMBIENT_MULT = 1.5
 
 # Độ phẳng phổ tối đa để coi là giọng nói (0→1).
 # Giọng nói có hài âm ≈ 0.1–0.4; tiếng quạt/gió/phím ≈ 0.6–0.9.

@@ -10,11 +10,12 @@ const io = socketIo(server);
 const {attachVoice, startVoiceService} = require('./voice-bridge');
 const {attachGeminiLive} = require('./gemini-live-bridge');
 const {attachGeminiTranscribe} = require('./gemini-transcribe-bridge');
-const {readFishConfig, synthesizeFishWithRetry} = require('./fish-tts');
+const {synthesizeEdge} = require('./edge-tts');
 
 // Define MQTT settings
 const MQTT_BROKER = 'mqtt://localhost:1883';
 const mqttClient = mqtt.connect(MQTT_BROKER);
+const browserMicOwners = new Set();
 attachVoice(server);
 attachGeminiLive(server, mqttClient);
 attachGeminiTranscribe(server);
@@ -22,17 +23,13 @@ startVoiceService();
 
 // Tạo một lần rồi giữ trong RAM để lời xác nhận wakeword phát gần như tức thì.
 // API key chỉ được dùng ở server, không bao giờ gửi xuống trình duyệt.
-const fishConfig = readFishConfig();
 let wakeAckAudio = null;
 let wakeAckPending = null;
 
 async function getWakeAckAudio() {
     if (wakeAckAudio) return wakeAckAudio;
     if (!wakeAckPending) {
-        wakeAckPending = synthesizeFishWithRetry('Moon nghe đây!', fishConfig, {
-            attempts: 1,
-            timeoutMs: 6000,
-        }).then(audio => {
+        wakeAckPending = synthesizeEdge('Moon nghe đây!', {timeoutMs: 10000}).then(audio => {
             wakeAckAudio = audio;
             return audio;
         }).finally(() => {
@@ -49,8 +46,8 @@ app.get('/api/live-ack', async (_req, res) => {
         res.set('Cache-Control', 'private, max-age=3600');
         res.send(audio);
     } catch (error) {
-        console.warn(`⚠️ [WEB] Không tạo được lời xác nhận Fish: ${error.message}`);
-        res.status(503).json({error: 'Fish acknowledgement unavailable'});
+        console.warn(`⚠️ [WEB] Không tạo được lời xác nhận Edge TTS: ${error.message}`);
+        res.status(503).json({error: 'Edge TTS acknowledgement unavailable'});
     }
 });
 
@@ -108,6 +105,7 @@ mqttClient.on('connect', () => {
     mqttClient.subscribe('moon/ai/thinking');
     mqttClient.subscribe('moon/ai/response');
     mqttClient.subscribe('moon/ai/topic');
+    mqttClient.subscribe('moon/ai/led');
     mqttClient.subscribe('moon/audio/tts_active');
 });
 
@@ -129,6 +127,10 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         console.log('🌐 [WEB] A client disconnected');
+        if (browserMicOwners.delete(socket.id) && browserMicOwners.size === 0) {
+            mqttClient.publish('moon/ai/mic_live', '0');
+            console.log('🎙️ [WEB] Browser mic owner disconnected; released server microphone lock');
+        }
     });
 
     // Browser push-to-talk: nhận base64 webm từ dashboard → chuyển sang MQTT cho brain
@@ -143,12 +145,22 @@ io.on('connection', (socket) => {
     });
     socket.on('mic_live', (st) => {
         console.log(`🎙️ [WEB] Live mic: ${st}`);
-        mqttClient.publish('moon/ai/mic_live', st);
+        if (st === '1') browserMicOwners.add(socket.id);
+        else browserMicOwners.delete(socket.id);
+        mqttClient.publish('moon/ai/mic_live', browserMicOwners.size > 0 ? '1' : '0');
     });
-    socket.on('voice_question', (text) => {
+    socket.on('voice_question', (question) => {
+        let text = typeof question === 'string' ? question : question?.text;
+        if (question && typeof question === 'object'
+                && question.provider && question.provider !== 'edge') return;
+        const provider = 'edge';
         if (typeof text !== 'string') return;
         text = text.trim().slice(0, 1000);
-        if (text) mqttClient.publish('moon/ai/question', text);
+        if (!text) return;
+        mqttClient.publish('moon/ai/browser_question', text, error => {
+            if (error) console.warn(`⚠️ [WEB] Browser question MQTT publish failed chars=${text.length}: ${error.message}`);
+            else console.info(`✅ [WEB] Browser question published to moon/ai/browser_question provider=${provider} chars=${text.length}`);
+        });
     });
 });
 

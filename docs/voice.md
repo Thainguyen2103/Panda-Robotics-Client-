@@ -5,25 +5,25 @@ chuyện liên tục cho tới khi người dùng bấm **Kết thúc**; không 
 cầu gọi wakeword trước từng câu hỏi. Camera, OLED, điều khiển và Monitor vẫn giữ
 nguyên. OLED chỉ thể hiện trạng thái/biểu cảm phù hợp.
 
-## Gemini Live + Fish Voice
+## Gemini Live + Edge TTS Neural
 
 Live Voice gửi PCM mono
 16 kHz qua WebSocket cùng origin `/live/ws`; Node giữ API key và mở phiên Gemini
 Live. Gemini hiểu audio trực tiếp, không chạy Groq/Whisper STT và không dùng
 pipeline Voice của Brain. Chế độ mặc định lấy transcript nội bộ của chính câu
-trả lời Gemini rồi tạo MP3 bằng Fish Audio để giữ cùng giọng Moon; transcript
-này không hiển thị trên dashboard. Vì phải chờ đủ câu rồi mới gọi Fish, phản hồi
-chậm hơn Gemini Native và sử dụng quota Fish. OLED chỉ nhận một trong 11 biểu cảm
+trả lời Gemini rồi tạo MP3 bằng Edge TTS Neural; transcript này không hiển thị
+trên dashboard. Vì phải chờ đủ câu rồi mới gọi TTS, phản hồi chậm hơn Gemini
+Native. Edge TTS dùng dịch vụ trực tuyến của Microsoft; cần kết nối mạng. OLED chỉ nhận một trong 11 biểu cảm
 qua function call `set_expression`.
 
 Menu **Giọng trả lời** có hai lựa chọn:
 
-- **Fish Voice** (mặc định): cùng `FISH_VOICE_ID` và `FISH_TTS_MODEL` với TTS hiện có.
-- **Gemini Native**: phát PCM trực tiếp bằng giọng `Kore`, nhanh hơn và không gọi Fish.
+- **Edge TTS Neural** (mặc định): chọn giọng Nhật/Anh/Việt theo nội dung.
+- **Gemini Native**: phát PCM trực tiếp bằng giọng `Kore`.
 
-Ở Fish Voice, bridge vẫn giữ audio Gemini của từng câu trong bộ nhớ. Nếu Fish
+Ở Edge TTS, bridge vẫn giữ audio Gemini của từng câu trong bộ nhớ. Nếu Edge
  timeout/lỗi hoặc trình duyệt không giải mã được MP3, câu đó tự chuyển sang giọng
-Gemini thay vì im lặng; câu kế tiếp vẫn thử Fish như bình thường.
+Gemini thay vì im lặng; câu kế tiếp vẫn thử Edge TTS.
 
 ### Hai cách kích hoạt
 
@@ -51,7 +51,7 @@ dự phòng: khi đã nghe tiếng nói và gặp khoảng 0,9 giây im lặng, 
 kết thúc luồng audio hiện tại để Gemini chốt câu và bắt đầu trả lời; microphone
 vẫn tiếp tục dùng cho câu kế tiếp.
 
-Khi kết thúc một phiên và đổi từ Fish Voice sang Kore (hoặc ngược lại), hàng đợi
+Khi kết thúc một phiên và đổi từ Edge TTS sang Kore (hoặc ngược lại), hàng đợi
 phát và mốc thời gian AudioContext được đặt lại trước phiên mới để audio không bị
 lên lịch ở một thời điểm cũ rồi tạo cảm giác mất tiếng.
 
@@ -61,10 +61,10 @@ Menu **Hệ thống xử lý** trong cùng thẻ Live Talk cho phép thử hai k
 cùng microphone:
 
 - **Gemini Live — audio native**: Gemini nghe và tạo câu trả lời; có thể chọn
-  Fish Voice hoặc giọng Gemini Native.
-- **Brain Pipeline — STT → LLM → Fish**: Gemini Transcribe Live nhận diện trực tiếp
+  Edge TTS Neural hoặc giọng Gemini Native.
+- **Brain Pipeline — STT → LLM → Edge TTS**: Gemini Transcribe Live nhận diện trực tiếp
   tiếng Việt, Anh và Nhật,
-  `brain.py` xử lý bằng LLM hiện tại và Fish phát giọng. Sau khi được bật trực
+  `brain.py` xử lý bằng LLM hiện tại và Edge TTS phát giọng. Sau khi được bật trực
   tiếp hoặc bằng wakeword, đây là một phiên liên tục.
 
 Ô **Nhận diện gần nhất** cho biết hệ thống nghe được gì. Ô **Độ trễ** hiển thị
@@ -78,15 +78,15 @@ Thêm key vào file không được Git theo dõi `config/secrets.py`:
 SECRETS = {
     # các key hiện có...
     "GEMINI_API_KEY": "key-cua-ban",
-    "FISH_AUDIO_API_KEY": "key-fish-cua-ban",
 }
 ```
 
 Sau đó chạy lại `start.bat`, mở dashboard, chọn cách kích hoạt rồi bấm nút bắt
 đầu. Có thể
-đặt biến môi trường `GEMINI_API_KEY`/`FISH_AUDIO_API_KEY` thay cho file. Fish Voice
-đọc `FISH_VOICE_ID` và `FISH_TTS_MODEL` trong `config/settings.py`; có thể đặt
-`FISH_VOICE_ID` và `FISH_LIVE_TTS_MODEL` bằng biến môi trường. Mặc định Gemini
+đặt biến môi trường `GEMINI_API_KEY` thay cho file. Edge voice mặc định là
+`ja-JP-NanamiNeural`, `en-US-AnaNeural`, và `vi-VN-HoaiMyNeural`; có thể cấu hình
+qua `MOON_EDGE_TTS_JA_VOICE`, `MOON_EDGE_TTS_EN_VOICE`, và
+`MOON_EDGE_TTS_VI_VOICE`. Mặc định Gemini
 dùng model `gemini-3.8-live` và voice nội bộ `Kore`; có thể đổi bằng
 `GEMINI_LIVE_MODEL` và `GEMINI_LIVE_VOICE` trước khi chạy Node.
 
@@ -112,7 +112,7 @@ Kiểm thử cầu nối không gọi API và không dùng quota:
 ```powershell
 node tests/test_gemini_live_bridge.cjs
 node tests/test_gemini_live_fish.cjs
-node tests/test_fish_tts.cjs
+node tests/test_edge_tts_bridge.cjs
 ```
 
 ## Chạy trên Windows
@@ -184,8 +184,8 @@ không âm thầm giả vờ đang chạy Porcupine.
 Trong thời gian chờ wakeword, audio được Gemini Transcribe nhận dạng và chỉ mở
 hội thoại khi transcript chứa tên `Moon` hoặc `ムーン`. Sau khi thức, chế độ Gemini
 Live nhận audio trực tiếp; riêng Brain Pipeline tiếp tục dùng Gemini Transcribe
-Live rồi chuyển text qua MQTT tới Brain/LLM và Fish. Raw audio không đi qua MQTT.
-Khi Brain/Fish đang phát câu trả lời, luồng thu tạm nghỉ và mở lại sau khi loa im
+Live rồi chuyển text qua MQTT tới Brain/LLM và Edge TTS. Raw audio không đi qua MQTT.
+Khi Brain/Edge TTS đang phát câu trả lời, luồng thu tạm nghỉ và mở lại sau khi loa im
 để hạn chế Moon tự nghe chính mình. Bấm **Kết thúc** sẽ đóng socket, dừng track
 microphone và hủy dữ liệu đang chờ.
 

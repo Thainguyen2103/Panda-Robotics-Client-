@@ -205,3 +205,24 @@ def language_failure_message(language: str) -> str:
     if language == "ja":
         return "正しい言語で回答できませんでした。もう一度お願いします。"
     return "Moon chưa thể trả lời đúng ngôn ngữ. Bạn thử hỏi lại nhé!"
+
+
+def detect_target_learning_language(question: str) -> str:
+    """
+    Xác định ngôn ngữ mục tiêu bé đang hỏi từ vựng (tiếng Anh, tiếng Nhật/Kanji, hoặc tiếng Việt):
+    - 'en': bé hỏi tiếng Anh ("... tiếng Anh là gì?")
+    - 'vi': bé hỏi nghĩa tiếng Việt ("... nghĩa là gì?", "... tiếng Việt là gì?")
+    - 'ja': bé hỏi tiếng Nhật / Chữ Hán (hoặc mặc định gia sư tiếng Nhật của robot)
+    """
+    normalized = unicodedata.normalize("NFC", question or "").casefold()
+
+    en_markers = ("tiếng anh", "tieng anh", "english", "in english", "bằng tiếng anh", "sang tiếng anh")
+    if any(m in normalized for m in en_markers):
+        return "en"
+
+    vi_markers = ("tiếng việt", "tieng viet", "vietnamese", "in vietnamese", "nghĩa là gì", "nghia la gi", "nghĩa gì", "dịch sang tiếng việt")
+    if any(m in normalized for m in vi_markers):
+        return "vi"
+
+    return "ja"
+

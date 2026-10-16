@@ -13,8 +13,8 @@ thái trên màn OLED theo phong cách robot Vector (Anki).
   luồng wakeword, 60 giây không có hội thoại sẽ tự quay lại chờ tên Moon.
 - **Hai pipeline để thử nghiệm**:
   - **Brain Pipeline**: Gemini Transcribe Live (STT Việt/Anh/Nhật) → Qwen local
-    qua Ollama → Fish Audio.
-  - **Gemini Live**: Gemini xử lý audio trực tiếp; đầu ra dùng Fish Voice hoặc
+    qua Ollama → Edge TTS Neural (ja/en/vi).
+  - **Gemini Live**: Gemini xử lý audio trực tiếp; đầu ra dùng Edge TTS Neural hoặc
     giọng Gemini Native. API key chỉ nằm ở backend.
 - **LLM local + kho bài học**: `moon-tutor` dùng Qwen 3.5 2B Q4, ưu tiên tốc độ
   và không tốn quota sinh văn bản. RAG cung cấp 48 bài học Nhật–Anh–Việt đã xác
@@ -39,7 +39,7 @@ thái trên màn OLED theo phong cách robot Vector (Anki).
  mic trình duyệt ─┬→ Gemini Live (audio trực tiếp) ───────────────┐
                   └→ Gemini Transcribe Live (VI/EN/JA) → brain.py │
  camera / ESP32-CAM → vision/ (face/body/hands/pipeline)          │
-                                                                ├→ Fish Audio / loa
+                                                                ├→ Edge TTS Neural / loa
  brain.py → llm_language.py → llm.py → Qwen/Ollama + learning/ ──┘
  dashboard web (OLED ảo, nút điều khiển) ↔ MQTT ↔ robot ESP32
 ```
@@ -66,8 +66,8 @@ model, tín hiệu hoặc transport mới.
 
 Chạy `start.bat`, mở <http://localhost:3000>, chọn **Hệ thống xử lý**, rồi chọn
 **Bật trực tiếp** hoặc **Chờ “Hey Moon” rồi trò chuyện**. Với Brain Pipeline,
-Gemini chỉ chuyển giọng nói thành văn bản; Qwen local tạo câu trả lời và Fish
-đọc câu trả lời đó. Sau khi wakeword được xác nhận, có thể hỏi nhiều lượt mà
+Gemini chỉ chuyển giọng nói thành văn bản; Qwen local tạo câu trả lời và Edge
+TTS Neural đọc câu trả lời đó. Sau khi wakeword được xác nhận, có thể hỏi nhiều lượt mà
 không cần gọi Moon lại.
 
 Wake âm học tức thời cần model Moon `.ppn` và Picovoice key; nếu chưa có,
@@ -85,7 +85,6 @@ trường của dự án.
 # Chạy các lệnh tại thư mục gốc repository
 py -3.12 -m venv server\venv
 .\server\venv\Scripts\python.exe -m pip install -r server\requirements.txt -r requirements-voice.txt
-.\server\venv\Scripts\python.exe -m pip install fish-audio-sdk pyttsx3
 npm --prefix web install
 
 # Tạo file key local; config/secrets.py đã được gitignore
@@ -95,13 +94,13 @@ Copy-Item config\secrets.example.py config\secrets.py
 ollama pull qwen3.5:2b-q4_K_M
 ollama create moon-tutor -f server\learning\Modelfile
 
-# Điền GEMINI_API_KEY và FISH_AUDIO_API_KEY vào config/secrets.py, rồi chạy
+# Điền GEMINI_API_KEY vào config/secrets.py, rồi chạy
 .\start.bat
 # Dashboard: http://localhost:3000
 ```
 
 `GEMINI_API_KEY` dùng cho STT Việt/Anh/Nhật và Gemini Live;
-`FISH_AUDIO_API_KEY` dùng cho giọng Moon. `GROQ_API_KEY`, DeepSeek và Picovoice
+Edge TTS dùng dịch vụ giọng nói trực tuyến, không cần API key riêng. `GROQ_API_KEY`, DeepSeek và Picovoice
 chỉ cần khi chủ động dùng các đường dự phòng tương ứng. Các file model Vision
 được đặt trong `models/vision/` theo bảng bên dưới.
 
@@ -120,7 +119,8 @@ Sau khi thay đổi key, model hoặc cấu hình, cần dừng tiến trình c�
 # Bridge/UI không gọi API thật
 node tests/test_gemini_live_bridge.cjs
 node tests/test_gemini_transcribe_bridge.cjs
-node tests/test_fish_tts.cjs
+node tests/test_gemini_live_fish.cjs
+node tests/test_edge_tts_bridge.cjs
 node tests/test_vision_ui.cjs
 ```
 

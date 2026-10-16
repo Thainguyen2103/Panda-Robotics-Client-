@@ -102,19 +102,20 @@ def test_llm():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TEST 2: TTS (Fish Audio)
+#  TEST 2: TTS (Edge TTS Neural)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def test_tts():
-    section("TEST 2 — TTS (Fish Audio)")
+    section("TEST 2 — TTS (Edge TTS Neural)")
     from server.voice import tts
 
-    assert_ok(tts.fish_client is not None,
-              "Fish Audio client OK",
-              "Fish Audio KHÔNG khởi tạo — kiểm tra FISH_AUDIO_API_KEY")
-
-    info(f"Voice ID: {tts.FISH_VOICE_ID or '(default)'}")
-    info(f"Model   : {tts.FISH_TTS_MODEL}")
+    try:
+        import edge_tts  # noqa: F401
+        edge_ready = True
+    except ImportError:
+        edge_ready = False
+    assert_ok(edge_ready, "Edge TTS package is available", "Cài requirements-voice.txt để bật Edge TTS")
+    info("Voices: ja-JP-NanamiNeural / en-US-AnaNeural / vi-VN-HoaiMyNeural")
 
     info("Phát âm câu test — lắng nghe xem có tiếng không...")
     t0 = time.time()
@@ -241,7 +242,12 @@ def test_full_pipeline():
     from server.llm import engine as llm
     from server.voice import tts
 
-    if not all([voice.groq_client, voice.sd, llm._client, tts.fish_client]):
+    try:
+        import edge_tts  # noqa: F401
+        edge_ready = True
+    except ImportError:
+        edge_ready = False
+    if not all([voice.groq_client, voice.sd, llm._client, edge_ready]):
         warn("Bỏ qua — 1 hoặc nhiều module chưa sẵn sàng"); return
 
     voice._select_input_device()   # warm-up mic trước để probe không nuốt mất giọng bạn
@@ -303,7 +309,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
 
     print(f"\n{BOLD}{CYAN}[MOON] Pipeline Test Suite{RESET}")
-    print(f"{CYAN}   Kiem tra: Voice (Groq) -> LLM (DeepSeek) -> TTS (Fish Audio){RESET}")
+    print(f"{CYAN}   Kiem tra: Voice (Groq) -> LLM (DeepSeek) -> TTS (Edge Neural){RESET}")
 
     try:
         if "--llm" in args:

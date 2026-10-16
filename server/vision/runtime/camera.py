@@ -182,6 +182,13 @@ def start_vision(callback, stop_event=None, publish=None):
             worker.join(timeout=2)
 
 
+def vision_process_worker(queue):
+    """Helper function to run vision in a separate multiprocessing.Process."""
+    def callback(person_detected, emotion, action):
+        queue.put((person_detected, emotion, action))
+    start_vision(callback)
+
+
 def main():
     if hasattr(sys.stdout,"reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8",errors="replace")

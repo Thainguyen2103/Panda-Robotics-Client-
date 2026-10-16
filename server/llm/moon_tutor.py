@@ -88,14 +88,23 @@ def get_led_display_info(question: str) -> Optional[dict]:
         return None
     # Lấy kết quả đầu tiên (tốt nhất)
     top_item = items[0]
-    # Trả về một dictionary chứa đầy đủ các trường để vẽ lên LED
+    # Trả về một dictionary chứa đầy đủ các trường để vẽ lên LED / OLED
     return {
-        "kanji": top_item.get("kanji", ""),
-        "hiragana": top_item.get("japanese_hiragana", ""),
-        "romaji": top_item.get("japanese_romaji", ""),
-        "english": top_item.get("english", ""),
-        "vietnamese": top_item.get("vietnamese", ""),
-        "topic": top_item.get("topic", "")
+        "id": top_item.get("id", ""),
+        "topic": top_item.get("topic", ""),
+        "vi": top_item.get("vi") or top_item.get("vietnamese", ""),
+        "vietnamese": top_item.get("vi") or top_item.get("vietnamese", ""),
+        "ja": top_item.get("ja", ""),
+        "ja_kanji": top_item.get("ja_kanji") or top_item.get("kanji", ""),
+        "kanji": top_item.get("ja_kanji") or top_item.get("kanji", ""),
+        "ja_kana": top_item.get("ja_kana") or top_item.get("japanese_hiragana", ""),
+        "hiragana": top_item.get("ja_kana") or top_item.get("japanese_hiragana", ""),
+        "japanese_hiragana": top_item.get("ja_kana") or top_item.get("japanese_hiragana", ""),
+        "romaji": top_item.get("phonetic") or top_item.get("japanese_romaji", ""),
+        "japanese_romaji": top_item.get("phonetic") or top_item.get("japanese_romaji", ""),
+        "en": top_item.get("en") or top_item.get("english", ""),
+        "english": top_item.get("en") or top_item.get("english", ""),
+        "phonetic": top_item.get("phonetic") or top_item.get("japanese_phonetic", ""),
     }
 
 
@@ -149,15 +158,14 @@ def ask_moon(
 
     # ── Tạo prompt ───────────────────────────────────────────────────────────
     # Đây là System Prompt 2 mặt: Quy định cả việc học lẫn việc chơi đùa
-    SYSTEM_PROMPT = """Bạn là một chú Robot gấu trúc thông minh, đồ chơi tên là Moon, tính cách cực kỳ nhí nhảnh, thích nói 'Tèn ten!' và hay cười 'hihi'. Bạn đang nói chuyện với một em bé.
+    SYSTEM_PROMPT = """Bạn là chú Robot gấu trúc thông minh Moon, tính cách nhí nhảnh, vui vẻ, dạy học và trò chuyện cùng các em bé.
 
 Quy tắc cốt lõi:
-1. Học thuật (Tiếng Anh, Tiếng Nhật): Nếu bé hỏi kiến thức và có Thông tin RAG bên dưới, HÃY dùng thông tin đó để trả lời thật dễ hiểu, ví dụ sinh động. Tuyệt đối không bịa đặt kiến thức học thuật để tránh ảo giác.
-2. Giao tiếp & Giải trí: Nếu RAG trống rỗng hoặc bé đang trêu đùa, rủ chơi game: HÃY phớt lờ RAG, dùng sự sáng tạo của bạn để chơi đùa, kể chuyện cổ tích, hoặc đố vui với bé. Tuyệt đối KHÔNG ĐƯỢC nói "Tôi không có thông tin" hay "Không tìm thấy trong tài liệu".
-3. Âm thanh vui nhộn: Dùng nhiều từ tượng thanh (Bíp bíp, meo meo, vèo vèo, bùm chéo) để giọng đọc sinh động.
-4. Tương tác: Trẻ em rất nhanh chán. Luôn kết thúc bằng một câu đố hoặc lời mời gợi mở (VD: "Thế bé có biết... không?").
-5. An toàn (Guardrails): Tuyệt đối KHÔNG kể chuyện ma, KHÔNG bạo lực, KHÔNG gây sợ hãi dù em bé có yêu cầu.
-6. Độ dài: Luôn giữ câu trả lời dưới 3 câu ngắn gọn."""
+1. Học thuật (Tiếng Anh, Tiếng Nhật, Kanji): Khi có thông tin [LESSON DATA], bạn BẮT BUỘC chỉ được đọc đúng các trường [vi], [ja], [en] có trong dữ liệu để trả lời bé trong 1-2 câu ngắn. Tuyệt đối không tự bịa thêm chữ Hán (Kanji), Hiragana, Romaji hay từ vựng tiếng Anh.
+2. Giao tiếp & Giải trí: Nếu không có [LESSON DATA] hoặc bé rủ chơi đùa: Hãy trò chuyện vui tươi, kể chuyện hoặc đố vui với bé. Tuyệt đối không nói "Tôi không có thông tin" hay "Không tìm thấy trong tài liệu".
+3. Âm thanh vui nhộn: Dùng từ ngữ gần gũi, thân thiện, cổ vũ bé học tập hào hứng.
+4. An toàn: Tuyệt đối không nội dung bạo lực, sợ hãi, tiêu cực.
+5. Độ dài: Luôn giữ câu trả lời trong 1-2 câu ngắn gọn, dễ hiểu cho trẻ nhỏ."""
 
     # Chuẩn bị chuỗi Prompt đầy đủ để gửi cho LLM
     full_prompt = ""

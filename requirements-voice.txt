@@ -1,4 +1,6 @@
 aiohttp>=3.10,<4
 groq>=0.11,<1
 webrtcvad-wheels>=2.0.14,<3
+# Default multilingual neural TTS provider (ja/en/vi); uses Microsoft's online service.
+edge-tts>=7,<8
 # Optional acoustic Moon wakeword: pip install pvporcupine

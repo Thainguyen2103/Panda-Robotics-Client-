@@ -34,6 +34,7 @@ from server.llm.language import (
     response_language_matches,
     strict_retry_instruction,
 )
+from server.llm.brain_router import Intent, IntentRouter, PROMPT_OVERRIDES
 
 # Fix Windows terminal encoding (giống brain.py) — tránh crash khi in emoji/Việt
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
@@ -62,7 +63,7 @@ try:
     OLLAMA_MAX_TOKENS = getattr(settings, "OLLAMA_MAX_TOKENS", 128)
     LLM_PROVIDER     = getattr(settings, "LLM_PROVIDER", "ollama")
     LEARNING_RAG_ENABLED = getattr(settings, "LEARNING_RAG_ENABLED", True)
-    QUICK_MODEL      = getattr(settings, "QUICK_MODEL", "groq/compound-mini")
+    QUICK_MODEL      = getattr(settings, "QUICK_MODEL", "llama-3.3-70b-versatile")
 except Exception:
     DEEPSEEK_API_KEY = None
     GROQ_API_KEY     = None
@@ -74,7 +75,7 @@ except Exception:
     OLLAMA_MAX_TOKENS = 128
     LLM_PROVIDER     = "ollama"
     LEARNING_RAG_ENABLED = True
-    QUICK_MODEL      = "groq/compound-mini"
+    QUICK_MODEL      = "llama-3.3-70b-versatile"
 
 # ─── Xác định model và client sẽ dùng ────────────────────────────────────────
 _client      = None
@@ -191,9 +192,9 @@ def has_learning_intent(question: str) -> bool:
     return any(marker in normalized for marker in _LEARNING_INTENT_MARKERS)
 
 
-def learning_context(question: str) -> str:
+def learning_context(question: str, *, force: bool = False) -> str:
     """Return verified lesson context without making the whole LLM depend on RAG."""
-    if not _retrieve_learning_context or not has_learning_intent(question):
+    if not _retrieve_learning_context or not force:
         return ""
     try:
         # Một bài liên quan là đủ cho model local và giảm đáng kể thời gian
@@ -216,10 +217,10 @@ def learning_display_info(question: str) -> dict | None:
 
 
 _VOCAB_LOOKUP_MARKERS = (
-    "tiếng nhật", "đọc thế nào", "đọc là gì", "viết thế nào", "nghĩa là gì",
+    "tiếng nhật", "tiếng anh", "tiếng việt", "đọc thế nào", "đọc là gì", "viết thế nào", "nghĩa là gì",
     "chữ hán", "hán tự", "kanji", "hiragana", "romaji",
-    "how do you say", "in japanese", "how is", "pronounce", "written in",
-    "日本語", "読み", "読ん", "書き", "漢字", "ひらがな", "ローマ字", "意味",
+    "how do you say", "in japanese", "in english", "in vietnamese", "how is", "pronounce", "written in",
+    "日本語", "英語", "読み", "読ん", "書き", "漢字", "ひらがな", "ローマ字", "意味",
 )
 
 _TIME_QUERY_MARKERS = (
@@ -241,7 +242,7 @@ def realtime_answer(question: str) -> str | None:
     if language == "ja":
         weekdays = ["月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日", "日曜日"]
         return (
-            f"現在は{now:%H時%M分}、{now.year}年{now.month}月{now.day}日"
+            f"現在は{now.hour:02d}時{now.minute:02d}分、{now.year}年{now.month}月{now.day}日"
             f"（{weekdays[now.weekday()]}）です。"
         )
     if language == "en":
@@ -260,69 +261,126 @@ def realtime_answer(question: str) -> str | None:
     return f"Bây giờ là {now:%H:%M}, {_WEEKDAYS[now.weekday()]} ngày {now:%d/%m/%Y}."
 
 
-from server.llm.dictionary_router import lookup_vocab, get_entertainment
+from server.llm.dictionary_router import lookup_vocab, get_entertainment, get_role_play
+from server.llm.pedagogy import (
+    fast_pedagogical_correction,
+    detect_pedagogical_context,
+    is_role_play_request,
+    is_role_play_exit,
+    format_role_play_system_instruction,
+    format_pedagogical_error_instruction,
+)
 from functools import lru_cache
 
-@lru_cache(maxsize=500)
 def grounded_learning_answer(question: str) -> str | None:
-    """Answer direct vocabulary lookups instantly via Hash Map (O(N) substring search).
-    Bỏ qua RAG/LLM nặng nề, trả về đáp án ngay lập tức từ data.json.
+    """Answer direct vocabulary lookups instantly via Hash Map / RAG display info.
+    Bỏ qua LLM nặng nề, trả về đáp án ngay lập tức từ data.json.
     """
     normalized = unicodedata.normalize("NFC", question or "").casefold()
     if not any(marker in normalized for marker in _VOCAB_LOOKUP_MARKERS):
         return None
 
-    info = lookup_vocab(question)
+    info = learning_display_info(question) or lookup_vocab(question)
     if not info:
         return None
 
-    kanji = str(info.get("kanji") or "").strip()
-    hiragana = str(info.get("japanese_hiragana") or info.get("hiragana") or "").strip()
-    romaji = str(info.get("japanese_romaji") or info.get("romaji") or "").strip()
-    english = str(info.get("english") or "").strip()
-    vietnamese = str(info.get("vietnamese") or "").strip()
-    
-    if not all((kanji, hiragana, romaji, english, vietnamese)):
+    kanji = str(info.get("ja_kanji") or info.get("kanji") or "").strip()
+    hiragana = str(info.get("ja_kana") or info.get("japanese_hiragana") or info.get("hiragana") or "").strip()
+    ja = str(info.get("ja") or "").strip()
+    romaji = str(info.get("romaji") or info.get("japanese_romaji") or "").strip()
+    if not romaji and "(" in ja and ")" in ja:
+        romaji = ja.split("(")[1].split(")")[0].strip()
+    english = str(info.get("en") or info.get("english") or "").strip()
+    vietnamese = str(info.get("vi") or info.get("vietnamese") or "").strip()
+
+    if not (vietnamese and english and (kanji or hiragana)):
         return None
 
     language = response_language(question)
+    disp_kanji = kanji or hiragana
+    disp_kana = hiragana or kanji
+    disp_romaji = romaji or disp_kana
+
     if language == "ja":
         return (
-            f"日本語では「{kanji}」と書き、「{hiragana}」"
-            f"（ローマ字: {romaji}）と読みます。英語では「{english}」、"
+            f"日本語では「{disp_kanji}」と書き、「{disp_kana}」"
+            f"（ローマ字: {disp_romaji}）と読みます。英語では「{english}」、"
             f"ベトナム語では「{vietnamese}」です。"
         )
     if language == "en":
         return (
-            f"In Japanese, {english} is written {kanji} and read {hiragana} "
-            f"({romaji}); in Vietnamese, it means {vietnamese}."
+            f"In Japanese, {english} is written {disp_kanji} and read {disp_kana} "
+            f"({disp_romaji}); in Vietnamese, it means {vietnamese}."
         )
+    q_lower = unicodedata.normalize("NFC", question or "").casefold()
+    if any(k in q_lower for k in ["tiếng anh", "english", "in english"]):
+        return f"Từ {vietnamese} trong tiếng Anh là {english} bé nha!"
+    # Mặc định: hỏi tiếng Nhật → tập trung vào Nhật
     return (
-        f"Trong tiếng Nhật, {vietnamese} viết là {kanji}, đọc là {hiragana} "
-        f"({romaji}); tiếng Anh là {english}."
+        f"Từ {vietnamese} ({english}) trong tiếng Nhật viết là {disp_kanji}, đọc là {disp_kana} "
+        f"({disp_romaji}) bé nha!"
     )
 
+
+def publish_learning_display(question: str, info: dict):
+    """
+    Trích xuất đúng trường dữ liệu theo ngôn ngữ bé hỏi:
+    - Tiếng Nhật / Chữ Hán -> lấy ja_kanji (hoặc ja)
+    - Tiếng Anh -> lấy en
+    - Tiếng Việt -> lấy vi
+    Bắn lệnh MQTT lên màn hình OLED/LED của robot.
+    """
+    if not info:
+        return
+    try:
+        from server.llm.dictionary_router import extract_display_text
+        from server.network.mqtt_bridge import publish
+        from config import settings
+        import json
+
+        field, display_text = extract_display_text(question, info)
+        if not display_text:
+            return
+
+        # 1. Bắn lên moon/ai/led (dành riêng cho OLED/Web hiển thị chữ Kanji to rõ)
+        publish("moon/ai/led", display_text)
+
+        # 2. Cập nhật nhãn OLED chủ đề/từ vựng (moon/ai/topic)
+        topic_var = getattr(settings, "TOPIC_AI_TOPIC", "moon/ai/topic")
+        topic_id = info.get("topic") or "study"
+        publish(topic_var, json.dumps({
+            "id": topic_id.lower() if isinstance(topic_id, str) else "study",
+            "cap": display_text[:12]
+        }))
+        print(f"📟 [OLED-MQTT] Đã hiển thị [{field}]: \"{display_text}\" lên OLED")
+    except Exception as e:
+        print(f"⚠️ [MQTT] Không thể bắn display lên OLED: {e}")
+
+
 # ─── System Prompt — Tính cách Moon (Tối ưu cho model nhỏ 2B-3B) ────────────
-# Few-shot examples giúp model nhỏ hiểu chính xác cách trả lời mà không bịa đặt.
-# Prompt ngắn gọn hơn → ít token hơn → sinh câu trả lời nhanh hơn.
-SYSTEM_PROMPT = """You are Moon, a friendly panda robot. Rules:
+# Ràng buộc chặt chẽ: chỉ sử dụng các trường [vi], [ja], [en] trong [LESSON DATA]
+SYSTEM_PROMPT = """You are Moon, a friendly panda robot tutor for kids. Rules:
 1. Reply in the user's language (Vietnamese/English/Japanese). Never Chinese.
-2. Answer in 1-3 short spoken sentences. No Markdown, no bullet lists.
-3. If [LESSON] data is provided, use it EXACTLY. Never invent Kanji/Hiragana/Romaji.
-4. If no lesson matches and you're unsure, say: "Moon chưa có bài này, hỏi ba mẹ nạp thêm nhé!"
+2. Answer in 1-2 short, cheerful spoken sentences. No Markdown, no bullet lists.
+3. If [LESSON DATA] is provided, you MUST use ONLY the exact fields [vi], [ja], [en] from it. Absolutely never invent or modify Kanji, Hiragana, Romaji or English words.
+4. If no lesson matches and you are unsure, say: "Moon chưa có bài này, hỏi ba mẹ nạp thêm nhé!"
 5. Input is from speech recognition; fix minor typos silently.
+6. PEDAGOGICAL ERROR CORRECTION: When a child speaks or practices in English or Japanese with grammar mistakes or awkward phrasing, NEVER say "I don't understand" or reply bluntly. Always follow 3 gentle steps:
+   - Step 1 (Encourage): Warmly praise the child's effort (e.g. "Bé nói gần đúng rồi nè, giỏi quá!", "Good try!").
+   - Step 2 (Correct sentence): Give the natural, accurate sentence clearly for the child to repeat.
+   - Step 3 (Brief explanation): Explain gently in 1 short Vietnamese sentence suitable for young children.
+7. INTERACTIVE ROLE-PLAY: In role-play scenarios, stay in character, speak in 1-2 short, engaging turns, and prompt the child with a simple line they can say next.
 
 Examples:
 User: Con mèo tiếng Nhật là gì?
-[LESSON] vietnamese=Mèo, kanji=猫, hiragana=ねこ, romaji=Neko
-Moon: Con mèo tiếng Nhật viết là 猫, đọc là ねこ, phiên âm là Neko. Bé thử đọc theo Moon nào: Nê-kô!
+[LESSON DATA]
+[vi]: Con mèo
+[ja]: 猫 (Neko) (Kanji: 猫, Kana: ねこ, đọc: nê-kô)
+[en]: Cat
+Moon: Con mèo tiếng Nhật viết là 猫, đọc là Neko bé nha! Bé thử đọc theo Moon nào: Nê-kô!
 
-User: What is dog in Japanese?
-[LESSON] vietnamese=Chó, kanji=犬, hiragana=いぬ, romaji=Inu
-Moon: Dog in Japanese is 犬, read as いぬ (Inu). Try saying it: ee-noo!
-
-User: Con gì kêu meo meo?
-Moon: Đó là con mèo đấy bé ơi! Mèo tiếng Nhật viết là 猫, đọc là ねこ (Neko). Bé giỏi lắm!"""
+User: Con nói "I goes to school" đúng không Moon?
+Moon: Bé giỏi lắm, đã rất tự tin nói tiếng Anh rồi nè! Câu chuẩn xác là: "I go to school" bé nha. Vì với chủ ngữ "I", chúng mình dùng động từ "go" không thêm "-es" nhé!"""
 
 # ─── Ngữ cảnh thời gian thực (để LLM biết "thế giới thật") ───────────────────
 # Giống Anki Vector: LLM không tự biết giờ/thời tiết — phải CẤP cho nó.
@@ -376,8 +434,20 @@ _history_lock = threading.Lock()
 # đến mức chậm rõ rệt sau một phút trò chuyện.
 MAX_HISTORY = 3
 
+# Trạng thái phiên nhập vai hiện tại (Role-play session)
+_active_role_play: dict | None = None
 
-def _get_messages(user_question: str) -> list[dict]:
+def get_active_role_play() -> dict | None:
+    with _history_lock:
+        return _active_role_play
+
+def set_active_role_play(scenario: dict | None):
+    global _active_role_play
+    with _history_lock:
+        _active_role_play = scenario
+
+
+def _get_messages(user_question: str, intent_decision=None) -> list[dict]:
     with _history_lock:
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         # Câu hỏi giờ/ngày đã có nhánh deterministic. Chỉ bơm thời tiết khi
@@ -385,7 +455,28 @@ def _get_messages(user_question: str) -> list[dict]:
         wx = _maybe_weather(user_question)
         if wx:
             messages.append({"role": "system", "content": wx})
-        lesson_context = learning_context(user_question)
+
+        # 1. Bơm chỉ thị nhập vai nếu đang trong phiên đóng vai tương tác
+        if _active_role_play:
+            messages.append({
+                "role": "system",
+                "content": format_role_play_system_instruction(_active_role_play),
+            })
+        else:
+            # 2. Bơm chỉ thị sư phạm sửa lỗi nếu phát hiện ngữ cảnh luyện nói ngoại ngữ
+            is_ped, _ = detect_pedagogical_context(user_question)
+            if is_ped:
+                messages.append({
+                    "role": "system",
+                    "content": format_pedagogical_error_instruction(),
+                })
+
+        route = intent_decision or IntentRouter().classify(user_question)
+        prompt_override = PROMPT_OVERRIDES.get(route.intent)
+        if prompt_override:
+            messages.append({"role": "system", "content": prompt_override})
+
+        lesson_context = learning_context(user_question, force=route.use_rag)
         if lesson_context:
             print("📚 [RAG] Đã thêm bài học xác thực vào prompt.")
             messages.append({
@@ -410,9 +501,11 @@ def _add_to_history(user_msg: str, assistant_msg: str):
 
 
 def clear_history():
+    global _active_role_play
     with _history_lock:
         _conversation_history.clear()
-    print("🧹 [LLM] Đã xóa lịch sử hội thoại.")
+        _active_role_play = None
+    print("🧹 [LLM] Đã xóa lịch sử hội thoại và đặt lại kịch bản nhập vai.")
 
 
 # ─── DeepSeek reasoning: strip <think>...</think> tags ───────────────────────
@@ -490,6 +583,56 @@ def chat(
     if model_question != question:
         print(f'✍️ [LLM] Hiệu chỉnh chắc chắn: "{question}" → "{model_question}"')
 
+    intent_decision = IntentRouter().classify(model_question)
+    print(f"🧭 [BRAIN ROUTER] intent={intent_decision.intent.value} confidence={intent_decision.confidence:.2f}")
+
+    # 0. Thoát vai nếu bé yêu cầu dừng trò chơi nhập vai
+    global _active_role_play
+    if _active_role_play and is_role_play_exit(model_question):
+        with _history_lock:
+            _active_role_play = None
+        exit_msg = "Cảm ơn bé đã cùng chơi đóng vai với Moon nha! Trò chơi hôm nay vui quá, lần sau chúng mình lại chơi tiếp nhé!"
+        if on_thinking:
+            on_thinking("answering")
+        if on_chunk:
+            on_chunk(exit_msg)
+        _add_to_history(question, exit_msg)
+        if on_done:
+            on_done(exit_msg)
+        return exit_msg
+
+    # 1. Cơ chế phản hồi lỗi sai sư phạm nhanh (Pedagogical Error Correction: Khích lệ -> Sửa chuẩn -> Giải thích)
+    fast_ped_answer = fast_pedagogical_correction(model_question)
+    if fast_ped_answer:
+        if on_thinking:
+            on_thinking("answering")
+        if on_chunk:
+            on_chunk(fast_ped_answer)
+        _add_to_history(question, fast_ped_answer)
+        if on_done:
+            on_done(fast_ped_answer)
+        print(f'✅ [PEDAGOGY] Sửa lỗi ngữ pháp 3 bước: "{fast_ped_answer[:80]}"')
+        return fast_ped_answer
+
+    # 2. Khởi động kịch bản nhập vai (Interactive Role-play Practice)
+    if is_role_play_request(model_question):
+        scenario = get_role_play(model_question)
+        if scenario:
+            with _history_lock:
+                _active_role_play = scenario
+            intro = scenario.get("intro", "")
+            first_turn = scenario.get("first_turn", "")
+            role_msg = f"{intro} {first_turn}".strip()
+            if on_thinking:
+                on_thinking("answering")
+            if on_chunk:
+                on_chunk(role_msg)
+            _add_to_history(question, role_msg)
+            if on_done:
+                on_done(role_msg)
+            print(f'✅ [ROLE-PLAY] Bắt đầu kịch bản: "{scenario.get("title")}"')
+            return role_msg
+
     # 1. BỘ NHỚ ĐỆM (SEMANTIC CACHE) - Tránh LLM chạy lại câu cũ
     if model_question in _semantic_cache:
         cached_ans = _semantic_cache[model_question]
@@ -518,16 +661,13 @@ def chat(
 
     # Với câu hỏi tra từ trực tiếp, lấy đáp án từ dữ liệu bài học đã xác thực.
     # Nhánh này vừa nhanh vừa tránh để model nhỏ làm sai Kanji/Hiragana/Romaji.
-    grounded_answer = grounded_learning_answer(model_question)
+    grounded_answer = (grounded_learning_answer(model_question)
+                       if intent_decision.intent is Intent.KNOWLEDGE_QNA else None)
     if grounded_answer:
-        # Publish Kanji lên MQTT để web hiển thị
+        # Publish hiển thị (Kanji/Tiếng Anh/Tiếng Việt) lên MQTT để OLED hiển thị
         info = lookup_vocab(model_question)
-        if info and info.get("kanji"):
-            try:
-                from server.network.mqtt_bridge import publish
-                publish("moon/ai/led", info["kanji"])
-            except Exception:
-                pass
+        if info:
+            publish_learning_display(model_question, info)
                 
         if on_thinking:
             on_thinking("answering")
@@ -554,6 +694,10 @@ def chat(
 
     if not _client:
         error_msg = "Xin lỗi, Moon chưa kết nối được với Qwen. Vui lòng kiểm tra Ollama."
+        if on_thinking:
+            on_thinking("answering")
+        if on_chunk:
+            on_chunk(error_msg)
         if on_done:
             on_done(error_msg)
         return error_msg
@@ -562,7 +706,12 @@ def chat(
     t0 = time.time()
 
     try:
-        messages = _get_messages(model_question)
+        messages = _get_messages(model_question, intent_decision)
+
+        # Nếu có bài học RAG liên quan, hiển thị lên OLED ngay
+        disp_info = learning_display_info(model_question)
+        if disp_info:
+            publish_learning_display(model_question, disp_info)
 
         # Extra params cho DeepSeek Reasoner
         extra_kwargs = {}
@@ -578,27 +727,44 @@ def chat(
         )
         temperature = 0.25 if _provider_name == "ollama" else 0.7
         
-        # Bật lại tính năng streaming để robot nói nhanh hơn (không chờ cả câu)
-        stream = _stream_provider(
-            _client,
-            _provider_name,
-            _model_name,
-            messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
-        
-        full_response_chunks = []
-        for chunk in stream:
-            full_response_chunks.append(chunk)
-            if on_chunk:
-                on_chunk(chunk)
-                
-        full_response = "".join(full_response_chunks)
-        full_response = _strip_thinking(full_response)
-        
+        expected_lang = response_language(model_question)
+        attempts = 0
+        max_attempts = 2
+        full_response = ""
+
+        while attempts < max_attempts:
+            stream = _stream_provider(
+                _client,
+                _provider_name,
+                _model_name,
+                messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            attempt_chunks = []
+            for chunk in stream:
+                attempt_chunks.append(chunk)
+
+            candidate = _strip_thinking("".join(attempt_chunks))
+            if not candidate:
+                attempts += 1
+                continue
+
+            if response_language_matches(candidate, expected_lang) or attempts == max_attempts - 1:
+                full_response = candidate
+                if on_chunk:
+                    for c in attempt_chunks:
+                        on_chunk(c)
+                break
+            else:
+                attempts += 1
+                print(f"⚠️ [LLM] Sai ngôn ngữ (kỳ vọng {expected_lang}), thử lại lượt {attempts}...")
+                messages.append({"role": "system", "content": strict_retry_instruction(expected_lang)})
+
         if not full_response:
-            raise RuntimeError(f"{_provider_name} trả về nội dung rỗng")
+            full_response = language_failure_message(expected_lang)
+            if on_chunk:
+                on_chunk(full_response)
 
         elapsed = time.time() - t0
         print(
@@ -619,6 +785,10 @@ def chat(
     except Exception as e:
         error_msg = "Xin lỗi, Moon gặp sự cố khi suy nghĩ. Bạn thử hỏi lại nhé!"
         print(f"❌ [LLM] Lỗi: {e}")
+        if on_thinking:
+            on_thinking("answering")
+        if on_chunk:
+            on_chunk(error_msg)
         if on_done:
             on_done(error_msg)
         return error_msg
@@ -646,47 +816,64 @@ elif GROQ_API_KEY:
 
 def quick(prompt: str, max_tokens: int = 200) -> str:
     """Completion cực ngắn, không lịch sử — dùng tạo caption OLED / sửa lỗi ASR /
-    chọn cảm xúc. Dùng model INSTANT (nhanh gấp ~10 lần gpt-oss reasoning)."""
-    try:
-        # Dùng Cloud (Gemini/Groq) cho tác vụ nhỏ để giải phóng Ollama
-        if _quick_cloud_provider == "gemini":
-            return _quick_cloud_client.complete(
-                prompt,
-                max_tokens=max_tokens,
-                temperature=0.2,
-            )
-        elif _quick_cloud_provider == "groq":
-            response = _quick_cloud_client.chat.completions.create(
-                model=QUICK_MODEL,
+    chọn cảm xúc. Dùng model INSTANT (nhanh gấp ~10 lần gpt-oss reasoning).
+    Hỗ trợ fallback nhiều tầng: Cloud API (Gemini/Groq) -> Local Ollama/Client -> Safe default."""
+    # ── Tầng 1: Thử Cloud API (Gemini/Groq) nếu khả dụng ─────────────────────
+    if _quick_cloud_client:
+        try:
+            if _quick_cloud_provider == "gemini":
+                return _quick_cloud_client.complete(
+                    prompt,
+                    max_tokens=max_tokens,
+                    temperature=0.2,
+                )
+            elif _quick_cloud_provider == "groq":
+                response = _quick_cloud_client.chat.completions.create(
+                    model=QUICK_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=max_tokens,
+                    temperature=0.2,
+                    stream=False,
+                )
+                return (response.choices[0].message.content or "").strip()
+        except Exception as cloud_err:
+            print(f"⚠️ [LLM] quick() cloud API ({_quick_cloud_provider}/{QUICK_MODEL}) lỗi: {cloud_err}. Fallback sang local Ollama...")
+
+    # ── Tầng 2: Fallback sang Client chính đang hoạt động (Ollama/Gemini/Groq) ──
+    if _client:
+        try:
+            if _provider_name in {"gemini", "ollama"}:
+                return _client.complete(
+                    prompt,
+                    max_tokens=max_tokens,
+                    temperature=0.2,
+                )
+
+            quick_model = QUICK_MODEL if _provider_name == "groq" else _model_name
+            response = _client.chat.completions.create(
+                model=quick_model,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
                 temperature=0.2,
                 stream=False,
             )
             return (response.choices[0].message.content or "").strip()
+        except Exception as client_err:
+            print(f"⚠️ [LLM] quick() client fallback lỗi: {client_err}")
 
-        if not _client:
-            return ""
-
-        if _provider_name in {"gemini", "ollama"}:
-            return _client.complete(
-                prompt,
-                max_tokens=max_tokens,
-                temperature=0.2,
-            )
-
-        quick_model = QUICK_MODEL if _provider_name == "groq" else _model_name
-        response = _client.chat.completions.create(
-            model=quick_model,
-            messages=[{"role": "user", "content": prompt}],
+    # ── Tầng 3: Thử trực tiếp Ollama local nếu các tầng trên chưa dùng được ────
+    try:
+        from server.llm_providers.ollama import OllamaTextClient
+        local_client = OllamaTextClient(OLLAMA_LLM_MODEL, OLLAMA_HOST)
+        return local_client.complete(
+            prompt,
             max_tokens=max_tokens,
             temperature=0.2,
-            stream=False,
         )
-        return (response.choices[0].message.content or "").strip()
-    except Exception as e:
-        print(f"⚠️ [LLM] quick() lỗi: {e}")
-        return ""
+    except Exception as local_err:
+        print(f"⚠️ [LLM] quick() local Ollama direct fallback lỗi: {local_err}")
+
+    return ""
 
 
 def chat_async(
