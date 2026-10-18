@@ -67,7 +67,7 @@ except Exception:
 
 # ─── Cờ TTS đang phát — để mic KHÔNG thu tiếng loa của chính Moon ───────────
 try:
-    from server.tts import is_speaking as _tts_speaking
+    from server.voice.tts import is_speaking as _tts_speaking
 except Exception:
     def _tts_speaking() -> bool:
         return False

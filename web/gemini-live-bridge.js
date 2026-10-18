@@ -4,7 +4,7 @@ const {WebSocket, WebSocketServer} = require('ws');
 const {
     GoogleGenAI, Modality, Type, StartSensitivity, EndSensitivity,
 } = require('@google/genai');
-const {readFishConfig, synthesizeFish, synthesizeFishWithRetry} = require('./fish-tts');
+const {synthesizeEdge} = require('./edge-tts');
 
 const DEFAULT_MODEL = 'gemini-3.8-live';
 const DEFAULT_VOICE = 'Kore';
@@ -93,9 +93,8 @@ function attachGeminiLive(server, mqttClient, options = {}) {
 
     wss.on('connection', async (downstream, req) => {
         const query = new URL(req.url, 'http://localhost').searchParams;
-        const outputMode = query.get('mode') === 'native' ? 'native' : 'fish';
-        const fishConfig = readFishConfig(options);
-        const synthesize = options.synthesizeFish || synthesizeFish;
+        const outputMode = query.get('mode') === 'native' ? 'native' : 'edge';
+        const synthesize = options.synthesizeEdge || synthesizeEdge;
         let session;
         let ready = false;
         let closed = false;
@@ -104,8 +103,8 @@ function attachGeminiLive(server, mqttClient, options = {}) {
         let pendingNativeAudio = [];
         let pendingNativeBytes = 0;
         let responseGeneration = 0;
-        let fishAbort;
-        let fishFinalizeTimer;
+        let edgeAbort;
+        let edgeFinalizeTimer;
         let toolContinuationTimer;
         let awaitingToolContinuation = false;
         let failed = false;
@@ -118,9 +117,9 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             closed = true;
             ready = false;
             responseGeneration++;
-            clearTimeout(fishFinalizeTimer);
+            clearTimeout(edgeFinalizeTimer);
             clearTimeout(toolContinuationTimer);
-            fishAbort?.abort();
+            edgeAbort?.abort();
             try { ignoreRejection(session?.sendRealtimeInput({audioStreamEnd: true})); } catch (_) {}
             try { ignoreRejection(session?.close()); } catch (_) {}
             if (session) publishFace('neutral');
@@ -157,16 +156,16 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             publishFace('neutral');
             sendJson({event: 'expression', expression: 'neutral'});
         };
-        const interruptFish = () => {
-            if (outputMode !== 'fish') return;
+        const interruptEdge = () => {
+            if (outputMode !== 'edge') return;
             responseGeneration++;
-            clearTimeout(fishFinalizeTimer);
+            clearTimeout(edgeFinalizeTimer);
             clearTimeout(toolContinuationTimer);
-            fishFinalizeTimer = undefined;
+            edgeFinalizeTimer = undefined;
             toolContinuationTimer = undefined;
             awaitingToolContinuation = false;
-            fishAbort?.abort();
-            fishAbort = undefined;
+            edgeAbort?.abort();
+            edgeAbort = undefined;
             pendingText = '';
             pendingNativeAudio = [];
             pendingNativeBytes = 0;
@@ -175,7 +174,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
         };
         const sendAudio = (chunks, format, fallbackText = '', complete = true, announce = true) => {
             if (!Array.isArray(chunks) || chunks.length === 0 || downstream.readyState !== WebSocket.OPEN) return false;
-            if (fallbackText) sendJson({event: 'fish_fallback', text: fallbackText});
+            if (fallbackText) sendJson({event: 'edge_fallback', text: fallbackText});
             if (announce) sendJson({event: 'speaking', format});
             try {
                 for (const chunk of chunks) {
@@ -191,8 +190,8 @@ function attachGeminiLive(server, mqttClient, options = {}) {
         };
         const fallbackToGeminiAudio = (chunks, reason, spokenText = '') => {
             const text = reason
-                ? `Fish Audio tạm lỗi (${reason}). Moon dùng giọng Gemini cho câu này.`
-                : 'Không nhận được bản chữ Fish. Moon dùng giọng Gemini cho câu này.';
+                ? `Edge TTS tạm lỗi (${reason}). Moon dùng giọng Gemini cho câu này.`
+                : 'Edge TTS không trả audio. Moon dùng giọng Gemini cho câu này.';
             if (sendAudio(chunks, 'pcm', text)) return;
             if (spokenText.trim()) {
                 browserFallbackActive = true;
@@ -207,19 +206,13 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             sendJson({event: 'turn_error', text: 'Gemini không trả về cả nội dung chữ lẫn âm thanh.'});
             sendJson({event: 'listening'});
         };
-        const speakFish = async (text, fallbackAudio) => {
+        const speakEdge = async (text, fallbackAudio) => {
             const generation = ++responseGeneration;
-            fishAbort?.abort();
-            fishAbort = new AbortController();
-            sendJson({event: 'fish_synthesizing'});
+            edgeAbort?.abort();
+            edgeAbort = new AbortController();
+            sendJson({event: 'edge_synthesizing'});
             try {
-                const audio = await synthesizeFishWithRetry(text, fishConfig, {
-                    signal: fishAbort.signal,
-                    synthesize,
-                    attempts: 2,
-                    timeoutMs: 15000,
-                    onRetry: () => sendJson({event: 'fish_retrying'}),
-                });
+                const audio = await synthesize(text, {signal: edgeAbort.signal, timeoutMs: 15000});
                 if (closed || generation !== responseGeneration || downstream.readyState !== WebSocket.OPEN) return;
                 sentSpeaking = true;
                 lastPlaybackFallback = fallbackAudio;
@@ -228,19 +221,19 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 sentSpeaking = false;
             } catch (error) {
                 if (error?.name === 'AbortError' || generation !== responseGeneration || closed) return;
-                fallbackToGeminiAudio(fallbackAudio, error?.message || 'không tạo được giọng Fish', text);
+                fallbackToGeminiAudio(fallbackAudio, error?.message || 'không tạo được giọng Edge TTS', text);
             } finally {
-                if (generation === responseGeneration) fishAbort = undefined;
+                if (generation === responseGeneration) edgeAbort = undefined;
             }
         };
-        const finalizeFishTurn = () => {
-            fishFinalizeTimer = undefined;
+        const finalizeEdgeTurn = () => {
+            edgeFinalizeTimer = undefined;
             const text = pendingText.trim();
             const fallbackAudio = pendingNativeAudio;
             pendingText = '';
             pendingNativeAudio = [];
             pendingNativeBytes = 0;
-            if (text) void speakFish(text, fallbackAudio);
+            if (text) void speakEdge(text, fallbackAudio);
             else fallbackToGeminiAudio(fallbackAudio, '');
         };
         const handleToolCalls = calls => {
@@ -273,14 +266,14 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 sendJson({
                     event: 'ready',
                     model,
-                    voice: outputMode === 'fish' ? 'Fish Voice' : voice,
+                    voice: outputMode === 'edge' ? 'Edge TTS Neural' : voice,
                     outputMode,
                 });
             }
 
             const activity = message.voiceActivity?.voiceActivityType;
             if (activity === 'ACTIVITY_START') {
-                interruptFish();
+                interruptEdge();
                 sendJson({event: 'user_speaking'});
             }
             if (activity === 'ACTIVITY_END') sendJson({event: 'thinking'});
@@ -293,12 +286,12 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 sendJson({event: 'input_transcript', text: content.inputTranscription.text});
             }
             if (content?.interrupted) {
-                interruptFish();
+                interruptEdge();
                 sentSpeaking = false;
                 sendJson({event: 'interrupted'});
             }
 
-            if (outputMode === 'fish') {
+            if (outputMode === 'edge') {
                 if (typeof content?.outputTranscription?.text === 'string') {
                     pendingText += content.outputTranscription.text;
                 } else {
@@ -320,7 +313,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                 clearTimeout(toolContinuationTimer);
                 toolContinuationTimer = undefined;
             }
-            if (outputMode === 'fish') {
+            if (outputMode === 'edge') {
                 for (const chunk of audioChunks) {
                     if (pendingNativeBytes + chunk.length > MAX_FALLBACK_AUDIO_BYTES) break;
                     pendingNativeAudio.push(chunk);
@@ -336,14 +329,14 @@ function attachGeminiLive(server, mqttClient, options = {}) {
 
             if (content?.turnComplete) {
                 sentSpeaking = false;
-                if (outputMode === 'fish') {
+                if (outputMode === 'edge') {
                     // A tool-only turn (OLED expression) is not the spoken answer.
                     // Wait for the continuation produced after sendToolResponse().
                     if ((hasToolCalls || awaitingToolContinuation)
                             && !pendingText.trim() && pendingNativeAudio.length === 0) return;
-                    clearTimeout(fishFinalizeTimer);
+                    clearTimeout(edgeFinalizeTimer);
                     // Output transcription can arrive a fraction after turnComplete.
-                    fishFinalizeTimer = setTimeout(finalizeFishTurn, 250);
+                    edgeFinalizeTimer = setTimeout(finalizeEdgeTurn, 250);
                 } else {
                     sendJson({event: 'turn_complete'});
                 }
@@ -358,12 +351,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
             fail('Chưa có GEMINI_API_KEY. Hãy thêm key vào config/secrets.py rồi chạy lại start.bat.', 'missing_key');
             return;
         }
-        if (outputMode === 'fish' && (!fishConfig.apiKey || !fishConfig.voiceId)) {
-            fail('Chế độ Fish Voice cần FISH_AUDIO_API_KEY và FISH_VOICE_ID trong cấu hình.', 'missing_fish_config');
-            return;
-        }
-
-        sendJson({event: 'connecting', model, voice: outputMode === 'fish' ? 'Fish Voice' : voice, outputMode});
+        sendJson({event: 'connecting', model, voice: outputMode === 'edge' ? 'Edge TTS Neural' : voice, outputMode});
         try {
             const ai = createClient(apiKey);
             session = await ai.live.connect({
@@ -381,7 +369,7 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                             silenceDurationMs: 700,
                         },
                     },
-                    ...(outputMode === 'fish' ? {outputAudioTranscription: {}} : {}),
+                    ...(outputMode === 'edge' ? {outputAudioTranscription: {}} : {}),
                     systemInstruction: {
                         parts: [{text: [
                             'Bạn là Moon, robot đồng hành thân thiện.',
@@ -389,8 +377,8 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                             'Trả lời trực tiếp, ngắn gọn, thường từ một đến ba câu; có thể ngắt lời như hội thoại thật.',
                             'Dựa trên nội dung và giọng điệu người dùng, hãy gọi set_expression để OLED thể hiện cảm xúc phù hợp.',
                             'Không đọc transcript, không mô tả công cụ và không nói rằng bạn đang gọi công cụ.',
-                            ...(outputMode === 'fish' ? [
-                                'Câu trả lời sẽ được đọc bằng Fish Audio: chỉ viết lời nói tự nhiên, không Markdown, không emoji và không ký hiệu trang trí.',
+                            ...(outputMode === 'edge' ? [
+                                'Câu trả lời sẽ được đọc bằng Edge TTS Neural: chỉ viết lời nói tự nhiên, không Markdown, không emoji và không ký hiệu trang trí.',
                                 'Để phát âm tiếng Việt rõ: dùng câu ngắn, dấu câu rõ; viết đầy đủ số, đơn vị và chữ viết tắt bằng tiếng Việt; ưu tiên từ tiếng Việt dễ đọc nếu có nghĩa tương đương.',
                             ] : []),
                         ].join(' ')}],
@@ -464,14 +452,14 @@ function attachGeminiLive(server, mqttClient, options = {}) {
                     lastPlaybackText = '';
                     resetFace();
                     sendJson({event: 'listening'});
-                } else if (command === 'playback_failed' && outputMode === 'fish') {
+                } else if (command === 'playback_failed' && outputMode === 'edge') {
                     const fallbackAudio = lastPlaybackFallback;
                     const fallbackText = lastPlaybackText;
                     lastPlaybackFallback = [];
                     lastPlaybackText = '';
                     fallbackToGeminiAudio(
                         fallbackAudio,
-                        'trình duyệt không phát được MP3 Fish',
+                        'trình duyệt không phát được MP3 Edge TTS',
                         fallbackText,
                     );
                 } else if (command === 'audio_stream_end') {

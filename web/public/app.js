@@ -373,13 +373,22 @@ socket.on('mqtt_message', (data) => {
                 case 'answer':
                     hideThinking();
                     setOledAiMode(liveTalkActive ? 'speaking' : 'answering', liveTalkActive ? '' : (msg.text || ''));
+                    // Hiển thị câu trả lời vào bubble chat (fast-path không dùng moon/ai/response)
+                    if (msg.text) {
+                        aiIdleHint.style.display = 'none';
+                        aiMoonBubble.style.display = 'block';
+                        aiMoonText.textContent = msg.text;
+                        aiCursor.style.display = 'none';
+                        logToTerminal(`AI: ${msg.text.substring(0, 60)}`, 'ai-response');
+                    }
                     break;
                 case 'done':
                     hideThinking();
                     break;
                 case 'tts_fallback':
-                    showThinking('🔊 Fish Audio chậm — đang dùng giọng dự phòng...');
-                    logToTerminal(msg.text || 'Fish Audio chậm — dùng giọng dự phòng', 'sys');
+                    hideThinking();
+                    setVoiceState('error');
+                    logToTerminal(msg.text || 'Edge TTS lỗi — không phát được câu trả lời', 'sys');
                     if (liveTalkMode === 'brain') {
                         window.dispatchEvent(new CustomEvent('moon-brain-pipeline', {
                             detail: {event: 'tts_fallback', text: msg.text || ''},
@@ -516,7 +525,7 @@ window.addEventListener('moon-live', ({detail: msg}) => {
         setOledAiMode('ai-thinking');
         setVoiceState('thinking');
         logToTerminal(`VOICE CONTINUOUS: ${msg.text}`, 'log-voice');
-        socket.emit('voice_question', msg.text);
+        socket.emit('voice_question', {text: msg.text, provider: 'edge'});
     } else if (['ready', 'listening', 'user_speaking', 'interrupted'].includes(msg.event)) {
         liveTalkActive = true;
         liveTalkWaitingWake = false;

@@ -7,12 +7,12 @@ from rag_engine import MoonRAG, EMBEDDINGS_CACHE_PATH
 
 def main():
     print("🚀 [PRECOMPUTE] Đang khởi tạo model multilingual-e5-small...")
-    rag = MoonRAG()
-    
     # Ép buộc xoá cache cũ nếu có để tính toán lại từ đầu
     if os.path.exists(EMBEDDINGS_CACHE_PATH):
         os.remove(EMBEDDINGS_CACHE_PATH)
         print("🗑️  [PRECOMPUTE] Đã xóa cache cũ.")
+
+    rag = MoonRAG()
 
     print(f"📚 [PRECOMPUTE] Bắt đầu mã hóa {len(rag.knowledge_base)} dòng dữ liệu từ data.json...")
     

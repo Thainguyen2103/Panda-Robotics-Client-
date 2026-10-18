@@ -2,11 +2,12 @@
 const $ = id => document.getElementById(`live-${id}`);
 let stream, context, source, highpass, capture, ws;
 let starting = false, active = false, ready = false, generation = 0;
-let releaseMicLock, micLockHeld = false, startedAt = 0, clockTimer;
-let playHead = 0, turnComplete = false, outputMode = 'fish', incomingFormat = 'mp3';
+let releaseMicLock, micLockHeld = false, startedAt = 0, clockTimer, micMonitorTimer;
+let playHead = 0, turnComplete = false, outputMode = 'edge', incomingFormat = 'mp3';
 let playbackGeneration = 0, decodingCount = 0;
+let fallbackAudioElement = null, fallbackAudioUrl = null, pendingFallbackAudio = null;
 let pipeline = 'gemini', turnTranscript = '', responseStartedAt = 0;
-let brainWaiting = false, brainTimer, brainResumeTimer;
+let brainWaiting = false, brainTimer, brainResumeTimer, brainTranscriptTimer;
 let geminiResponseTimer;
 let activation = 'manual', phase = 'idle', promotingWake = false, wakeCalibrating = false;
 let wakeIdleTimer, returningToWake = false;
@@ -14,6 +15,10 @@ const configuredWakeIdleMs = Number(window.MOON_WAKE_IDLE_TIMEOUT_MS);
 const WAKE_IDLE_TIMEOUT_MS = Number.isFinite(configuredWakeIdleMs) && configuredWakeIdleMs > 0
     ? configuredWakeIdleMs : 60000;
 let localSpeech = false, localSilenceFrames = 0, localNoise = .0015;
+let micAudioLogSent = false;
+let micStats = {frames: 0, rmsTotal: 0, rmsPeak: 0, activeFrames: 0};
+let lastSpeechEventAt = 0;
+let micDiagnosticError = false;
 const localSpeechVotes = [];
 const playing = new Set();
 
@@ -42,7 +47,8 @@ function setState(state, text) {
     $('orb').dataset.state = state;
     $('badge').dataset.state = state;
     $('badge').textContent = ({
-        idle: 'Chưa chạy', connecting: 'Đang kết nối', listening: 'Đang nghe',
+        idle: 'Chưa chạy', requesting_permission: 'Xin quyền mic', connecting: 'Đang kết nối', listening: 'Đang nghe',
+        speech_detected: 'Đã phát hiện giọng nói', transcribing: 'Đang nhận diện', recognized: 'Đã nhận diện', stopped: 'Đã dừng',
         waiting: 'Chờ Moon', thinking: 'Đang nghĩ', speaking: 'Moon đang nói', error: 'Có lỗi',
     })[state] || state;
     $('state').textContent = text;
@@ -164,10 +170,67 @@ function armGeminiResponseTimeout() {
     }, 15000);
 }
 
+function armBrainTranscriptTimeout() {
+    clearTimeout(brainTranscriptTimer);
+    const token = generation;
+    brainTranscriptTimer = setTimeout(() => {
+        if (token !== generation || !active || pipeline !== 'brain' || brainWaiting) return;
+        $('error').textContent = 'Gemini chưa trả transcript sau khi nghe giọng nói. Hãy thử nói lại hoặc kiểm tra kết nối STT.';
+        showHeard('Chưa nhận diện được — hãy thử nói lại');
+        setState('listening', 'Brain vẫn đang nghe — hãy thử nói lại');
+        dispatch('transcription_timeout');
+    }, 15000);
+}
+
+function startMicDiagnostics(track) {
+    clearInterval(micMonitorTimer);
+    micStats = {frames: 0, rmsTotal: 0, rmsPeak: 0, activeFrames: 0};
+    lastSpeechEventAt = Date.now();
+    micMonitorTimer = setInterval(() => {
+        const stats = micStats;
+        micStats = {frames: 0, rmsTotal: 0, rmsPeak: 0, activeFrames: 0};
+        if (!active || !context || !track) return;
+        const rmsAverage = stats.frames ? stats.rmsTotal / stats.frames : 0;
+        const liveTracks = stream?.getAudioTracks().filter(item => item.readyState === 'live').length || 0;
+        console.info(`[LIVE MIC] frames=${stats.frames} rms_avg=${rmsAverage.toFixed(5)} rms_peak=${stats.rmsPeak.toFixed(5)} active_frames=${stats.activeFrames} streams=${stream ? 1 : 0} tracks=${liveTracks} track=${track.readyState} muted=${track.muted} context=${context.state}`);
+        if (track.muted) {
+            micDiagnosticError = true;
+            $('error').textContent = 'Microphone đang bị trình duyệt tạm tắt. Kiểm tra thiết bị hoặc quyền microphone.';
+            showHeard('Microphone đang bị tắt tiếng');
+        } else if (!stats.frames && Date.now() - startedAt >= 10000) {
+            micDiagnosticError = true;
+            $('error').textContent = 'AudioWorklet chưa tạo frame từ microphone. Hãy dừng rồi thử lại và kiểm tra quyền microphone của trình duyệt.';
+            showHeard('Không nhận được frame audio từ microphone');
+            setState('error', 'Luồng thu microphone không hoạt động');
+        } else if (stats.frames && rmsAverage < 0.00003 && stats.rmsPeak < 0.0001
+                && Date.now() - startedAt >= 10000) {
+            micDiagnosticError = true;
+            $('error').textContent = 'Mic đang gửi frame nhưng gần như không có tín hiệu. Kiểm tra đúng thiết bị đầu vào và âm lượng mic.';
+            showHeard('Chưa có tín hiệu âm thanh từ microphone');
+            setState('error', 'Microphone chưa có tín hiệu');
+        } else if (pipeline === 'brain' && stats.activeFrames >= 10
+                && Date.now() - lastSpeechEventAt >= 10000) {
+            micDiagnosticError = true;
+            $('error').textContent = 'Mic có tín hiệu âm thanh nhưng Gemini chưa phát hiện giọng nói. Kiểm tra thiết bị, khoảng cách và mức âm lượng.';
+            showHeard('Có tín hiệu audio — chưa phát hiện giọng nói');
+            setState('listening', 'Mic có tín hiệu — đang chờ Gemini phát hiện lời nói');
+        } else if (micDiagnosticError && !track.muted && (rmsAverage >= 0.00003 || stats.frames === 0)) {
+            micDiagnosticError = false;
+            $('error').textContent = '';
+            if (pipeline === 'brain' && active) {
+                showHeard('Đang chờ giọng nói…');
+                setState('listening', 'Brain đang nghe — không cần gọi Moon');
+            } else if (active) {
+                setState('listening', 'Microphone đã có tín hiệu');
+            }
+        }
+    }, 3000);
+}
+
 function detectGeminiTurnEnd(rms) {
     if (pipeline !== 'gemini' || phase !== 'live' || !ready
             || !ws || ws.readyState !== WebSocket.OPEN) return;
-    const threshold = Math.max(.0035, localNoise * 2.5);
+    const threshold = Math.max(.001, localNoise * 1.5);
     const speech = rms >= threshold;
     if (!localSpeech && !speech) localNoise = localNoise * .985 + rms * .015;
     localSpeechVotes.push(speech);
@@ -178,7 +241,7 @@ function detectGeminiTurnEnd(rms) {
         return;
     }
     if (!localSpeech) return;
-    const stillSpeaking = rms >= Math.max(.0025, threshold * .65);
+    const stillSpeaking = rms >= Math.max(.0008, threshold * .65);
     localSilenceFrames = stillSpeaking ? 0 : localSilenceFrames + 1;
     if (localSilenceFrames < 30) return; // 900 ms: chốt câu nếu VAD Gemini bỏ lỡ.
 
@@ -200,7 +263,7 @@ async function acquireMicLock() {
         micLockHeld = true;
         settle(true);
         return new Promise(resolve => { releaseMicLock = resolve; });
-    }).catch(() => settle(true));
+    }).catch(() => settle(false));
     return acquired;
 }
 
@@ -214,6 +277,18 @@ function unlockMicrophone() {
 function clearPlayback() {
     playbackGeneration++;
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    if (fallbackAudioElement) {
+        fallbackAudioElement.onended = null;
+        fallbackAudioElement.onerror = null;
+        fallbackAudioElement.pause();
+        fallbackAudioElement.removeAttribute('src');
+        fallbackAudioElement.load();
+        fallbackAudioElement = null;
+    }
+    if (fallbackAudioUrl) URL.revokeObjectURL(fallbackAudioUrl);
+    fallbackAudioUrl = null;
+    pendingFallbackAudio = null;
+    $('unmute').hidden = true;
     decodingCount = 0;
     for (const node of playing) {
         node.onended = null;
@@ -227,7 +302,7 @@ function clearPlayback() {
 
 function speakBrowserFallback(text, reason) {
     if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
-        $('error').textContent = 'Fish/Gemini không có audio và trình duyệt không hỗ trợ giọng dự phòng.';
+        $('error').textContent = 'Edge/Gemini không có audio và trình duyệt không hỗ trợ giọng dự phòng.';
         setState('error', 'Không phát được âm thanh');
         if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({command: 'playback_complete'}));
         return;
@@ -250,20 +325,23 @@ function speakBrowserFallback(text, reason) {
     };
     utterance.onend = finish;
     utterance.onerror = finish;
-    $('error').textContent = `Fish Audio tạm lỗi (${reason || 'không có audio'}); đang dùng giọng trình duyệt cho câu này.`;
+    $('error').textContent = `Edge TTS tạm lỗi (${reason || 'không có audio'}); đang dùng giọng trình duyệt cho câu này.`;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
 }
 
 function notifyPlaybackComplete() {
-    if (!turnComplete || playing.size > 0 || decodingCount > 0 || !ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!turnComplete || playing.size > 0 || fallbackAudioElement || pendingFallbackAudio
+            || decodingCount > 0 || !ws || ws.readyState !== WebSocket.OPEN) return;
     turnComplete = false;
     ws.send(JSON.stringify({command: 'playback_complete'}));
     armWakeIdleTimeout();
 }
 
-function playAudioBuffer(buffer) {
-    if (!context) return;
+async function playAudioBuffer(buffer) {
+    if (!context) throw new Error('AudioContext is not initialized');
+    if (context.state !== 'running') await context.resume();
+    if (context.state !== 'running') throw new Error('AudioContext is not running');
     const node = context.createBufferSource();
     node.buffer = buffer;
     node.connect(context.destination);
@@ -272,10 +350,11 @@ function playAudioBuffer(buffer) {
     playing.add(node);
     node.onended = () => {
         playing.delete(node);
-        node.disconnect();
+        try { node.disconnect(); } catch (_) {}
         notifyPlaybackComplete();
     };
     node.start(startAt);
+    return node;
 }
 
 function playPcm24k(arrayBuffer) {
@@ -286,22 +365,94 @@ function playPcm24k(arrayBuffer) {
     const channel = buffer.getChannelData(0);
     for (let i = 0; i < samples; i++) channel[i] = view.getInt16(i * 2, true) / 32768;
 
-    playAudioBuffer(buffer);
+    void playAudioBuffer(buffer).catch(error => {
+        console.error('[AUDIO] PCM playback failed:', error?.name || 'Error');
+        $('error').textContent = 'Trình duyệt chưa phát được âm thanh. Hãy bấm để bật tiếng.';
+        $('unmute').hidden = false;
+    });
+}
+
+async function playHtmlAudio(arrayBuffer, token) {
+    if (token !== playbackGeneration || !arrayBuffer?.byteLength) return false;
+    if (fallbackAudioElement) {
+        fallbackAudioElement.pause();
+        fallbackAudioElement.onended = null;
+        fallbackAudioElement.onerror = null;
+    }
+    if (fallbackAudioUrl) URL.revokeObjectURL(fallbackAudioUrl);
+    fallbackAudioUrl = URL.createObjectURL(new Blob([arrayBuffer], {type: 'audio/mpeg'}));
+    fallbackAudioElement = new Audio(fallbackAudioUrl);
+    fallbackAudioElement.preload = 'auto';
+    pendingFallbackAudio = arrayBuffer;
+    const audio = fallbackAudioElement;
+    audio.onended = () => {
+        if (audio !== fallbackAudioElement) return;
+        fallbackAudioElement = null;
+        pendingFallbackAudio = null;
+        if (fallbackAudioUrl) URL.revokeObjectURL(fallbackAudioUrl);
+        fallbackAudioUrl = null;
+        $('unmute').hidden = true;
+        notifyPlaybackComplete();
+    };
+    audio.onerror = () => {
+        if (audio !== fallbackAudioElement) return;
+        fallbackAudioElement = null;
+        pendingFallbackAudio = null;
+        $('error').textContent = 'Web Audio và HTML Audio không phát được MP3 Edge TTS.';
+        $('unmute').hidden = true;
+        if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({command: 'playback_failed'}));
+    };
+    try {
+        await audio.play();
+        if (token !== playbackGeneration) return false;
+        pendingFallbackAudio = null;
+        $('unmute').hidden = true;
+        $('error').textContent = '';
+        console.info('[AUDIO] HTMLAudio fallback playback started');
+        return true;
+    } catch (error) {
+        if (token !== playbackGeneration) return false;
+        if (error?.name === 'NotAllowedError') {
+            $('error').textContent = 'Trình duyệt đã chặn tự động phát âm thanh. Bấm nút bên dưới để bật tiếng.';
+            $('unmute').hidden = false;
+            setState('error', 'Cần thao tác để bật âm thanh');
+            console.warn('[AUDIO] HTMLAudio playback blocked; user gesture required');
+            return false;
+        }
+        audio.onerror = null;
+        audio.onended = null;
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
+        if (fallbackAudioElement === audio) fallbackAudioElement = null;
+        pendingFallbackAudio = null;
+        if (fallbackAudioUrl) URL.revokeObjectURL(fallbackAudioUrl);
+        fallbackAudioUrl = null;
+        throw error;
+    }
 }
 
 async function playEncodedAudio(arrayBuffer) {
-    if (!context || arrayBuffer.byteLength === 0) return;
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+        console.warn('[AUDIO] Empty binary audio payload received');
+        return;
+    }
+    console.log('[AUDIO] Playing audio payload bytes:', arrayBuffer.byteLength);
     const token = playbackGeneration;
     decodingCount++;
     try {
+        if (!context) throw new Error('AudioContext is not initialized');
+        if (context.state !== 'running') await context.resume();
         const buffer = await context.decodeAudioData(arrayBuffer.slice(0));
-        if (token === playbackGeneration && context) playAudioBuffer(buffer);
-    } catch (_) {
+        if (token === playbackGeneration && context) await playAudioBuffer(buffer);
+    } catch (error) {
         if (token === playbackGeneration) {
-            $('error').textContent = 'Trình duyệt không giải mã được âm thanh Fish Audio.';
-            turnComplete = false;
-            if (ws?.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({command: 'playback_failed'}));
+            console.warn('[AUDIO] Web Audio decode/play failed:', error?.name || 'Error');
+            try {
+                await playHtmlAudio(arrayBuffer, token);
+            } catch (fallbackError) {
+                $('error').textContent = `Không phát được MP3 Edge TTS (${fallbackError?.name || 'lỗi audio'}).`;
+                if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({command: 'playback_failed'}));
             }
         }
     } finally {
@@ -309,6 +460,39 @@ async function playEncodedAudio(arrayBuffer) {
             decodingCount = Math.max(0, decodingCount - 1);
             notifyPlaybackComplete();
         }
+    }
+}
+
+function activateAudioFromGesture() {
+    try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) throw new Error('Web Audio API is unavailable');
+        if (!context || context.state === 'closed') context = new AudioContextClass();
+        playHead = context.currentTime;
+        const resume = context.resume();
+        return resume.catch(error => {
+            console.warn('[AUDIO] AudioContext resume deferred:', error?.name || 'Error');
+            return false;
+        });
+    } catch (error) {
+        console.warn('[AUDIO] AudioContext initialization failed:', error?.name || 'Error');
+        return Promise.resolve(false);
+    }
+}
+
+async function unlockAudioFromButton() {
+    try {
+        if (context && context.state !== 'running') await context.resume();
+        const payload = pendingFallbackAudio;
+        const token = playbackGeneration;
+        if (payload) {
+            await playHtmlAudio(payload, token);
+            return;
+        }
+        $('unmute').hidden = true;
+        $('error').textContent = '';
+    } catch (error) {
+        $('error').textContent = `Không bật được âm thanh (${error?.name || 'lỗi audio'}).`;
     }
 }
 
@@ -320,29 +504,34 @@ function handleServer(message) {
         resetGeminiTurnDetector();
         if (pipeline === 'brain') {
             outputMode = 'brain';
-            $('model').textContent = 'Brain · Gemini STT (VI/EN/JA) · Qwen 3.5 2B · Fish';
+            $('model').textContent = 'Brain · Gemini STT (VI/EN/JA) · Qwen 3.5 2B · Edge TTS';
+            showHeard('Đang chờ giọng nói…');
             setState('listening', message.calibrating
                 ? 'Đang đo tiếng nền — hãy giữ im lặng' : 'Brain đang nghe — không cần gọi Moon');
             dispatch('ready', {engine: message.engine});
             return;
         }
         outputMode = message.outputMode || 'native';
-        incomingFormat = outputMode === 'fish' ? 'mp3' : 'pcm';
+        incomingFormat = outputMode === 'edge' ? 'mp3' : 'pcm';
         $('model').textContent = `${message.model} · ${message.voice}`;
         setState('listening', 'Moon đang nghe — cứ nói tự nhiên');
         dispatch('ready');
     } else if (message.event === 'user_speaking' || message.event === 'listening') {
         if (message.event === 'user_speaking') {
+            lastSpeechEventAt = Date.now();
+            if (micDiagnosticError) { micDiagnosticError = false; $('error').textContent = ''; }
             clearWakeIdleTimeout();
             clearTimeout(geminiResponseTimer);
+            if (pipeline === 'brain') armBrainTranscriptTimeout();
             clearPlayback();
             $('error').textContent = '';
             turnTranscript = '';
             responseStartedAt = 0;
-            showHeard('Đang nghe…');
+            showHeard(pipeline === 'brain' ? 'Đã phát hiện giọng nói…' : 'Đang nghe…');
             showLatency('đang đo');
         }
-        setState('listening', message.event === 'user_speaking' ? 'Bạn đang nói…' : 'Moon đang nghe — cứ nói tự nhiên');
+        setState(message.event === 'user_speaking' && pipeline === 'brain' ? 'speech_detected' : 'listening',
+            message.event === 'user_speaking' ? 'Đã phát hiện giọng nói — đang nhận diện…' : 'Moon đang nghe — cứ nói tự nhiên');
         if (message.event === 'listening') {
             resetGeminiTurnDetector();
             armWakeIdleTimeout();
@@ -355,20 +544,18 @@ function handleServer(message) {
         armGeminiResponseTimeout();
         setState('thinking', 'Moon đang suy nghĩ…');
         dispatch('thinking');
-    } else if (message.event === 'fish_synthesizing') {
+    } else if (message.event === 'edge_synthesizing') {
         clearWakeIdleTimeout();
         clearTimeout(geminiResponseTimer);
-        setState('thinking', 'Đang tạo giọng Fish Audio…');
+        setState('thinking', 'Đang tạo giọng Edge TTS Neural…');
         dispatch('thinking');
-    } else if (message.event === 'fish_retrying') {
-        setState('thinking', 'Fish Audio chưa phản hồi — đang thử lại lần cuối…');
     } else if (message.event === 'browser_tts_fallback') {
         speakBrowserFallback(message.text, message.reason);
     } else if (message.event === 'speaking') {
         clearWakeIdleTimeout();
         clearTimeout(geminiResponseTimer);
         resetGeminiTurnDetector();
-        incomingFormat = message.format || (outputMode === 'fish' ? 'mp3' : 'pcm');
+        incomingFormat = message.format || (outputMode === 'edge' ? 'mp3' : 'pcm');
         if (responseStartedAt) showLatency(`${Math.round(performance.now() - responseStartedAt)} ms tới âm thanh`);
         setState('speaking', 'Moon đang trả lời — bạn có thể ngắt lời');
         dispatch('speaking');
@@ -385,19 +572,27 @@ function handleServer(message) {
     } else if (pipeline === 'brain' && message.event === 'meter') {
         if (typeof message.rms === 'number') $('level').value = message.rms;
     } else if (pipeline === 'brain' && message.event === 'processing') {
+        lastSpeechEventAt = Date.now();
         clearWakeIdleTimeout();
-        setState('thinking', 'Đang chuyển giọng nói thành văn bản…');
+        armBrainTranscriptTimeout();
+        setState('transcribing', 'Đang chuyển giọng nói thành văn bản…');
     } else if (pipeline === 'brain' && message.event === 'partial') {
+        lastSpeechEventAt = Date.now();
         clearWakeIdleTimeout();
+        armBrainTranscriptTimeout();
+        $('error').textContent = '';
         showHeard(message.text || 'Đang nghe…');
         showLatency('STT trực tiếp');
     } else if (pipeline === 'brain' && message.event === 'transcript') {
         clearWakeIdleTimeout();
+        clearTimeout(brainTranscriptTimer);
         showHeard(message.text);
+        setState('recognized', 'Đã nhận diện transcript — đang chuyển cho Brain…');
         showCorrected('', false);
         showLatency(`STT ${message.latency_ms || 0} ms · đang chờ Brain`);
     } else if (pipeline === 'brain' && message.event === 'question') {
         clearWakeIdleTimeout();
+        clearTimeout(brainTranscriptTimer);
         brainWaiting = true;
         responseStartedAt = performance.now();
         showHeard(message.text);
@@ -414,6 +609,7 @@ function handleServer(message) {
             armWakeIdleTimeout();
         }, 60000);
     } else if (pipeline === 'brain' && message.event === 'rejected') {
+        clearTimeout(brainTranscriptTimer);
         $('error').textContent = message.text || 'Chưa nghe rõ — hãy nói lại.';
         setState('listening', 'Brain đang nghe — hãy nói lại');
         armWakeIdleTimeout();
@@ -422,8 +618,8 @@ function handleServer(message) {
             setState('listening', 'Brain đang nghe — không cần gọi Moon');
             armWakeIdleTimeout();
         }
-    } else if (message.event === 'fish_fallback') {
-        $('error').textContent = message.text || 'Fish Audio tạm lỗi; đang dùng giọng Gemini cho câu này.';
+    } else if (message.event === 'edge_fallback') {
+        $('error').textContent = message.text || 'Edge TTS tạm lỗi; đang dùng giọng Gemini cho câu này.';
         setState('speaking', 'Đang chuyển sang giọng Gemini dự phòng…');
     } else if (message.event === 'interrupted') {
         clearPlayback();
@@ -435,7 +631,7 @@ function handleServer(message) {
         notifyPlaybackComplete();
     } else if (message.event === 'turn_error') {
         clearTimeout(geminiResponseTimer);
-        $('error').textContent = message.text || 'Không tạo được câu trả lời bằng Fish Audio.';
+        $('error').textContent = message.text || 'Không tạo được câu trả lời bằng Edge TTS.';
         setState('error', 'Lỗi tạo giọng — phiên vẫn đang nghe');
         dispatch('error', {text: message.text});
         armWakeIdleTimeout();
@@ -531,6 +727,7 @@ async function promoteWakeToLive(token) {
     if (promotingWake || token !== generation || phase !== 'wake') return;
     promotingWake = true;
     clearWakeIdleTimeout();
+    clearTimeout(brainTranscriptTimer);
     wakeCalibrating = false;
     ready = false;
     wakeTick();
@@ -577,6 +774,7 @@ async function returnLiveToWake(token) {
     clearWakeIdleTimeout();
     clearTimeout(brainTimer);
     clearTimeout(brainResumeTimer);
+    clearTimeout(brainTranscriptTimer);
     clearTimeout(geminiResponseTimer);
     brainWaiting = false;
     ready = false;
@@ -625,8 +823,8 @@ async function returnLiveToWake(token) {
 
 async function connectSocket(token) {
     pipeline = $('pipeline').value === 'brain' ? 'brain' : 'gemini';
-    const mode = $('mode').value === 'native' ? 'native' : 'fish';
-    const path = pipeline === 'brain' ? '/transcribe/ws?mode=continuous' : `/live/ws?mode=${encodeURIComponent(mode)}`;
+    const mode = $('mode').value === 'native' ? 'native' : 'edge';
+    const path = pipeline === 'brain' ? '/transcribe/ws?mode=continuous&provider=edge' : `/live/ws?mode=${encodeURIComponent(mode)}&provider=edge`;
     const endpoint = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${path}`;
     const socket = new WebSocket(endpoint);
     socket.binaryType = 'arraybuffer';
@@ -664,18 +862,56 @@ async function openMicrophone(token) {
         throw new Error('Live Talk cần Chrome/Edge trên localhost hoặc HTTPS.');
     }
     const selected = $('device').value;
-    const acquired = await navigator.mediaDevices.getUserMedia({audio: {
+    setState('requesting_permission', 'Đang xin quyền truy cập microphone…');
+    const micRequest = navigator.mediaDevices.getUserMedia({audio: {
         deviceId: selected ? {exact: selected} : undefined,
         channelCount: 1,
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: activation !== 'wakeword',
     }});
+    let permissionTimer;
+    let acquired;
+    try {
+        acquired = await Promise.race([
+            micRequest,
+            new Promise((_, reject) => {
+                permissionTimer = setTimeout(() => reject(new Error(
+                    'Yêu cầu quyền microphone đã chờ quá lâu. Hãy cấp quyền cho trang rồi thử lại.',
+                )), 30000);
+            }),
+        ]);
+    } catch (error) {
+        micRequest.then(lateStream => lateStream.getTracks().forEach(track => track.stop())).catch(() => {});
+        throw error;
+    } finally {
+        clearTimeout(permissionTimer);
+    }
     if (token !== generation) { acquired.getTracks().forEach(track => track.stop()); return; }
     stream = acquired;
-    stream.getAudioTracks()[0].onended = () => {
+    console.info('[LIVE MIC] Microphone permission granted');
+    const micTrack = stream.getAudioTracks()[0];
+    if (!micTrack) throw new Error('Trình duyệt không trả về audio track từ microphone.');
+    console.info(`[LIVE MIC] tracks=${stream.getAudioTracks().length} track=${micTrack?.readyState} muted=${micTrack?.muted}`);
+    micTrack.onmute = () => {
+        console.warn('[LIVE MIC] Microphone track muted');
+        micDiagnosticError = true;
+        $('error').textContent = 'Microphone đang bị trình duyệt tạm tắt.';
+        showHeard('Microphone đang bị tắt tiếng');
+        setState('error', 'Microphone đang bị tắt tiếng');
+    };
+    micTrack.onunmute = () => {
+        console.info('[LIVE MIC] Microphone track unmuted');
+        if (micDiagnosticError) {
+            micDiagnosticError = false;
+            $('error').textContent = '';
+            setState('listening', 'Microphone đã kết nối — đang chờ giọng nói');
+        }
+    };
+    micTrack.onended = () => {
         $('error').textContent = 'Microphone đã ngắt kết nối.';
-        stop();
+        showHeard('Microphone đã ngắt kết nối');
+        stop(false, true);
     };
 
     const devices = await navigator.mediaDevices.enumerateDevices();
@@ -684,9 +920,16 @@ async function openMicrophone(token) {
         $('device').add(new Option(device.label || 'Microphone', device.deviceId)));
     $('device').value = selected;
 
-    context = new AudioContext();
-    playHead = 0;
-    await context.resume();
+    if (!context || context.state === 'closed') {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) throw new Error('Trình duyệt không hỗ trợ Web Audio API.');
+        context = new AudioContextClass();
+    }
+    try {
+        await context.resume();
+    } catch (error) {
+        console.warn('[AUDIO] Capture context resume deferred:', error?.name || 'Error');
+    }
     await context.audioWorklet.addModule('/voice-worklet.js');
     source = context.createMediaStreamSource(stream);
     highpass = context.createBiquadFilter();
@@ -700,22 +943,36 @@ async function openMicrophone(token) {
         for (let i = 0; i < pcm.length; i++) energy += (pcm[i] / 32768) ** 2;
         const rms = Math.sqrt(energy / Math.max(1, pcm.length));
         $('level').value = rms;
+        micStats.frames++;
+        micStats.rmsTotal += rms;
+        micStats.rmsPeak = Math.max(micStats.rmsPeak, rms);
+        if (rms >= 0.001) micStats.activeFrames++;
         // Không gửi tiếng chuông/lời xác nhận của Moon ngược lại vào hội thoại.
         if (!ready || promotingWake || !ws || ws.readyState !== WebSocket.OPEN) return;
         if (ws.bufferedAmount > 65536) return;
+        if (!micAudioLogSent) {
+            micAudioLogSent = true;
+            console.info('[LIVE MIC] First 16 kHz PCM chunk sent');
+        }
         ws.send(event.data);
         detectGeminiTurnEnd(rms);
     };
     source.connect(highpass);
     highpass.connect(capture);
     capture.connect(context.destination); // Worklet chỉ phát silence.
+    startMicDiagnostics(micTrack);
+    console.info(`[LIVE MIC] Capture started context_sample_rate=${context.sampleRate} pcm_rate=16000 frame_samples=480 channels=1`);
 }
 
 async function start() {
     if (starting || active) return;
+    // Create/resume Web Audio synchronously from the Start button gesture,
+    // before waiting on permission prompts or the WebSocket handshake.
+    const audioActivation = activateAudioFromGesture();
     starting = true;
     const token = ++generation;
     $('error').textContent = '';
+    micDiagnosticError = false;
     $('start').disabled = true;
     $('stop').disabled = false;
     $('pipeline').disabled = true;
@@ -732,6 +989,7 @@ async function start() {
     wakeCalibrating = false;
     localNoise = .0015;
     resetGeminiTurnDetector();
+    micAudioLogSent = false;
     clearPlayback();
     turnTranscript = '';
     brainWaiting = false;
@@ -741,6 +999,7 @@ async function start() {
     dispatch('starting');
     window.dispatchEvent(new Event('moon-live-request-mic'));
     try {
+        await audioActivation;
         if (!await acquireMicLock()) throw new Error('Microphone đang được dùng ở tab Moon khác.');
         if (phase === 'wake') await connectWakeSocket(token);
         else await connectSocket(token);
@@ -755,7 +1014,7 @@ async function start() {
         }, 1000);
         if (phase === 'wake') {
             // Chuẩn bị sẵn câu xác nhận trong lúc chờ wakeword; không làm tốn
-            // quota Fish nếu người dùng chỉ dùng chế độ bật trực tiếp.
+            // Edge acknowledgement is cached by the server for repeated wakeword use.
             void fetch('/api/live-ack', {cache: 'force-cache'}).catch(() => {});
             setState(wakeCalibrating ? 'connecting' : 'waiting', wakeCalibrating
                 ? 'Đang đo tiếng nền — hãy giữ im lặng'
@@ -785,8 +1044,10 @@ async function stop(userRequested = true, preserveError = false) {
     wakeCalibrating = false;
     resetGeminiTurnDetector();
     clearInterval(clockTimer);
+    clearInterval(micMonitorTimer);
     clearTimeout(brainTimer);
     clearTimeout(brainResumeTimer);
+    clearTimeout(brainTranscriptTimer);
     clearTimeout(geminiResponseTimer);
     clearWakeIdleTimeout();
     brainWaiting = false;
@@ -817,7 +1078,8 @@ async function stop(userRequested = true, preserveError = false) {
     $('level').value = 0;
     $('duration').textContent = '00:00';
     if (!preserveError) $('error').textContent = '';
-    setState(preserveError ? 'error' : 'idle', preserveError ? 'Phiên Live Talk đã dừng' : 'Sẵn sàng kết nối');
+    setState(preserveError ? 'error' : (userRequested ? 'stopped' : 'idle'),
+        preserveError ? 'Phiên Live Talk đã dừng do lỗi' : (userRequested ? 'Đã dừng Live Talk' : 'Sẵn sàng kết nối'));
     dispatch(preserveError ? 'error' : 'stopped', preserveError ? {text: $('error').textContent} : {});
     if (userRequested) $('state').textContent = 'Đã kết thúc Live Talk';
     phase = 'idle';
@@ -828,18 +1090,18 @@ function updatePipelineUi() {
     pipeline = $('pipeline').value === 'brain' ? 'brain' : 'gemini';
     activation = $('activation').value === 'wakeword' ? 'wakeword' : 'manual';
     const brain = pipeline === 'brain';
-    if (brain) $('mode').value = 'fish';
+    if (brain) $('mode').value = 'edge';
     $('mode').disabled = brain || active || starting;
     const activationText = activation === 'wakeword'
         ? ' Moon chỉ mở hội thoại sau khi nghe tên mình hoặc cách phát âm gần giống; 60 giây im lặng sẽ quay lại chờ wakeword.'
         : ' Hội thoại bắt đầu ngay khi bạn bấm nút.';
     $('description').textContent = (brain
-        ? 'Gemini STT nhận tiếng Việt, Anh và Nhật rồi chuyển câu nói cho Qwen local; Fish Audio trả lời liên tục.'
-        : 'Gemini nghe và hiểu âm thanh trực tiếp; có thể trả lời bằng Fish Voice hoặc Gemini Native.')
+        ? 'Gemini STT nhận tiếng Việt, Anh và Nhật rồi chuyển câu nói cho Qwen local; Edge TTS Neural đọc câu trả lời.'
+        : 'Gemini nghe và hiểu âm thanh trực tiếp; có thể trả lời bằng Edge TTS Neural hoặc Gemini Native.')
         + activationText + ' OLED chỉ hiển thị biểu cảm phù hợp.';
     $('model').textContent = brain
-        ? 'Brain · Gemini STT (VI/EN/JA) · Qwen 3.5 2B · Fish'
-        : `gemini-3.8-live · ${$('mode').value === 'fish' ? 'Fish Voice' : 'Kore'}`;
+        ? 'Brain · Gemini STT (VI/EN/JA) · Qwen 3.5 2B · Edge TTS'
+        : `gemini-3.8-live · ${$('mode').value === 'edge' ? 'Edge TTS Neural' : 'Kore'}`;
     $('start').innerHTML = activation === 'wakeword'
         ? '<i data-lucide="ear"></i> Bắt đầu chờ tên Moon'
         : '<i data-lucide="radio"></i> Bắt đầu Live Talk';
@@ -854,13 +1116,14 @@ function updatePipelineUi() {
 
 $('start').onclick = start;
 $('stop').onclick = () => stop(true);
+$('unmute').onclick = unlockAudioFromButton;
 $('pipeline').onchange = updatePipelineUi;
 $('activation').onchange = updatePipelineUi;
 $('mode').onchange = () => {
-    const fish = $('mode').value === 'fish';
-    $('model').textContent = fish ? 'gemini-3.8-live · Fish Voice' : 'gemini-3.8-live · Kore';
-    $('state').textContent = fish
-        ? 'Fish Voice chậm hơn một chút nhưng giữ đúng giọng Moon'
+    const edge = $('mode').value === 'edge';
+    $('model').textContent = edge ? 'gemini-3.8-live · Edge TTS Neural' : 'gemini-3.8-live · Kore';
+    $('state').textContent = edge
+        ? 'Phản hồi bằng Edge TTS Neural'
         : 'Gemini Native phản hồi nhanh hơn';
 };
 window.addEventListener('moon-brain-pipeline', ({detail}) => {
@@ -873,12 +1136,13 @@ window.addEventListener('moon-brain-pipeline', ({detail}) => {
     } else if (detail.event === 'state' && detail.state === 'thinking') {
         setState('thinking', 'Brain và LLM đang xử lý…');
     } else if (detail.event === 'answer_ready' && $('orb').dataset.state !== 'speaking') {
-        setState('thinking', 'Đã có câu trả lời — đang tạo giọng Fish…');
+        setState('thinking', 'Đã có câu trả lời — đang tạo giọng Edge TTS…');
     } else if (detail.event === 'tts_fallback') {
-        setState('speaking', 'Fish Audio chậm — Moon đang trả lời bằng giọng dự phòng…');
+        $('error').textContent = detail.text || 'Edge TTS lỗi — câu trả lời chưa phát được.';
+        setState('error', 'Không phát được câu trả lời bằng Edge TTS');
     } else if (detail.event === 'state' && detail.state === 'speaking') {
         if (responseStartedAt) showLatency(`${Math.round(performance.now() - responseStartedAt)} ms tới âm thanh`);
-        setState('speaking', 'Moon đang trả lời bằng Brain + Fish…');
+        setState('speaking', 'Moon đang trả lời bằng Brain + Edge TTS…');
     } else if (detail.event === 'state' && detail.state === 'standby' && brainWaiting) {
         clearTimeout(brainTimer);
         clearTimeout(brainResumeTimer);

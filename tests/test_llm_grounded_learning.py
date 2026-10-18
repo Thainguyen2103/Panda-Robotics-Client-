@@ -1,7 +1,9 @@
 import unittest
+import sys
+sys.path.insert(0, ".")
 from unittest.mock import patch
 
-from server.llm.engine import engine as llm
+from server.llm import engine as llm
 
 
 APPLE = {

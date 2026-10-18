@@ -1,4 +1,5 @@
 const {WebSocket, WebSocketServer} = require('ws');
+const {randomUUID} = require('node:crypto');
 const {
     AudioTranscriptionConfigMode,
     EndSensitivity,
@@ -58,6 +59,7 @@ function attachGeminiTranscribe(server, options = {}) {
     });
 
     wss.on('connection', async (downstream, req) => {
+        const sessionId = randomUUID().slice(0, 8);
         const query = new URL(req.url, 'http://localhost').searchParams;
         const mode = query.get('mode') === 'wake' ? 'wake' : 'continuous';
         const apiKey = readGeminiKey(options);
@@ -69,6 +71,12 @@ function attachGeminiTranscribe(server, options = {}) {
         let reconnecting = false;
         let lastFinal = '';
         let lastFinalAt = 0;
+        let audioChunksSent = 0;
+        let audioRmsTotal = 0;
+        let audioRmsPeak = 0;
+        let audioNonzeroChunks = 0;
+
+        console.info(`[STT ${sessionId}] Browser session opened mode=${mode}`);
 
         const sendJson = value => {
             if (downstream.readyState !== WebSocket.OPEN) return false;
@@ -91,11 +99,13 @@ function attachGeminiTranscribe(server, options = {}) {
             closed = true;
             ready = false;
             connectionGeneration++;
+            console.info(`[STT ${sessionId}] Browser session closed`);
             closeSession(session);
             session = undefined;
         };
         const fail = (text, code = 'transcribe_error') => {
             if (closed) return;
+            console.warn(`[STT ${sessionId}] Failure stage=${code}`);
             sendJson({event: 'error', code, text});
             if (downstream.readyState === WebSocket.OPEN) {
                 try { downstream.close(1011, code.slice(0, 123)); } catch (_) {}
@@ -122,6 +132,7 @@ function attachGeminiTranscribe(server, options = {}) {
             if (clean === lastFinal && now - lastFinalAt < 3000) return;
             lastFinal = clean;
             lastFinalAt = now;
+            console.info(`[STT ${sessionId}] Final transcript received chars=${clean.length}`);
             sendJson({event: 'transcript', text: clean});
             if (mode === 'wake') {
                 const tail = wakeTail(clean);
@@ -134,6 +145,7 @@ function attachGeminiTranscribe(server, options = {}) {
                 return;
             }
             paused = true;
+            console.info(`[STT ${sessionId}] Final transcript emitted to browser`);
             sendJson({event: 'question', text: clean});
         };
 
@@ -172,6 +184,7 @@ function attachGeminiTranscribe(server, options = {}) {
                             if (message.setupComplete) {
                                 ready = true;
                                 reconnecting = false;
+                                console.info(`[STT ${sessionId}] Gemini session ready model=${model}`);
                                 sendJson({
                                     event: 'ready', model, mode,
                                     languages: [...languages], calibrating: false,
@@ -180,14 +193,17 @@ function attachGeminiTranscribe(server, options = {}) {
                             }
                             const activity = message.voiceActivity?.voiceActivityType;
                             if (!paused && activity === 'ACTIVITY_START') {
+                                console.info(`[STT ${sessionId}] Gemini VAD detected speech`);
                                 lastFinal = '';
                                 sendJson({event: 'user_speaking'});
                             } else if (!paused && activity === 'ACTIVITY_END') {
+                                console.info(`[STT ${sessionId}] Gemini VAD ended speech; waiting for final transcript`);
                                 sendJson({event: 'processing'});
                             }
                             const content = message.serverContent;
                             const interim = content?.interimInputTranscription?.text;
                             if (!paused && typeof interim === 'string' && interim.trim()) {
+                                console.info(`[STT ${sessionId}] Partial transcript received chars=${interim.trim().length}`);
                                 sendJson({event: 'partial', text: interim.trim()});
                             }
                             const finalText = content?.inputTranscription?.text;
@@ -243,6 +259,22 @@ function attachGeminiTranscribe(server, options = {}) {
                 if (data.length === 0 || data.length > 4096 || data.length % 2 !== 0) {
                     downstream.close(1003, 'Invalid PCM frame');
                     return;
+                }
+                audioChunksSent++;
+                let energy = 0;
+                for (let offset = 0; offset < data.length; offset += 2) {
+                    const sample = data.readInt16LE(offset) / 32768;
+                    energy += sample * sample;
+                }
+                const rms = Math.sqrt(energy / (data.length / 2));
+                audioRmsTotal += rms;
+                audioRmsPeak = Math.max(audioRmsPeak, rms);
+                if (rms > 0.0001) audioNonzeroChunks++;
+                if (audioChunksSent === 1 || audioChunksSent % 100 === 0) {
+                    console.info(`[STT ${sessionId}] PCM chunks=${audioChunksSent} rms_avg=${(audioRmsTotal / Math.min(audioChunksSent, 100)).toFixed(5)} rms_peak=${audioRmsPeak.toFixed(5)} signal_chunks=${audioNonzeroChunks}/100`);
+                    audioRmsTotal = 0;
+                    audioRmsPeak = 0;
+                    audioNonzeroChunks = 0;
                 }
                 callSession({
                     audio: {

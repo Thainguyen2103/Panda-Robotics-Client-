@@ -77,12 +77,20 @@ function openClient(port, mode) {
 
     continuous.client.send(Buffer.alloc(960), {binary: true});
     await waitFor(() => first.inputs.some(input => input.audio));
-    assert.equal(first.inputs.find(input => input.audio).audio.mimeType, 'audio/pcm;rate=16000');
+    const sentAudio = first.inputs.find(input => input.audio).audio;
+    assert.equal(sentAudio.mimeType, 'audio/pcm;rate=16000');
+    assert(Buffer.from(sentAudio.data, 'base64').some(byte => byte !== 0),
+        'a browser frame gated to digital zero must still be sent as valid near-silence PCM');
     first.params.callbacks.onmessage({
         serverContent: {inputTranscription: {text: '日本語を勉強します。'}},
     });
     await waitFor(() => continuous.messages.some(message => message.event === 'question'));
     assert.equal(continuous.messages.find(message => message.event === 'question').text, '日本語を勉強します。');
+    first.params.callbacks.onmessage({serverContent: {inputTranscription: {text: '   '}}});
+    first.params.callbacks.onmessage({serverContent: {inputTranscription: {text: '日本語を勉強します。'}}});
+    await new Promise(resolve => setTimeout(resolve, 30));
+    assert.equal(continuous.messages.filter(message => message.event === 'question').length, 1,
+        'empty and repeated final transcripts must not create extra Brain questions');
 
     const pausedInputCount = first.inputs.length;
     continuous.client.send(Buffer.alloc(960), {binary: true});
@@ -108,12 +116,46 @@ function openClient(port, mode) {
     const wakeEvent = await waitFor(() => wake.messages.find(message => message.event === 'wake'));
     assert.equal(wakeEvent.tail, '日本語で話して');
 
+    const failingServer = http.createServer();
+    const failingWss = attachGeminiTranscribe(failingServer, {
+        env: {GEMINI_API_KEY: 'unit-test-key'},
+        createClient: () => ({live: {connect: async () => { throw new Error('mock API unavailable'); }}}),
+    });
+    await new Promise(resolve => failingServer.listen(0, '127.0.0.1', resolve));
+    const failing = openClient(failingServer.address().port, 'continuous');
+    const failure = await waitFor(() => failing.messages.find(message => message.event === 'error'));
+    assert.equal(failure.code, 'transcribe_connect_error');
+    await new Promise(resolve => failingWss.close(resolve));
+    await new Promise(resolve => failingServer.close(resolve));
+
+    const closedServer = http.createServer();
+    const closedSessions = [];
+    const closedWss = attachGeminiTranscribe(closedServer, {
+        env: {GEMINI_API_KEY: 'unit-test-key'},
+        createClient: () => ({live: {connect: async params => {
+            const session = {sendRealtimeInput() {}, close() {}};
+            closedSessions.push({params, session});
+            return session;
+        }}}),
+    });
+    await new Promise(resolve => closedServer.listen(0, '127.0.0.1', resolve));
+    const unexpectedlyClosed = openClient(closedServer.address().port, 'continuous');
+    await waitFor(() => closedSessions.length === 1);
+    closedSessions[0].params.callbacks.onmessage({setupComplete: {sessionId: 'close-test'}});
+    await waitFor(() => unexpectedlyClosed.messages.some(message => message.event === 'ready'));
+    closedSessions[0].params.callbacks.onclose({reason: 'mock socket closed'});
+    const closeFailure = await waitFor(() => unexpectedlyClosed.messages.find(message => message.event === 'error'));
+    assert.equal(closeFailure.code, 'transcribe_closed');
+    unexpectedlyClosed.client.close();
+    await new Promise(resolve => closedWss.close(resolve));
+    await new Promise(resolve => closedServer.close(resolve));
+
     continuous.client.close();
     wake.client.close();
     await new Promise(resolve => setTimeout(resolve, 20));
     await new Promise(resolve => wss.close(resolve));
     await new Promise(resolve => server.close(resolve));
-    console.log('Gemini Transcribe bridge: Vietnamese, English, Japanese and wake routing passed');
+    console.log('Gemini Transcribe bridge: language config, transcript routing, deduplication and failure handling passed');
 })().catch(error => {
     console.error(error);
     process.exitCode = 1;

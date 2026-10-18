@@ -73,7 +73,18 @@ class VisionEngine:
             self.errors["opencv"] = "OpenCV is not installed"
             return
         cv2.setNumThreads(settings.VISION_CV_THREADS)
-        self._load("face", lambda: cv2.FaceDetectorYN_create(str(model_path("face_detection_yunet_2023mar.onnx")), "", (320,320), settings.VISION_FACE_THRESHOLD))
+        def load_face():
+            path = model_path(settings.VISION_FACE_MODEL)
+            if not path.is_file(): raise FileNotFoundError(path.name)
+            return cv2.FaceDetectorYN.create(
+                model=str(path),
+                config="",
+                input_size=(320, 320),
+                score_threshold=settings.VISION_FACE_THRESHOLD,
+                nms_threshold=0.3,
+                top_k=5000
+            )
+        self._load("face", load_face)
         self._load("identity", lambda: cv2.FaceRecognizerSF_create(str(model_path("face_recognition_sface_2021dec.onnx")), ""))
         self._load("emotion", lambda: cv2.dnn.readNetFromONNX(str(model_path(settings.EMOTION_MODEL))))
         if settings.VISION_FACE_DETAILS_ENABLED:
@@ -222,14 +233,8 @@ class VisionEngine:
         result, best = empty_result(), None
         if "face" in self.models:
             def detect():
-                detector = self.models["face"]
-                scale = min(1.,settings.VISION_FACE_WIDTH/frame.shape[1])
-                small = cv2.resize(frame,(int(frame.shape[1]*scale),max(1,int(frame.shape[0]*scale)))) if scale < 1 else frame
-                detector.setInputSize((small.shape[1],small.shape[0]))
-                faces = detector.detect(small)[1]
-                if faces is not None:
-                    faces = faces.copy()
-                    faces[:,:14] /= scale
+                self.models["face"].setInputSize((frame.shape[1], frame.shape[0]))
+                _, faces = self.models["face"].detect(frame)
                 return faces
             faces = self._run("face",detect)
             if faces is not None:
