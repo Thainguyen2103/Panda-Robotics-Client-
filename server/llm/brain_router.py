@@ -96,7 +96,15 @@ def is_study_help_query(text: str) -> bool:
     )
 
     has_action = any(w in norm for w in action_words)
-    has_request = any(r in norm for r in request_endings)
+    # Match request phrases at the end of a token sequence. Substring matching
+    # made "nha" match the start of "nhat" (Japanese), so a learner's answer
+    # such as "muốn học về gia đình bằng tiếng Nhật" was mistaken for a new
+    # generic request and got the same clarification again.
+    request_text = norm.rstrip(" .?!,;:~")
+    has_request = any(
+        request_text == ending or request_text.endswith(f" {ending}")
+        for ending in request_endings
+    )
 
     if has_action and has_request:
         if any(w in norm for w in ("hoc", "day", "kem")):

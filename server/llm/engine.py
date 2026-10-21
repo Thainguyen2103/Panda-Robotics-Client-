@@ -760,6 +760,15 @@ def chat(
         print(f'✍️ [LLM] Hiệu chỉnh chắc chắn: "{question}" → "{model_question}"')
 
     intent_decision = IntentRouter().classify(model_question)
+    study_state = get_study_help_state(_conversation_context.conversation_id)
+    if (study_state and study_state.get("waiting_for_level")
+            and not is_study_help_query(model_question)):
+        # Treat the next learner turn as the details requested by the study-help
+        # prompt. Keep RAG available to supply a matching lesson, while avoiding
+        # the knowledge-Q&A hard fallback for a tutoring follow-up.
+        intent_decision = IntentDecision(
+            Intent.STUDY_HELP, 1.0, True, "study_help_followup"
+        )
     print(f"🧭 [BRAIN ROUTER] intent={intent_decision.intent.value} confidence={intent_decision.confidence:.2f}")
 
     # Reject known out-of-scope factual requests before study-help/chitchat

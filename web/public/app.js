@@ -431,14 +431,57 @@ socket.on('mqtt_message', (data) => {
             }
         } catch(e) {}
 
-    } else if (topic === 'moon/ai/led') {
+    } else if (topic === 'moon/ai/led' || topic === 'moon/ai/learning_display') {
         const kanjiDiv = document.getElementById('oled-kanji');
         if (kanjiDiv) {
-            kanjiDiv.textContent = payload;
+            if (topic === 'moon/ai/led' && kanjiDiv.dataset.structuredDisplay === 'true') return;
+            let item = null;
+            try { item = JSON.parse(payload); } catch (_) {}
+            const displayText = item && typeof item === 'object'
+                ? String(item.kanji || item.text || item.kana || item.meaning_vi || '')
+                : payload;
+            if (!displayText) return;
+            const turnId = Number(item?.display_sequence || item?.turn_id);
+            const currentTurn = Number(kanjiDiv.dataset.turnId || 0);
+            if (Number.isFinite(turnId) && turnId > 0 && turnId < currentTurn) return;
+            const itemId = item?.item_id ? String(item.item_id) : displayText;
+            if (kanjiDiv.dataset.itemId === itemId && kanjiDiv.textContent === displayText) return;
+            kanjiDiv.dataset.turnId = Number.isFinite(turnId) && turnId > 0
+                ? String(turnId) : String(currentTurn + 1);
+            kanjiDiv.dataset.itemId = itemId;
+            if (item && item.schema === 'moon.learning-display.v1') {
+                kanjiDiv.dataset.structuredDisplay = 'true';
+                kanjiDiv.replaceChildren();
+                const main = document.createElement('span');
+                main.className = 'learning-kanji-main';
+                main.textContent = item.kanji || item.kana || displayText;
+                kanjiDiv.append(main);
+                const reading = [item.kana, item.romaji].filter(Boolean).join(' · ');
+                if (reading) {
+                    const subtitle = document.createElement('span');
+                    subtitle.className = 'learning-kanji-reading';
+                    subtitle.textContent = reading;
+                    kanjiDiv.append(subtitle);
+                }
+                if (item.meaning_vi) {
+                    const meaning = document.createElement('span');
+                    meaning.className = 'learning-kanji-meaning';
+                    meaning.textContent = item.meaning_vi;
+                    kanjiDiv.append(meaning);
+                }
+                kanjiDiv.title = [item.kanji, item.kana, item.romaji, item.meaning_vi]
+                    .filter(Boolean).join(' · ');
+            } else {
+                kanjiDiv.replaceChildren(document.createTextNode(displayText));
+                kanjiDiv.title = displayText;
+            }
             kanjiDiv.classList.add('show');
-            // Ẩn đi sau 6 giây
+            const displayToken = String(Number(kanjiDiv.dataset.displayToken || 0) + 1);
+            kanjiDiv.dataset.displayToken = displayToken;
             setTimeout(() => {
-                kanjiDiv.classList.remove('show');
+                if (kanjiDiv.dataset.displayToken === displayToken) {
+                    kanjiDiv.classList.remove('show');
+                }
             }, 6000);
         }
     } else {

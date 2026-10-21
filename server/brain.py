@@ -546,24 +546,31 @@ def _handle_wake_word(trigger_text: str, conversation_id: str | None = None,
         from server.llm.dictionary_router import lookup_vocab, extract_display_text
         from server.llm.brain_router import (
             is_study_help_query, STUDY_HELP_RESPONSE, set_study_help_state,
-            get_fast_chitchat
+            get_study_help_state, get_fast_chitchat
         )
         
         q_lower = question.lower()
-        fast_vocab = lookup_vocab(question)
+        study_conversation_id = conversation_id or _local_voice_conversation_id
+        study_state = get_study_help_state(study_conversation_id)
+        waiting_for_study_details = bool(
+            study_state and study_state.get("waiting_for_level")
+        )
+        # A pending answer belongs to the tutor dialogue; do not let dictionary
+        # or chitchat fast paths steal it before the LLM can use that context.
+        fast_vocab = None if waiting_for_study_details else lookup_vocab(question)
         fast_answer = None
 
         # 1. Ý định nhờ hỗ trợ học tập (Study Help) -> Phản hồi gợi mở ngay lập tức (0ms)
-        if is_study_help_query(question):
+        if not waiting_for_study_details and is_study_help_query(question):
             fast_answer = STUDY_HELP_RESPONSE
-            set_study_help_state(conversation_id or _local_voice_conversation_id, {
+            set_study_help_state(study_conversation_id, {
                 "waiting_for_level": True,
                 "timestamp": time.time(),
             })
             fast_vocab = None
 
         # 2. Chào hỏi, cảm ơn, tạm biệt đơn giản (Chitchat) -> Trả lời thân thiện ngay (0ms)
-        elif not fast_vocab:
+        elif not waiting_for_study_details and not fast_vocab:
             chitchat_ans = get_fast_chitchat(question)
             if chitchat_ans:
                 fast_answer = chitchat_ans

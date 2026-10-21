@@ -9,6 +9,7 @@ Setup:
 
 import io
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import os
 import sys
 import queue
@@ -43,6 +44,7 @@ EDGE_TTS_JA_VOICE = os.getenv("MOON_EDGE_TTS_JA_VOICE", "ja-JP-NanamiNeural")
 EDGE_TTS_EN_VOICE = os.getenv("MOON_EDGE_TTS_EN_VOICE", "en-US-AnaNeural")
 EDGE_TTS_VI_VOICE = os.getenv("MOON_EDGE_TTS_VI_VOICE", "vi-VN-HoaiMyNeural")
 EDGE_TTS_TIMEOUT_SEC = float(os.getenv("MOON_EDGE_TTS_TIMEOUT_SEC", "15"))
+EDGE_TTS_RATE = os.getenv("MOON_EDGE_TTS_RATE", "-8%")
 
 # ─── Phát audio — dùng sounddevice + scipy (không cần pygame) ────────────────
 _sd  = None
@@ -270,6 +272,53 @@ def _contains_japanese(text: str) -> bool:
     return bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", text or ""))
 
 
+def language_segments(text: str, metadata: dict | None = None) -> list[dict]:
+    """Route explicit vocabulary language metadata and Japanese-script runs."""
+    def typed(parts):
+        return [{**part, "voice": _voice_for_language(part["language"]),
+                 "rate": EDGE_TTS_RATE, "segment_id": str(index + 1)}
+                for index, part in enumerate(parts)]
+
+    targets = (metadata or {}).get("targets") or []
+    valid_targets = [item for item in targets if isinstance(item, dict)
+                     and item.get("text") and item.get("language") in {"vi", "en", "ja"}]
+    if valid_targets:
+        by_text = {str(item["text"]): item["language"] for item in valid_targets}
+        pattern = re.compile("(" + "|".join(re.escape(value) for value in
+                             sorted(by_text, key=len, reverse=True)) + ")")
+        result = []
+        cursor = 0
+        for match in pattern.finditer(text):
+            if match.start() > cursor:
+                result.append({"text": text[cursor:match.start()], "language": "vi"})
+            result.append({"text": match.group(0), "language": by_text[match.group(0)]})
+            cursor = match.end()
+        if cursor < len(text):
+            result.append({"text": text[cursor:], "language": "vi"})
+        if result:
+            return typed(result)
+    if metadata and metadata.get("target_text") and metadata.get("language") in {"vi", "en", "ja"}:
+        target = str(metadata["target_text"])
+        position = text.find(target)
+        if position >= 0:
+            result = []
+            if position:
+                result.append({"text": text[:position], "language": "vi"})
+            result.append({"text": target, "language": metadata["language"]})
+            if position + len(target) < len(text):
+                result.append({"text": text[position + len(target):], "language": "vi"})
+            return typed(result)
+    parts = re.split(r"([\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]+)", text or "")
+    return typed([{"text": part, "language": "ja" if _contains_japanese(part) else
+                   ("vi" if _edge_voice_for_text(part) == EDGE_TTS_VI_VOICE else "en")}
+                  for part in parts if part])
+
+
+def _voice_for_language(language: str) -> str:
+    return {"vi": EDGE_TTS_VI_VOICE, "en": EDGE_TTS_EN_VOICE,
+            "ja": EDGE_TTS_JA_VOICE}.get(language, EDGE_TTS_VI_VOICE)
+
+
 def _edge_voice_for_text(text: str) -> str | None:
     """Choose a matching Edge voice for Japanese, English, or Vietnamese."""
     try:
@@ -291,7 +340,7 @@ async def _synth_edge_async(text: str, voice: str) -> bytes:
     """Generate MP3 bytes with edge-tts without writing a temporary audio file."""
     import edge_tts
 
-    communicator = edge_tts.Communicate(text, voice)
+    communicator = edge_tts.Communicate(text, voice, rate=EDGE_TTS_RATE)
     chunks = bytearray()
     async for item in communicator.stream():
         if item.get("type") == "audio":
@@ -352,10 +401,55 @@ def _synth_speech(text: str) -> bytes | None:
 
 
 def _speak_preferred(text: str) -> bool:
-    audio = _synth_speech(text)
-    if not audio:
+    # Japanese script runs are synthesized independently; playback remains
+    # sequential under the existing TTS lock. Latin loanwords use metadata
+    # when callers provide it through speak_segments().
+    segments = language_segments(text)
+    if len(segments) <= 1:
+        audio = _synth_speech(text)
+        return bool(audio and _play_mp3_bytes(audio))
+    for segment in segments:
+        audio = _synth_edge(_normalize_tts_text(segment["text"]),
+                            _voice_for_language(segment["language"]))
+        if not audio or not _play_mp3_bytes(audio):
+            return False
+    return True
+
+
+def speak_segments(segments, blocking: bool = True):
+    """Speak typed {text, language, voice?, rate?, segment_id?} parts in order."""
+    normalized = []
+    for item in segments or []:
+        if not isinstance(item, dict) or not str(item.get("text", "")):
+            continue
+        language = item.get("language") if item.get("language") in {"vi", "en", "ja"} else "vi"
+        normalized.append((str(item["text"]), item.get("voice") or _voice_for_language(language)))
+    if not normalized:
         return False
-    return _play_mp3_bytes(audio)
+
+    def run():
+        with _tts_lock:
+            _set_speaking(True)
+            try:
+                # Request mixed-language clips concurrently, then play them in
+                # order. Serial synth→play→synth made every voice transition
+                # wait for another network round trip to Edge TTS.
+                with ThreadPoolExecutor(max_workers=min(3, len(normalized))) as pool:
+                    pending = [
+                        pool.submit(_synth_edge, _normalize_tts_text(text), voice)
+                        for text, voice in normalized
+                    ]
+                    for (text, _voice), future in zip(normalized, pending):
+                        audio = future.result()
+                        if not audio or not _play_mp3_bytes(audio):
+                            break
+            finally:
+                _set_speaking(False)
+    if blocking:
+        run()
+        return True
+    threading.Thread(target=run, daemon=True, name="moon-tts-segments").start()
+    return True
 
 
 def speak(text: str, blocking: bool = True):
@@ -423,7 +517,7 @@ class SentencePlayer:
         self._play_thread.start()
 
     def _synth_worker(self):
-        """Tổng hợp trước từng câu, đẩy sang hàng đợi phát."""
+        """Tổng hợp trước từng đoạn ngôn ngữ, đẩy sang hàng đợi phát."""
         while True:
             item = self._synth_q.get()
             if item is _SENTINEL or self._stopped:
@@ -433,17 +527,23 @@ class SentencePlayer:
             if self._stopped:
                 self._audio_q.put(_SENTINEL)
                 break
-            self._audio_q.put((item, audio, reason))
+            text, voice = item
+            self._audio_q.put((text, audio, reason, voice))
 
-    def _synth_with_timeout(self, text):
+    def _synth_with_timeout(self, item):
         """Bound provider synthesis; one timeout disables remote synthesis this turn."""
         if self._edge_disabled:
             return None, "Edge TTS đã bị bỏ qua sau lần quá thời gian trước"
+        text, voice = item if isinstance(item, tuple) else (str(item), None)
         result = queue.Queue(maxsize=1)
 
         def run():
             try:
-                result.put((_synth_speech(text), None), block=False)
+                if voice and voice != _edge_voice_for_text(text):
+                    audio = _synth_edge(_normalize_tts_text(text), voice)
+                else:
+                    audio = _synth_speech(text)
+                result.put((audio, None), block=False)
             except Exception as exc:
                 try:
                     result.put((None, str(exc)), block=False)
@@ -470,9 +570,9 @@ class SentencePlayer:
                         break
                     if self._stopped:
                         continue   # xả hàng đợi, không phát nữa
-                    text, audio, reason = item
+                    text, audio, reason, voice = item
                     if not audio:
-                        print(f"⚠️ [TTS] {reason or 'Edge TTS lỗi'} — câu này không được phát.")
+                        print(f"⚠️ [TTS] {reason or 'Edge TTS lỗi'} — đoạn voice={voice} không được phát.")
                         if self._on_fallback:
                             try:
                                 self._on_fallback(text, reason or "Edge TTS lỗi")
@@ -497,9 +597,15 @@ class SentencePlayer:
             _speech_end_t = time.time()
 
     def push(self, sentence: str):
-        """Đẩy 1 câu vào hàng đợi tổng hợp."""
+        """Tách câu theo ngôn ngữ để mỗi đoạn dùng đúng giọng TTS."""
         if sentence and sentence.strip():
-            self._synth_q.put(sentence.strip())
+            for segment in language_segments(sentence.strip()):
+                text = segment["text"].strip()
+                voice = segment["voice"]
+                if text:
+                    if voice == EDGE_TTS_JA_VOICE:
+                        print(f"🎌 [TTS] Định tuyến đoạn tiếng Nhật qua {voice}.")
+                    self._synth_q.put((text, voice))
 
     def finish(self):
         """Báo hiệu không còn câu nào nữa."""

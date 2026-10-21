@@ -21,6 +21,15 @@ class EdgeTtsTests(unittest.TestCase):
         self.assertEqual(tts._edge_voice_for_text("こんにちは、ムーンです。"), "ja-JP-NanamiNeural")
         self.assertEqual(tts._edge_voice_for_text("猫"), "ja-JP-NanamiNeural")
 
+    def test_mixed_language_segments_use_script_or_dictionary_metadata(self):
+        segments = tts.language_segments("Từ cat trong tiếng Nhật là 猫 nhé!")
+        self.assertEqual([item["language"] for item in segments], ["vi", "ja", "vi"])
+        explicit = tts.language_segments(
+            "Từ neko trong tiếng Việt là con mèo.",
+            {"target_text": "neko", "language": "ja"},
+        )
+        self.assertEqual([item["language"] for item in explicit], ["vi", "ja", "vi"])
+
     def test_edge_failure_does_not_call_fish_or_offline_tts(self):
         with patch.object(tts, "_synth_edge", return_value=None) as edge:
             self.assertIsNone(tts._synth_speech("猫です"))
@@ -38,9 +47,10 @@ class EdgeTtsTests(unittest.TestCase):
 
     def test_async_stream_collects_audio_chunks(self):
         class FakeCommunicate:
-            def __init__(self, text, voice):
+            def __init__(self, text, voice, rate):
                 self.text = text
                 self.voice = voice
+                self.rate = rate
 
             async def stream(self):
                 yield {"type": "WordBoundary", "data": {}}
@@ -50,6 +60,7 @@ class EdgeTtsTests(unittest.TestCase):
         fake_module = types.SimpleNamespace(Communicate=FakeCommunicate)
         with patch.dict(sys.modules, {"edge_tts": fake_module}):
             self.assertEqual(tts._synth_edge("こんにちは"), b"firstsecond")
+        self.assertEqual(tts.EDGE_TTS_RATE, "-8%")
 
 
 if __name__ == "__main__":
