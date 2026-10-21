@@ -541,9 +541,16 @@ class MoonRAG:
         q_words = set(q_unacc.split())
 
         stopwords = {"la", "gi", "the", "nao", "sao", "cho", "minh", "hoi", "ban", "oi", "con", "cai", "be", "biet", "khong"}
+        # Function words are not evidence for an English lesson match.
+        stopwords.update({"a", "an", "i", "am", "is", "are", "was", "were", "be",
+                          "do", "does", "did", "you", "your", "me", "my", "we",
+                          "our", "it", "its", "he", "she", "they", "their", "who",
+                          "what", "when", "where", "why", "how", "of", "to", "in",
+                          "on", "at", "for", "and", "or", "can", "could", "would",
+                          "should", "know", "hey"})
         content_words = q_words - stopwords
         if not content_words:
-            content_words = q_words
+            return []
 
         scored_items = []
         for item in self.knowledge_base:

@@ -18,8 +18,8 @@ const {chromium} = require('playwright');
         assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/);
         await page.evaluate(() => {
             const receive = socket.listeners('mqtt_message')[0];
-            receive({topic: 'panda/cmd/face', payload: 'questioning'});
-            receive({topic: 'panda/ai/state', payload: 'thinking'});
+            receive({topic: 'moon/cmd/face', payload: 'questioning'});
+            receive({topic: 'moon/ai/state', payload: 'thinking'});
         });
         assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/,
             'legacy MQTT events must not take OLED ownership while Live Voice waits');
@@ -42,14 +42,14 @@ const {chromium} = require('playwright');
 
         await page.evaluate(() => {
             const receive = socket.listeners('mqtt_message')[0];
-            receive({topic: 'panda/ai/thinking', payload: JSON.stringify({
+            receive({topic: 'moon/ai/thinking', payload: JSON.stringify({
                 stage: 'question_corrected', text: 'Ronaldo là ai?',
                 original: 'ronando là ai?', changed: true,
             })});
-            receive({topic: 'panda/ai/thinking', payload: JSON.stringify({
+            receive({topic: 'moon/ai/thinking', payload: JSON.stringify({
                 stage: 'answer', text: 'Một cầu thủ.',
             })});
-            receive({topic: 'panda/ai/response', payload: JSON.stringify({
+            receive({topic: 'moon/ai/response', payload: JSON.stringify({
                 text: 'Một cầu thủ.', done: true,
             })});
         });
@@ -58,7 +58,7 @@ const {chromium} = require('playwright');
         assert.match(await page.locator('#oled-face').getAttribute('class'), /speaking/);
 
         await page.evaluate(() => socket.listeners('mqtt_message')[0](
-            {topic: 'panda/ai/state', payload: 'standby'}));
+            {topic: 'moon/ai/state', payload: 'standby'}));
         assert.match(await page.locator('#oled-face').getAttribute('class'), /neutral/);
         await say({event: 'stopped', pipeline: 'brain'});
         assert.deepEqual(errors, []);

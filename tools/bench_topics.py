@@ -6,7 +6,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 sys.path.insert(0, ".")
 
 from server import brain
-from server.topics import classify_topic
+from server.network.topics import classify_topic
 
 CASES = [
     ("Tích phân là gì?", "math"),

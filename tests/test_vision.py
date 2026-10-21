@@ -105,15 +105,19 @@ class VisionTests(unittest.TestCase):
         self.assertFalse(result["person_detected"])
         self.assertIn("pose",result["errors"])
 
-    def test_face_coordinates_rescaled_and_emotion_failure_isolated(self):
+    def test_full_frame_face_coordinates_and_emotion_failure_isolated(self):
         engine = self.engine()
         class Detector:
             def setInputSize(self,size): self.size = size
-            def detect(self,frame): return None,np.array([face()])
+            def detect(self,frame):
+                self.frame_shape = frame.shape
+                return None,np.array([face()])
         engine.models["face"] = Detector()
         engine.models["emotion"] = object()
         result = engine.process(np.zeros((480,640,3),dtype=np.uint8))
-        self.assertEqual(result["face_box"],[0.,0.,320.,360.])
+        self.assertEqual(engine.models["face"].size,(640,480))
+        self.assertEqual(engine.models["face"].frame_shape,(480,640,3))
+        self.assertEqual(result["face_box"],[0.,0.,160.,180.])
         self.assertTrue(result["face_detected"])
         self.assertEqual(result["emotion"],"unknown")
         self.assertIn("emotion",result["errors"])

@@ -105,7 +105,8 @@ VISION_FACE_WIDTH_CM = 14.0
 VISION_DISTANCE_SCALE_CM = float(os.environ.get("MOON_DISTANCE_SCALE_CM", "0")) or None
 VISION_POSE_ENABLED = True
 VISION_POSE_SIZE = 320
-VISION_DEVICE = "0"  # Đổi sang "0" để bắt buộc chạy bằng Card rời RTX 4050
+# Auto-select an available GPU or CPU; allow an explicit per-machine override.
+VISION_DEVICE = os.environ.get("MOON_VISION_DEVICE", "")
 VISION_CV_THREADS = 2
 VISION_STALE_SEC = 2.0
 VISION_FACE_THRESHOLD = 0.8
@@ -290,3 +291,15 @@ MIC_DEVICE_INDEX = None
 #   "remote" = CHỈ clip qua MQTT — khi não lên cloud, hoặc khi test đường
 #              robot bằng dev_mic_bridge (mic laptop giả lập mic robot)
 MIC_SOURCE = "auto"
+
+# Browser DSP + WebRTC VAD + STT; accepted questions can be handed to Brain.
+VOICE_VAD_MODE = 2
+VOICE_MIN_RMS = 0.003
+VOICE_WAKE_SILENCE_SEC = 0.45
+VOICE_QUESTION_SILENCE_SEC = 1.2
+VOICE_WAIT_SEC = 20.0
+VOICE_MAX_SEC = 15.0
+VOICE_WAKE_VERIFY_MAX_SEC = 3.0
+VOICE_WAKE_VERIFY_MAX_WORDS = 3
+VOICE_WAKE_VERIFY_TIMEOUT_SEC = 4.0
+WAKE_SENSITIVITY = 0.6

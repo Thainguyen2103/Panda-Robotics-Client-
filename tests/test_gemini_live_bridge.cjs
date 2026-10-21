@@ -108,7 +108,7 @@ function waitFor(check, timeoutMs = 2000) {
         toolCall: {functionCalls: [{id: 'call-1', name: 'set_expression', args: {expression: 'happy'}}]},
     });
     await waitFor(() => toolResponses.length === 1);
-    assert.deepEqual(published.at(-1), {topic: 'panda/cmd/face', payload: 'happy'});
+    assert.deepEqual(published.at(-1), {topic: 'moon/cmd/face', payload: 'happy'});
     assert.equal(toolResponses[0].functionResponses[0].id, 'call-1');
 
     const pcm = Buffer.from([0, 0, 1, 0]);

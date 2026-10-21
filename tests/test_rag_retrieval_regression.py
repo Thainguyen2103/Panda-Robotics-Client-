@@ -37,6 +37,11 @@ class RagRetrievalRegressionTests(unittest.TestCase):
     def result_ids(self, query):
         return [item["id"] for item in self.rag.search(query, top_k=2)]
 
+    def test_jaccard_fallback_ignores_english_function_words(self):
+        self.assertEqual(self.rag._tier3_jaccard_fallback("Hey, do you know who I am?"), [])
+        results = self.rag._tier3_jaccard_fallback("con gi co chiec voi rat dai thich an mia")
+        self.assertEqual(results[0]["id"], "animal_elephant")
+
     def test_paraphrase_does_not_match_mother_from_english_substring(self):
         query = (
             "Which Japanese word names the animal whose eyes see in the dark "
