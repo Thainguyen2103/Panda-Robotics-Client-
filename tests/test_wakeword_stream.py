@@ -4,7 +4,7 @@ import types
 import unittest
 from unittest.mock import patch
 
-from server import wakeword
+from server.voice import wakeword
 
 
 class FakeEngine:

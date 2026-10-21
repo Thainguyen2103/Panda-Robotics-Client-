@@ -61,13 +61,13 @@ from server.voice.speech.transcription import transcribe_bytes as _transcribe_by
 
 # ─── MQTT để log transcript lên dashboard ─────────────────────────────────────
 try:
-    from server import mqtt_bridge
+    from server.network import mqtt_bridge
 except Exception:
     mqtt_bridge = None
 
 # ─── Cờ TTS đang phát — để mic KHÔNG thu tiếng loa của chính Moon ───────────
 try:
-    from server.tts import is_speaking as _tts_speaking
+    from server.voice.tts import is_speaking as _tts_speaking
 except Exception:
     def _tts_speaking() -> bool:
         return False

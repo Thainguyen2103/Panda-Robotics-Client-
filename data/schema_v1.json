@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PandaRoboticsRAGRecordSchemaV1",
+  "description": "Standardized schema for Panda Robotics educational RAG knowledge records (Schema V1 - Task 13)",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "id",
+      "language",
+      "level",
+      "skill",
+      "type",
+      "title",
+      "content",
+      "source_id",
+      "stopwords_override",
+      "review_status"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "Unique record identifier in category_item format",
+        "pattern": "^[a-z0-9]+_[a-z0-9_]+$"
+      },
+      "language": {
+        "type": "string",
+        "description": "Primary language of target learning item",
+        "enum": ["ja", "vi", "en", "multilingual"]
+      },
+      "level": {
+        "type": "string",
+        "description": "CEFR / JLPT or general difficulty level",
+        "enum": ["N5", "N4", "N3", "N2", "N1", "basic", "intermediate", "advanced"]
+      },
+      "skill": {
+        "type": "string",
+        "description": "Pedagogical skill category",
+        "enum": ["vocab", "grammar", "pronunciation", "dialogue", "culture"]
+      },
+      "type": {
+        "type": "string",
+        "description": "Knowledge item structure type",
+        "enum": ["word", "sentence", "rule", "conversation"]
+      },
+      "title": {
+        "type": "string",
+        "description": "Human-readable title of the lesson"
+      },
+      "content": {
+        "description": "Structured or textual knowledge content",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "vi": { "type": "string" },
+              "ja": { "type": "string" },
+              "ja_kanji": { "type": "string" },
+              "ja_kana": { "type": "string" },
+              "en": { "type": "string" },
+              "phonetic": { "type": "string" },
+              "example": { "type": "string" },
+              "fact": { "type": "string" }
+            }
+          },
+          {
+            "type": "string"
+          }
+        ]
+      },
+      "source_id": {
+        "type": "string",
+        "description": "Source curriculum reference identifier"
+      },
+      "stopwords_override": {
+        "type": "array",
+        "description": "List of words forbidden from short-circuiting Tier 1/2 matches for this record",
+        "items": {
+          "type": "string"
+        }
+      },
+      "review_status": {
+        "type": "string",
+        "description": "Review and verification status of the record",
+        "enum": ["draft", "verified", "deprecated"]
+      },
+      "topic": {
+        "type": "string",
+        "description": "Legacy curriculum topic"
+      },
+      "keywords": {
+        "type": "array",
+        "description": "Keywords for indexing and fast lookup",
+        "items": { "type": "string" }
+      },
+      "vi": { "type": "string" },
+      "ja": { "type": "string" },
+      "ja_kanji": { "type": "string" },
+      "ja_kana": { "type": "string" },
+      "en": { "type": "string" },
+      "phonetic": { "type": "string" },
+      "example": { "type": "string" },
+      "fact": { "type": "string" }
+    },
+    "additionalProperties": true
+  }
+}

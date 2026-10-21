@@ -1,4 +1,4 @@
-# tools/bench_topics.py — benchmark độ chính xác phân loại chủ đề hybrid
+﻿# tools/bench_topics.py — benchmark độ chính xác phân loại chủ đề hybrid
 import sys
 import io
 

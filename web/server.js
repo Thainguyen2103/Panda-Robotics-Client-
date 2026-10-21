@@ -10,11 +10,12 @@ const io = socketIo(server);
 const {attachVoice, startVoiceService} = require('./voice-bridge');
 const {attachGeminiLive} = require('./gemini-live-bridge');
 const {attachGeminiTranscribe} = require('./gemini-transcribe-bridge');
-const {readFishConfig, synthesizeFishWithRetry} = require('./fish-tts');
+const {synthesizeEdge} = require('./edge-tts');
 
 // Define MQTT settings
 const MQTT_BROKER = 'mqtt://localhost:1883';
 const mqttClient = mqtt.connect(MQTT_BROKER);
+const browserMicOwners = new Set();
 attachVoice(server);
 attachGeminiLive(server, mqttClient);
 attachGeminiTranscribe(server);
@@ -22,17 +23,13 @@ startVoiceService();
 
 // Tạo một lần rồi giữ trong RAM để lời xác nhận wakeword phát gần như tức thì.
 // API key chỉ được dùng ở server, không bao giờ gửi xuống trình duyệt.
-const fishConfig = readFishConfig();
 let wakeAckAudio = null;
 let wakeAckPending = null;
 
 async function getWakeAckAudio() {
     if (wakeAckAudio) return wakeAckAudio;
     if (!wakeAckPending) {
-        wakeAckPending = synthesizeFishWithRetry('Moon nghe đây!', fishConfig, {
-            attempts: 1,
-            timeoutMs: 6000,
-        }).then(audio => {
+        wakeAckPending = synthesizeEdge('Moon nghe đây!', {timeoutMs: 10000}).then(audio => {
             wakeAckAudio = audio;
             return audio;
         }).finally(() => {
@@ -49,9 +46,40 @@ app.get('/api/live-ack', async (_req, res) => {
         res.set('Cache-Control', 'private, max-age=3600');
         res.send(audio);
     } catch (error) {
-        console.warn(`⚠️ [WEB] Không tạo được lời xác nhận Fish: ${error.message}`);
-        res.status(503).json({error: 'Fish acknowledgement unavailable'});
+        console.warn(`⚠️ [WEB] Không tạo được lời xác nhận Edge TTS: ${error.message}`);
+        res.status(503).json({error: 'Edge TTS acknowledgement unavailable'});
     }
+});
+
+app.post('/api/preload-model', (req, res) => {
+    const postData = JSON.stringify({
+        model: 'qwen3.5:2b',
+        prompt: '',
+        keep_alive: '60m', // Giữ trong RAM 60 phút
+        options: {
+            num_gpu: 99 // Ép Ollama nạp 100% các lớp của mô hình lên VRAM của Card rời
+        }
+    });
+    const options = {
+        hostname: '127.0.0.1',
+        port: 11434,
+        path: '/api/generate',
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postData)
+        }
+    };
+    const ollamaReq = http.request(options, (ollamaRes) => {
+        ollamaRes.on('data', () => {}); // Consume data
+        ollamaRes.on('end', () => res.json({success: true}));
+    });
+    ollamaReq.on('error', (e) => {
+        console.error(`⚠️ [WEB] Preload Error: ${e.message}`);
+        res.status(500).json({error: e.message});
+    });
+    ollamaReq.write(postData);
+    ollamaReq.end();
 });
 
 // Serve static files
@@ -66,18 +94,19 @@ app.use(express.static(path.join(__dirname, 'public')));
 // MQTT Connection
 mqttClient.on('connect', () => {
     console.log('✅ [WEB] Connected to MQTT Broker');
-    mqttClient.subscribe('panda/status');
-    mqttClient.subscribe('panda/cmd/#');
-    mqttClient.subscribe('panda/log/voice');
-    mqttClient.subscribe('panda/log/voice_partial');
-    mqttClient.subscribe('panda/camera');
-    mqttClient.subscribe('panda/user_status');
-    mqttClient.subscribe('panda/vision/status');
-    mqttClient.subscribe('panda/ai/state');
-    mqttClient.subscribe('panda/ai/thinking');
-    mqttClient.subscribe('panda/ai/response');
-    mqttClient.subscribe('panda/ai/topic');
-    mqttClient.subscribe('panda/audio/tts_active');
+    mqttClient.subscribe('moon/status');
+    mqttClient.subscribe('moon/cmd/#');
+    mqttClient.subscribe('moon/log/voice');
+    mqttClient.subscribe('moon/log/voice_partial');
+    mqttClient.subscribe('moon/camera');
+    mqttClient.subscribe('moon/user_status');
+    mqttClient.subscribe('moon/vision/status');
+    mqttClient.subscribe('moon/ai/state');
+    mqttClient.subscribe('moon/ai/thinking');
+    mqttClient.subscribe('moon/ai/response');
+    mqttClient.subscribe('moon/ai/topic');
+    mqttClient.subscribe('moon/ai/led');
+    mqttClient.subscribe('moon/audio/tts_active');
 });
 
 mqttClient.on('message', (topic, message) => {
@@ -98,30 +127,70 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         console.log('🌐 [WEB] A client disconnected');
+        if (browserMicOwners.delete(socket.id) && browserMicOwners.size === 0) {
+            mqttClient.publish('moon/ai/mic_live', '0');
+            console.log('🎙️ [WEB] Browser mic owner disconnected; released server microphone lock');
+        }
     });
 
     // Browser push-to-talk: nhận base64 webm từ dashboard → chuyển sang MQTT cho brain
     socket.on('voice_audio', (b64) => {
         console.log(`🎤 [WEB] Browser audio received (${Math.round(b64.length / 1024)} KB b64) → MQTT`);
-        mqttClient.publish('panda/ai/voice_audio', b64);
+        mqttClient.publish('moon/ai/voice_audio', b64);
     });
 
     // Live-mic: clip PCM đã khử nhiễu từ trình duyệt → MQTT
     socket.on('voice_clip', (b64) => {
-        mqttClient.publish('panda/ai/clip', b64);
+        mqttClient.publish('moon/ai/clip', b64);
     });
     socket.on('mic_live', (st) => {
         console.log(`🎙️ [WEB] Live mic: ${st}`);
-        mqttClient.publish('panda/ai/mic_live', st);
+        if (st === '1') browserMicOwners.add(socket.id);
+        else browserMicOwners.delete(socket.id);
+        mqttClient.publish('moon/ai/mic_live', browserMicOwners.size > 0 ? '1' : '0');
     });
-    socket.on('voice_question', (text) => {
+    socket.on('voice_question', (question) => {
+        let text = typeof question === 'string' ? question : question?.text;
+        if (question && typeof question === 'object'
+                && question.provider && question.provider !== 'edge') return;
+        const provider = 'edge';
         if (typeof text !== 'string') return;
         text = text.trim().slice(0, 1000);
-        if (text) mqttClient.publish('panda/ai/question', text);
+        if (!text) return;
+        mqttClient.publish('moon/ai/browser_question', text, error => {
+            if (error) console.warn(`⚠️ [WEB] Browser question MQTT publish failed chars=${text.length}: ${error.message}`);
+            else console.info(`✅ [WEB] Browser question published to moon/ai/browser_question provider=${provider} chars=${text.length}`);
+        });
     });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`🚀 [WEB] Dashboard running at http://localhost:${PORT}`);
+    
+    // Tự động nạp model Ollama lên VRAM lúc khởi động Server
+    console.log('🤖 [WEB] Đang tự động nạp AI model vào VRAM...');
+    const postData = JSON.stringify({
+        model: 'qwen3.5:2b',
+        prompt: '',
+        keep_alive: '60m',
+        options: { num_gpu: 99 }
+    });
+    const options = {
+        hostname: '127.0.0.1',
+        port: 11434,
+        path: '/api/generate',
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postData)
+        }
+    };
+    const req = http.request(options, (res) => {
+        res.on('data', () => {}); 
+        res.on('end', () => console.log('✅ [WEB] Nạp model tự động thành công! Robot phản hồi không độ trễ.'));
+    });
+    req.on('error', (e) => console.log(`⚠️ [WEB] Lỗi nạp model tự động (Có thể Ollama chưa bật): ${e.message}`));
+    req.write(postData);
+    req.end();
 });

@@ -83,43 +83,46 @@
 
                     <h3>Movement</h3>
                     <div class="d-pad">
-                        <button id="btn-forward" onclick="sendCommand('panda/cmd/move', 'forward')">↑</button>
+                        <button id="btn-forward" onclick="sendCommand('moon/cmd/move', 'forward')">↑</button>
                         <div class="d-pad-middle">
-                            <button id="btn-left" onclick="sendCommand('panda/cmd/move', 'left')">←</button>
-                            <button id="btn-stop" class="btn-stop" onclick="sendCommand('panda/cmd/move', 'stop')">STOP</button>
-                            <button id="btn-right" onclick="sendCommand('panda/cmd/move', 'right')">→</button>
+                            <button id="btn-left" onclick="sendCommand('moon/cmd/move', 'left')">←</button>
+                            <button id="btn-stop" class="btn-stop" onclick="sendCommand('moon/cmd/move', 'stop')">STOP</button>
+                            <button id="btn-right" onclick="sendCommand('moon/cmd/move', 'right')">→</button>
                         </div>
-                        <button id="btn-back" onclick="sendCommand('panda/cmd/move', 'back')">↓</button>
+                        <button id="btn-back" onclick="sendCommand('moon/cmd/move', 'back')">↓</button>
                     </div>
                 </div>
 
                 <div class="control-group">
                     <h3>Arm & Face</h3>
                     <div class="button-row">
-                        <button id="btn-wave" onclick="sendCommand('panda/cmd/arm', 'wave')"><i data-lucide="hand"></i> Wave</button>
-                        <button id="btn-arm-up" onclick="sendCommand('panda/cmd/arm', 'up')"><i data-lucide="arrow-up"></i> Up</button>
-                        <button id="btn-arm-down" onclick="sendCommand('panda/cmd/arm', 'down')"><i data-lucide="arrow-down"></i> Down</button>
+                        <button id="btn-wave" onclick="sendCommand('moon/cmd/arm', 'wave')"><i data-lucide="hand"></i> Wave</button>
+                        <button id="btn-arm-up" onclick="sendCommand('moon/cmd/arm', 'up')"><i data-lucide="arrow-up"></i> Up</button>
+                        <button id="btn-arm-down" onclick="sendCommand('moon/cmd/arm', 'down')"><i data-lucide="arrow-down"></i> Down</button>
                     </div>
                     <div class="button-row">
-                        <button id="btn-face-happy" onclick="sendCommand('panda/cmd/face', 'happy')"><i data-lucide="smile"></i> Happy</button>
-                        <button id="btn-face-sad" onclick="sendCommand('panda/cmd/face', 'sad')"><i data-lucide="frown"></i> Sad</button>
-                        <button id="btn-face-angry" onclick="sendCommand('panda/cmd/face', 'angry')"><i data-lucide="flame"></i> Angry</button>
-                        <button id="btn-face-surprised" onclick="sendCommand('panda/cmd/face', 'surprised')"><i data-lucide="scan-face"></i> Wow</button>
-                        <button id="btn-face-love" onclick="sendCommand('panda/cmd/face', 'love')"><i data-lucide="heart"></i> Love</button>
-                        <button id="btn-face-wink" onclick="sendCommand('panda/cmd/face', 'wink')"><i data-lucide="smile-plus"></i> Wink</button>
-                        <button id="btn-face-sleepy" onclick="sendCommand('panda/cmd/face', 'sleepy')"><i data-lucide="moon"></i> Sleepy</button>
-                        <button id="btn-face-dizzy" onclick="sendCommand('panda/cmd/face', 'dizzy')"><i data-lucide="zap"></i> Dizzy</button>
-                        <button id="btn-face-cool" onclick="sendCommand('panda/cmd/face', 'cool')"><i data-lucide="glasses"></i> Cool</button>
-                        <button id="btn-face-cute" onclick="sendCommand('panda/cmd/face', 'cute')"><i data-lucide="sparkles"></i> Cute</button>
-                        <button id="btn-face-neutral" onclick="sendCommand('panda/cmd/face', 'neutral')"><i data-lucide="meh"></i> Neutral</button>
+                        <button id="btn-face-happy" onclick="sendCommand('moon/cmd/face', 'happy')"><i data-lucide="smile"></i> Happy</button>
+                        <button id="btn-face-sad" onclick="sendCommand('moon/cmd/face', 'sad')"><i data-lucide="frown"></i> Sad</button>
+                        <button id="btn-face-angry" onclick="sendCommand('moon/cmd/face', 'angry')"><i data-lucide="flame"></i> Angry</button>
+                        <button id="btn-face-surprised" onclick="sendCommand('moon/cmd/face', 'surprised')"><i data-lucide="scan-face"></i> Wow</button>
+                        <button id="btn-face-love" onclick="sendCommand('moon/cmd/face', 'love')"><i data-lucide="heart"></i> Love</button>
+                        <button id="btn-face-wink" onclick="sendCommand('moon/cmd/face', 'wink')"><i data-lucide="smile-plus"></i> Wink</button>
+                        <button id="btn-face-sleepy" onclick="sendCommand('moon/cmd/face', 'sleepy')"><i data-lucide="moon"></i> Sleepy</button>
+                        <button id="btn-face-dizzy" onclick="sendCommand('moon/cmd/face', 'dizzy')"><i data-lucide="zap"></i> Dizzy</button>
+                        <button id="btn-face-cool" onclick="sendCommand('moon/cmd/face', 'cool')"><i data-lucide="glasses"></i> Cool</button>
+                        <button id="btn-face-cute" onclick="sendCommand('moon/cmd/face', 'cute')"><i data-lucide="sparkles"></i> Cute</button>
+                        <button id="btn-face-neutral" onclick="sendCommand('moon/cmd/face', 'neutral')"><i data-lucide="meh"></i> Neutral</button>
                     </div>
                 </div>
 
                 <div class="control-group">
                     <h3>Misc</h3>
                     <div class="button-row">
-                        <button id="btn-buzz-on" onclick="sendCommand('panda/cmd/buzz', 'on')"><i data-lucide="bell"></i> Buzz ON</button>
-                        <button id="btn-buzz-off" onclick="sendCommand('panda/cmd/buzz', 'off')"><i data-lucide="bell-off"></i> Buzz OFF</button>
+                        <button id="btn-buzz-on" onclick="sendCommand('moon/cmd/buzz', 'on')"><i data-lucide="bell"></i> Buzz ON</button>
+                        <button id="btn-buzz-off" onclick="sendCommand('moon/cmd/buzz', 'off')"><i data-lucide="bell-off"></i> Buzz OFF</button>
+                    </div>
+                    <div class="button-row" style="margin-top: 8px;">
+
                     </div>
                 </div>
 
@@ -174,6 +177,9 @@
                             <div class="oled-text" id="oled-text"></div>
                             <!-- Topic emoji (thinking/speaking) -->
                             <div class="oled-topic" id="oled-topic"></div>
+                            
+                            <!-- Kanji overlay -->
+                            <div class="oled-kanji" id="oled-kanji"></div>
                         </div>
                     </div>
                 </div>
@@ -188,7 +194,7 @@
                     </div>
                     <p class="live-talk-description" id="live-description">
                         Gemini nghe và hiểu âm thanh trực tiếp, không dùng dịch vụ STT riêng.
-                        Fish Audio giữ đúng giọng Moon; phản hồi chậm hơn một chút và có dùng quota Fish. OLED chỉ hiển thị biểu cảm.
+                        Edge TTS Neural đọc câu trả lời bằng giọng phù hợp ngôn ngữ. Dịch vụ tổng hợp cần kết nối Internet. OLED chỉ hiển thị biểu cảm.
                     </p>
                     <div class="live-talk-orb" id="live-orb" data-state="idle" aria-hidden="true">
                         <span></span><span></span><span></span>
@@ -197,7 +203,7 @@
                     <p class="live-talk-state" id="live-state" role="status">Sẵn sàng kết nối</p>
                     <meter id="live-level" min="0" max="0.2" value="0" aria-label="Mức âm lượng Live Talk"></meter>
                     <div class="live-talk-meta">
-                        <span id="live-model">gemini-3.8-live · Fish Voice</span>
+                        <span id="live-model">gemini-3.8-live · Edge TTS Neural</span>
                         <span id="live-duration">00:00</span>
                     </div>
                     <div class="live-talk-result" aria-live="polite">
@@ -235,11 +241,11 @@
                     <label class="live-talk-select-label" for="live-pipeline">Hệ thống xử lý</label>
                     <select id="live-pipeline" aria-label="Hệ thống xử lý hội thoại">
                         <option value="gemini" selected>Gemini Live — audio native</option>
-                        <option value="brain">Brain Pipeline — STT → LLM → Fish</option>
+                        <option value="brain">Brain Pipeline — STT → LLM → Edge TTS</option>
                     </select>
                     <label class="live-talk-select-label" for="live-mode">Giọng trả lời</label>
                     <select id="live-mode" aria-label="Giọng trả lời Live Talk">
-                        <option value="fish" selected>Fish Voice — cùng giọng Moon (dùng quota Fish)</option>
+                        <option value="edge" selected>Edge TTS Neural — ja/en/vi</option>
                         <option value="native">Gemini Native — nhanh hơn (Kore)</option>
                     </select>
                     <label class="live-talk-select-label" for="live-device">Microphone</label>
@@ -251,9 +257,10 @@
                         <button class="btn-live-talk btn-live-stop" id="live-stop" disabled><i data-lucide="square"></i> Kết thúc</button>
                     </div>
                     <p class="live-talk-error" id="live-error" role="alert"></p>
+                    <button class="live-talk-unmute" id="live-unmute" type="button" hidden>Nhấn để bật âm thanh</button>
                     <details class="live-talk-setup">
                         <summary>Cách thêm API key</summary>
-                          <p>Thêm <code>"GEMINI_API_KEY": "..."</code> và <code>"FISH_AUDIO_API_KEY": "..."</code> vào <code>config/secrets.py</code>, rồi chạy lại <code>start.bat</code>. Key chỉ được đọc ở backend.</p>
+                          <p>Thêm <code>"GEMINI_API_KEY": "..."</code> vào <code>config/secrets.py</code>, rồi chạy lại <code>start.bat</code>. Key chỉ được đọc ở backend.</p>
                     </details>
                 </div>
             </section>
