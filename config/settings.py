@@ -81,6 +81,11 @@ VISION_POSE_FPS = 5
 VISION_IDENTITY_FPS = 1
 VISION_EMOTION_FPS = 3
 VISION_EMOTION_STALE_SEC = 1.5
+# Keep FER+ input in its trained 0..255 grayscale range. Correct only head roll.
+VISION_EMOTION_ALIGN_ROLL = True
+VISION_EMOTION_SMOOTH_SEC = 0.25
+# Neutral must persist longer than an expressive label before replacing it.
+VISION_EMOTION_NEUTRAL_DWELL = 0.65
 VISION_FACE_WIDTH = 320
 VISION_FACE_DETAILS_ENABLED = True
 VISION_FACE_DETAILS_MODEL = "face_landmarker.task"

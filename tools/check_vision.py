@@ -29,6 +29,7 @@ def main():
     engine.reset()
     cap = cv2.VideoCapture(camera_source()) if args.camera else None
     timings,faces,actions = [],0,Counter()
+    emotions,emotion_sources,fer_top = Counter(),Counter(),Counter()
     hand_frames,object_frames = 0,0
     hand_gestures,object_labels = Counter(),Counter()
     head_frames = cue_frames = joint_frames = 0
@@ -51,6 +52,10 @@ def main():
             timings.append(result["inference_ms"])
             faces += int(result["face_detected"])
             actions[result["action"]] += 1
+            emotions[result["emotion"]] += 1
+            emotion_sources[result.get("emotion_source","uncertain")] += 1
+            if result.get("emotion_probs"):
+                fer_top[max(result["emotion_probs"],key=result["emotion_probs"].get)] += 1
             hand_frames += int(bool(result.get("hands")))
             object_frames += int(bool(result.get("objects")))
             hand_gestures.update(hand.get("gesture_candidate","unknown") for hand in result.get("hands",[]))
@@ -66,7 +71,8 @@ def main():
     print(json.dumps(dict(source="camera" if args.camera else "blank",frames=len(timings),
         face_frames=faces,head_pose_frames=head_frames,face_cue_frames=cue_frames,joint_frames=joint_frames,
         hand_frames=hand_frames,object_frames=object_frames,hand_gestures=dict(hand_gestures),
-        object_labels=dict(object_labels),actions=dict(actions),median_ms=round(float(np.median(timings)),1),
+        object_labels=dict(object_labels),actions=dict(actions),emotions=dict(emotions),
+        emotion_sources=dict(emotion_sources),fer_top=dict(fer_top),median_ms=round(float(np.median(timings)),1),
         p95_ms=round(float(np.percentile(timings,95)),1),
         observed_fps=round(len(timings)/(time.monotonic()-began),1),
         models=result["models"],errors=result["errors"]),indent=2))

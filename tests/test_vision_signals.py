@@ -55,7 +55,8 @@ class SignalTests(unittest.TestCase):
         self.assertEqual(state.update(probs,{'smile':.8},.2)['emotion'],'happy')
         self.assertEqual(probs[0],.94)
         state.update(probs,{},.3)
-        self.assertEqual(state.update(probs,{},.7)['emotion'],'neutral')
+        self.assertEqual(state.update(probs,{},.7)['emotion'],'happy','brief neutral interruption must not replace a confirmed smile')
+        self.assertEqual(state.update(probs,{},1.)['emotion'],'neutral')
         state.reset()
         self.assertEqual(state.update(None,{'jaw_open':.9},0)['emotion'],'unknown','mouth opening alone is not surprise')
 

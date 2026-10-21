@@ -17,19 +17,33 @@ khác tiếp tục hoạt động. Bật/tắt/tần suất trong `config/settin
 - Cười rõ (`smile >= 0.45`) được phép đổi nhãn sau 0,18 giây, kể cả FER+ nghiêng
   về trung tính. Ngạc nhiên cần cả mở miệng và mở mắt/nâng mày; chỉ há miệng
   khi nói hoặc ngáp không đủ. Đây là các quy tắc thực nghiệm trên blendshapes.
-- FER+ dùng thời gian ổn định 0,30 giây; ứng viên buồn/giận được mốc mặt hỗ trợ
-  cần 0,65 giây. Không còn chờ ba lần suy luận rồi lại chờ thêm nửa giây ở UI.
+- FER+ có nhãn khác trung tính rõ ràng cần ổn định 0,30 giây; ứng viên được
+  FER+ và mốc mặt cùng hỗ trợ cần 0,45 giây. Trung tính cần 0,65 giây trước khi
+  thay nhãn. Cần ít nhất hai mẫu mới; kết quả FER cache không được tính là mẫu mới.
 - Cấu hình chân mày + nheo mắt/ép môi hoặc chân mày + hạ khóe miệng đủ mạnh
   cũng có thể tạo nhãn giận/buồn độc lập FER sau 0,65 giây. Chỉ một biến đổi
   nhỏ ở chân mày không đủ. Đây vẫn là quy tắc biểu cảm, có thể nhầm tập trung
   với giận; điểm mốc mặt luôn được tách khỏi điểm FER.
 - `emotion_probs`: đủ 8 điểm FER+ đã làm mượt, tổng xấp xỉ 1. Đây là xác suất
   phân lớp của mô hình, không phải xác suất cảm xúc thực tế của người.
-- `expression_intensities`: mức kích hoạt hình học của cười/ngạc nhiên/buồn/giận.
+- `expression_intensities`: mức kích hoạt hình học của cả bảy biểu cảm khác trung tính.
   Các điểm độc lập, không cộng thành 1, không tương đương `emotion_probs`.
 - `emotion_source`: `fer`, `fer+landmarks`, `landmarks`, `uncertain`.
-  `emotion_confidence` là điểm từ nguồn đó, không so sánh trực tiếp giữa nguồn.
-- Dashboard có mục mở rộng “Điểm FER+ liên tục”, kèm các mức kích hoạt mốc mặt.
+  `emotion_confidence` là điểm ở lần xác nhận gần nhất từ nguồn đó; không so sánh
+  trực tiếp giữa nguồn, không phải xác suất cảm xúc thực tế.
+- `emotion_scores` là điểm tổng hợp FER+ và các tổ hợp mốc mặt hợp lệ, chuẩn hóa
+  tổng bằng 1 để xếp hạng; chưa được hiệu chuẩn thành xác suất.
+- Dashboard hiển thị riêng **Cảm xúc** đã xác nhận và **Điểm tổng hợp**. Xếp hạng
+  trung tính cao không được che nhãn khác đã xác nhận. Mục “Điểm FER+ liên tục”
+  vẫn giữ đủ điểm FER gốc đã làm mượt, kèm các mức kích hoạt mốc mặt.
+- Khi FER chưa quyết định, các ứng viên được so bằng mức hỗ trợ thay vì thứ tự
+  luật. Cười lệch có thể hỗ trợ khinh miệt; sợ chỉ dùng mốc mặt cần thêm kéo giãn
+  môi để phân biệt ngạc nhiên. Trường hợp cạnh tranh sát nhau trả `unknown`.
+- Đầu vào giữ grayscale 0–255, 64×64; căn độ nghiêng theo cặp mắt YuNet hợp lệ,
+  resize bằng INTER_AREA. EMA dùng khoảng thời gian giữa hai suy luận FER thay
+  vì trọng số cố định theo số frame. Cấu hình tại `config/settings.py`.
+
+Quy trình đo chất lượng và công cụ đánh giá: [emotion-evaluation.md](emotion-evaluation.md).
 
 Giới hạn: độ nhạy của buồn/giận vẫn phụ thuộc người, ánh sáng, góc quay và mô
 hình. Chưa có bộ video gán nhãn để kết luận tỷ lệ chính xác. Không coi biểu cảm

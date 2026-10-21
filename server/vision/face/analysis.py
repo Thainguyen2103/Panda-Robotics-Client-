@@ -5,16 +5,33 @@ import numpy as np
 from config import settings
 from server.vision.face.eyes import eye_geometry
 
+EMOTIONS = ("neutral","happy","surprised","sad","angry","disgust","fear","contempt")
+
+
+def _valid_cues(cues):
+    return {key:float(np.clip(value,0,1)) for key,value in (cues or {}).items()
+            if isinstance(value,(int,float,np.number)) and np.isfinite(value)}
+
+
+def _distribution(probs):
+    if probs is None:
+        return None
+    raw = np.asarray(probs,dtype=float).reshape(-1)
+    if raw.size != len(EMOTIONS) or not np.isfinite(raw).all() or np.any(raw < 0) or raw.sum() <= 0:
+        return None
+    return raw/raw.sum()
+
 
 class FaceDetails:
-    def __init__(self, path):
+    def __init__(self, path, *, video=True):
         import mediapipe as mp
         self.mp = mp
+        self.video = video
         self.timestamp = -1
         self.model = mp.tasks.vision.FaceLandmarker.create_from_options(
             mp.tasks.vision.FaceLandmarkerOptions(
                 base_options=mp.tasks.BaseOptions(model_asset_path=str(path)),
-                running_mode=mp.tasks.vision.RunningMode.VIDEO,
+                running_mode=mp.tasks.vision.RunningMode.VIDEO if video else mp.tasks.vision.RunningMode.IMAGE,
                 num_faces=1, min_face_detection_confidence=.6,
                 min_face_presence_confidence=.6, min_tracking_confidence=.6,
                 output_face_blendshapes=True, output_facial_transformation_matrixes=True))
@@ -27,7 +44,7 @@ class FaceDetails:
         self.timestamp = max(self.timestamp+1,int(now*1000))
         image = self.mp.Image(image_format=self.mp.ImageFormat.SRGB,
                               data=cv2.cvtColor(frame,cv2.COLOR_BGR2RGB))
-        result = self.model.detect_for_video(image,self.timestamp)
+        result = self.model.detect_for_video(image,self.timestamp) if self.video else self.model.detect(image)
         if not result.face_landmarks:
             return None
         nose = result.face_landmarks[0][1]
@@ -63,7 +80,7 @@ class FaceDetails:
 
 def expression_intensities(cues):
     """Independent geometric activation scores, not probabilities summing to one."""
-    c = cues or {}
+    c = _valid_cues(cues)
     smile_left,smile_right = c.get("smile_left",0),c.get("smile_right",0)
     raised_brows = max(c.get("brow_inner_up",0),c.get("brow_outer_up",0))
     return dict(happy=float(c.get("smile",0)),
@@ -75,25 +92,71 @@ def expression_intensities(cues):
         contempt=float(math.sqrt(max(smile_left,smile_right)*abs(smile_left-smile_right))))
 
 
+def _supported_expressions(cues):
+    """Require combinations of movements; a single brow/jaw cue is insufficient."""
+    c = _valid_cues(cues)
+    left,right = c.get("smile_left",0),c.get("smile_right",0)
+    asymmetric = max(left,right) >= .35 and abs(left-right) >= .22
+    return dict(
+        happy=c.get("smile",0) >= .25 and not asymmetric,
+        surprised=c.get("jaw_open",0) >= .18 and max(c.get("eye_wide",0),c.get("brow_outer_up",0)) >= .18,
+        angry=c.get("brow_down",0) >= .30 and max(c.get("eye_squint",0),c.get("mouth_press",0)) >= .12,
+        sad=c.get("brow_inner_up",0) >= .25 and c.get("mouth_frown",0) >= .12,
+        disgust=c.get("nose_sneer",0) >= .25 and c.get("upper_lip_raise",0) >= .15,
+        fear=max(c.get("brow_inner_up",0),c.get("brow_outer_up",0)) >= .25
+             and c.get("eye_wide",0) >= .18 and max(c.get("jaw_open",0),c.get("mouth_stretch",0)) >= .18,
+        contempt=asymmetric)
+
+
 def combined_emotion_scores(probs, cues):
-    """Fuse FER+ distribution and independent landmarks into a normalized ranking."""
-    labels = ("neutral","happy","surprised","sad","angry","disgust","fear","contempt")
-    if probs is None:
+    """Normalized evidence ranking, not a calibrated probability of emotion."""
+    raw = _distribution(probs)
+    if raw is None:
         return {}
-    raw = np.clip(np.asarray(probs,dtype=float).reshape(-1),0,1)
-    if raw.size != len(labels) or not np.isfinite(raw).all() or raw.sum() <= 0:
-        return {}
-    raw /= raw.sum()
     intensities = expression_intensities(cues)
+    supported = _supported_expressions(cues)
     scores = .75*raw
-    activation = max(intensities.values(),default=0.)
+    activation = max((intensities[name] for name,valid in supported.items() if valid),default=0.)
     # FER+ frequently absorbs subtle expressions into neutral. Reduce neutral only
     # when independent facial motion exists, then add class-specific evidence.
     scores[0] *= max(.35,1-.65*activation)
-    for index,name in enumerate(labels[1:],1):
-        scores[index] += .25*np.clip(intensities.get(name,0.),0,1)
+    for index,name in enumerate(EMOTIONS[1:],1):
+        if supported[name]:
+            scores[index] += .25*intensities[name]
     scores /= scores.sum()
-    return {name:float(value) for name,value in zip(labels,scores)}
+    return {name:float(value) for name,value in zip(EMOTIONS,scores)}
+
+
+def expression_decision(probs, cues):
+    """Return candidate, required dwell and source, without temporal confirmation."""
+    label,count,source = emotion_candidate(probs,cues)
+    if source == "fer" and label != "neutral":
+        return label,.30,source
+    if source == "fer+landmarks":
+        return label,.45,source
+    c = _valid_cues(cues)
+    strengths = expression_intensities(c)
+    supported = _supported_expressions(c)
+    thresholds = dict(happy=.45,surprised=.30,angry=.30,sad=.24,disgust=.24,fear=.20,contempt=.25)
+    supported["angry"] &= c.get("brow_down",0) >= .42
+    supported["sad"] &= c.get("brow_inner_up",0) >= .30
+    # Fear and surprise share raised brows/open eyes. Stretching the lips
+    # supplies the additional evidence needed for a landmarks-only fear label.
+    supported["fear"] &= c.get("mouth_stretch",0) >= .25 and c.get("mouth_stretch",0) >= .65*c.get("jaw_open",0)
+    if supported["fear"]:
+        supported["surprised"] = False
+    candidates = sorted(((strengths[name]/thresholds[name],name) for name in thresholds
+                         if supported[name] and strengths[name] >= thresholds[name]),reverse=True)
+    if candidates:
+        # Competing expressions must separate; dictionary/if order cannot decide.
+        if len(candidates) == 1 or candidates[0][0]-candidates[1][0] >= .15:
+            name = candidates[0][1]
+            dwell = .18 if name in ("happy","surprised") else .55 if name in ("fear","disgust") else .65
+            return name,dwell,"landmarks"
+        return "unknown",.30,"uncertain"
+    if label == "neutral":
+        return label,settings.VISION_EMOTION_NEUTRAL_DWELL,source
+    return label,.65 if count == 5 else .30,source
 
 
 class ExpressionState:
@@ -102,47 +165,41 @@ class ExpressionState:
         self.value,self.pending = "unknown","unknown"
         self.since,self.confirmed = 0.,-float("inf")
         self.source = "uncertain"
+        self.confidence = 0.
+        self.last_update = None
+        self.pending_source = "uncertain"
+        self.observations = 0
+        self.observed_at = None
 
     def update(self,probs,cues,now,*,fer_fresh=True):
+        if self.last_update is not None and (now < self.last_update or now-self.last_update > settings.VISION_EMOTION_STALE_SEC):
+            self.reset()
+        self.last_update = now
+        probs = _distribution(probs)
         intensities = expression_intensities(cues)
-        model_label,count,model_source = emotion_candidate(probs,cues) if probs is not None else ("unknown",3,"uncertain")
-        # Trust a decisive non-neutral FER result. Geometric cues primarily recover
-        # expressions that FER+ incorrectly collapses into its dominant neutral class.
-        if model_source == "fer" and model_label != "neutral":
-            label,dwell,source = model_label,.30,model_source
-        elif model_source == "fer+landmarks":
-            label,dwell,source = model_label,.45,model_source
-        elif intensities["happy"] >= .45:
-            label,dwell,source = "happy",.18,"landmarks"
-        elif intensities["surprised"] >= .30:
-            label,dwell,source = "surprised",.18,"landmarks"
-        elif intensities["angry"] >= .30 and (cues or {}).get("brow_down",0) >= .42:
-            label,dwell,source = "angry",.65,"landmarks"
-        elif intensities["sad"] >= .24 and (cues or {}).get("brow_inner_up",0) >= .30:
-            label,dwell,source = "sad",.65,"landmarks"
-        elif intensities["disgust"] >= .24:
-            label,dwell,source = "disgust",.55,"landmarks"
-        elif intensities["fear"] >= .20:
-            label,dwell,source = "fear",.55,"landmarks"
-        elif intensities["contempt"] >= .25:
-            label,dwell,source = "contempt",.65,"landmarks"
-        elif probs is not None:
-            label,source = model_label,model_source
-            dwell = .65 if count == 5 else .30
-        else:
-            label,dwell,source = "unknown",.30,"uncertain"
-        if label != self.pending:
+        label,dwell,source = expression_decision(probs,cues)
+        if label != self.pending or source != self.pending_source:
             self.pending,self.since = label,now
+            self.pending_source = source
+            self.observations,self.observed_at = 0,None
         # Cached FER probabilities may be displayed, but only a new inference
         # can confirm or extend a FER-based label. Landmarks are sampled each frame.
         fresh = source == "landmarks" or fer_fresh
-        if label != "unknown" and fresh and now-self.since >= dwell:
+        if label != "unknown" and fresh and now != self.observed_at:
+            if self.observations == 0:
+                self.since = now
+            self.observations += 1
+            self.observed_at = now
+        if label != "unknown" and fresh and self.observations >= 2 and now-self.since >= dwell:
             self.value,self.confirmed,self.source = label,now,source
-        elif now-self.confirmed > .6:
+            self.confidence = intensities[label] if source == "landmarks" else float(probs[EMOTIONS.index(label)])
+        # Allow a brief neutral interruption without erasing a confirmed expression.
+        # Cached FER still cannot confirm or refresh either label.
+        expiry = settings.VISION_EMOTION_NEUTRAL_DWELL+.3 if label == "neutral" and self.value not in ("neutral","unknown") else .6
+        if now-self.confirmed > expiry:
             self.value,self.source = "unknown","uncertain"
-        labels = ("neutral","happy","surprised","sad","angry","disgust","fear","contempt")
-        score = intensities.get(self.value,0.) if self.source == "landmarks" else float(probs[labels.index(self.value)]) if probs is not None and self.value in labels else 0.
-        return dict(emotion=self.value,emotion_source=self.source,emotion_confidence=score,
+            self.confidence = 0.
+        return dict(emotion=self.value,emotion_source=self.source,emotion_confidence=self.confidence,
                     emotion_scores=combined_emotion_scores(probs,cues),expression_intensities=intensities)
 
 
@@ -205,24 +262,24 @@ class HeadMotion:
 
 def emotion_candidate(probs, cues):
     """Keep FER scores intact; geometry only corroborates subtle candidates."""
-    labels = ("neutral","happy","surprised","sad","angry","disgust","fear","contempt")
+    probs = _distribution(probs)
+    if probs is None:
+        return "unknown",3,"uncertain"
     order = np.argsort(probs)
     top,runner = int(order[-1]),int(order[-2])
     decisive = probs[top] >= settings.VISION_EMOTION_THRESHOLD and probs[top]-probs[runner] >= settings.VISION_EMOTION_MARGIN
     if decisive and top != 0:
-        return labels[top],3,"fer"
-    cues = cues or {}
-    angry = cues.get("brow_down",0) >= .3 and max(cues.get("eye_squint",0),cues.get("mouth_press",0)) >= .12
-    sad = cues.get("brow_inner_up",0) >= .25 and cues.get("mouth_frown",0) >= .12
-    disgust = cues.get("nose_sneer",0) >= .25 and cues.get("upper_lip_raise",0) >= .15
-    fear = (max(cues.get("brow_inner_up",0),cues.get("brow_outer_up",0)) >= .25
-            and cues.get("eye_wide",0) >= .18
-            and max(cues.get("jaw_open",0),cues.get("mouth_stretch",0)) >= .18)
-    smile_left,smile_right = cues.get("smile_left",0),cues.get("smile_right",0)
-    contempt = max(smile_left,smile_right) >= .35 and abs(smile_left-smile_right) >= .22
-    for index,supported in ((3,sad),(4,angry),(5,disgust),(6,fear),(7,contempt)):
-        if supported and top in (0,index) and index in (top,runner) and probs[index] >= .12 and probs[index] >= probs[top]*.28:
-            return labels[index],5,"fer+landmarks"
+        return EMOTIONS[top],3,"fer"
+    supported = _supported_expressions(cues)
+    intensities = expression_intensities(cues)
+    candidates = sorted(((probs[index]+.25*intensities[name],name)
+                         for index,name in enumerate(EMOTIONS[1:],1)
+                         if supported[name] and top in (0,index) and probs[index] >= .12
+                         and probs[index] >= probs[top]*.28),reverse=True)
+    if candidates:
+        if len(candidates) == 1 or candidates[0][0]-candidates[1][0] >= .04:
+            return candidates[0][1],5,"fer+landmarks"
+        return "unknown",3,"uncertain"
     if decisive:
-        return labels[top],3,"fer"
+        return EMOTIONS[top],3,"fer"
     return "unknown",3,"uncertain"

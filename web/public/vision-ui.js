@@ -67,7 +67,7 @@ class VisionPanel {
             this.objects.clear();
             this.hands.clear();
             this.text('cv-health',cameraFresh ? 'Camera còn hình · AI đang xử lý' : 'Mất kết nối Vision');
-            for (const id of ['cv-identity','cv-emotion','cv-action','cv-joints','cv-cues','cv-head','cv-arms','cv-left-hand','cv-right-hand','cv-gaze','cv-eyes','cv-blinks','cv-distance','cv-objects']) this.text(id,'Chưa rõ');
+            for (const id of ['cv-identity','cv-emotion','cv-emotion-confirmed','cv-action','cv-joints','cv-cues','cv-head','cv-arms','cv-left-hand','cv-right-hand','cv-gaze','cv-eyes','cv-blinks','cv-distance','cv-objects']) this.text(id,'Chưa rõ');
             this.meters({});
             return;
         }
@@ -81,15 +81,20 @@ class VisionPanel {
         this.stable('cv-identity',identity,identity === 'Chưa rõ' || !s.person_detected);
         const emotion = offline ? 'unknown' : s.emotion;
         const emotionLabel = VisionPanel.labels[emotion] || 'Chưa rõ';
+        if (offline) this.fields.delete('cv-emotion');
         this.stable('cv-emotion',emotionLabel,emotion === 'unknown',150);
         const emotionElement = this.document.getElementById('cv-emotion');
         const shownEmotion = this.fields.get('cv-emotion')?.shown || 'Chưa rõ';
         const hasCurrentScore = emotion !== 'unknown' && shownEmotion === emotionLabel && Number.isFinite(s.emotion_confidence);
         const fallbackEmotion = hasCurrentScore ? `${shownEmotion} (${Math.round(s.emotion_confidence*100)}%)` : shownEmotion;
-        const ranking = offline ? '' : this.emotionRanking(s.emotion_scores || s.emotion_probs || {});
+        this.text('cv-emotion-confirmed',fallbackEmotion);
+        const confirmedElement = this.document.getElementById('cv-emotion-confirmed');
+        if (confirmedElement) confirmedElement.title = `Nhãn đã xác nhận theo thời gian · nguồn: ${s.emotion_source || 'uncertain'} · điểm từ nguồn xác nhận gần nhất`;
+        const fused = s.emotion_scores && Object.keys(s.emotion_scores).length > 0;
+        const ranking = offline ? '' : this.emotionRanking(fused ? s.emotion_scores : s.emotion_probs || {});
         this.text('cv-emotion',ranking || fallbackEmotion);
         if (emotionElement) emotionElement.title = ranking
-            ? 'Tối đa 5 đầu ra FER+ có điểm cao nhất, xếp theo thứ tự giảm dần.'
+            ? (fused ? 'Tối đa 5 điểm tổng hợp FER+ và mốc mặt. Đây là điểm hỗ trợ, không phải xác suất đã hiệu chuẩn; nhãn xác nhận nằm ở dòng Cảm xúc.' : 'Tối đa 5 điểm FER+ cao nhất; nhãn xác nhận nằm ở dòng Cảm xúc.')
             : `Nguồn: ${s.emotion_source || 'unknown'} · độ tin cậy ${Math.round((s.emotion_confidence || 0)*100)}% (ước lượng từ mô hình/tín hiệu mặt)`;
         if (offline) {
             this.events.clear();

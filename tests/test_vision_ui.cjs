@@ -26,9 +26,14 @@ send({emotion_probs:{happy:.30,neutral:.25,surprised:.15,sad:.10,angry:.08,disgu
 assert.equal(elements.get('cv-emotion').textContent,'Vui (30%)\nTrung tính (25%)\nNgạc nhiên (15%)\nBuồn (10%)\nGiận (8%)','only the top five emotions must be shown');
 send({emotion_probs:{happy:.60,neutral:.30,surprised:.10},emotion_scores:{sad:.45,angry:.30,neutral:.25}},7500);
 assert.equal(elements.get('cv-emotion').textContent,'Buồn (45%)\nGiận (30%)\nTrung tính (25%)','fused scores should drive the main ranking');
-now=11750;panel.tick();
+send({emotion:'happy',emotion_source:'landmarks',emotion_confidence:.8,emotion_scores:{neutral:.70,happy:.30}},7750);
+assert.equal(elements.get('cv-emotion-confirmed').textContent,'Vui (80%)','confirmed expression must stay visible when neutral leads the score ranking');
+assert.equal(elements.get('cv-emotion').textContent,'Trung tính (70%)\nVui (30%)','supporting scores must remain truthful');
+assert.match(elements.get('cv-emotion').title,/điểm tổng hợp/);
+now=11800;panel.tick();
 assert.equal(elements.get('cv-health').textContent,'Mất kết nối Vision');
 assert.equal(elements.get('cv-identity').textContent,'Chưa rõ');
+assert.equal(elements.get('cv-emotion-confirmed').textContent,'Chưa rõ');
 panel.cameraFrame();panel.tick();
 assert.equal(elements.get('cv-health').textContent,'Camera còn hình · AI đang xử lý');
 console.log('Vision UI: smoothing, event hold, uncertainty expiry and disconnection passed');
@@ -68,6 +73,7 @@ for (const status of ['camera_unavailable','inference_stale']) {
     assert.match(elements.get('cv-left-hand').textContent,/Đang xác nhận/);
     send({status,hands:[],actions:[]},now+100);
     assert.equal(elements.get('cv-left-hand').textContent,'Chưa rõ',status+' must clear hand candidates immediately');
+    assert.equal(elements.get('cv-emotion-confirmed').textContent,'Chưa rõ',status+' must clear the confirmed emotion immediately');
     send({hands:[],actions:[]},now+100);
     assert.equal(elements.get('cv-left-hand').textContent,'Chưa rõ','recovery must not restore old hands');
 }

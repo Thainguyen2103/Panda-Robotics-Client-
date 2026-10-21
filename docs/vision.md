@@ -181,6 +181,8 @@ gật/lắc/vẫy trên người thật. Chưa có bộ video gán nhãn để c
 
 ## Cơ sở mô hình
 
+Kiểm thử biểu cảm và đo accuracy/macro-F1: [emotion-evaluation.md](emotion-evaluation.md).
+
 - [OpenCV Zoo — YuNet và SFace](https://github.com/opencv/opencv_zoo).
 - [FER+ ONNX: đầu vào 64×64, tám nhãn và softmax](https://github.com/onnx/models/tree/main/validated/vision/body_analysis/emotion_ferplus).
   Không nhân trọng số buồn/giận hay gộp nhãn thành cảm xúc khác.

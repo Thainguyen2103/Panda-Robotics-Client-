@@ -47,6 +47,41 @@ def emotion_face_crop(frame, box, padding=.12):
     return frame[top:top+side,left:left+side]
 
 
+def emotion_input_blob(frame, face):
+    """FER+ grayscale NCHW input; deskew plausible YuNet eye pairs, then area-resize.
+
+    No /255 normalization or histogram equalization: neither is part of the
+    published FER+ preprocessing. A bad/missing eye pair falls back to the crop.
+    """
+    crop = emotion_face_crop(frame,face)
+    if settings.VISION_EMOTION_ALIGN_ROLL and len(face) >= 14:
+        eyes = np.asarray(face[4:8],dtype=float).reshape(2,2)
+        eyes = eyes[np.argsort(eyes[:,0])]
+        dx,dy = eyes[1]-eyes[0]
+        x,y,w,h = face[:4]
+        inside = (np.isfinite(eyes).all() and np.all(eyes[:,0] >= x)
+                  and np.all(eyes[:,0] <= x+w) and np.all(eyes[:,1] >= y)
+                  and np.all(eyes[:,1] <= y+h))
+        angle = float(np.degrees(np.arctan2(dy,dx)))
+        if inside and .2*w <= np.hypot(dx,dy) <= .85*w and 2 < abs(angle) <= 35:
+            center = ((crop.shape[1]-1)/2,(crop.shape[0]-1)/2)
+            rotation = cv2.getRotationMatrix2D(center,angle,1.)
+            crop = cv2.warpAffine(crop,rotation,(crop.shape[1],crop.shape[0]),
+                                  flags=cv2.INTER_LINEAR,borderMode=cv2.BORDER_REPLICATE)
+    gray = cv2.cvtColor(crop,cv2.COLOR_BGR2GRAY)
+    gray = cv2.resize(gray,(64,64),interpolation=cv2.INTER_AREA)
+    return gray.astype(np.float32)[None,None,:,:]
+
+
+def emotion_probabilities(model, frame, face):
+    model.setInput(emotion_input_blob(frame,face))
+    logits = model.forward().reshape(-1)
+    if logits.size != 8 or not np.isfinite(logits).all():
+        raise ValueError("Invalid FER+ logits")
+    probs = np.exp(logits-logits.max())
+    return probs/probs.sum()
+
+
 def empty_result(status="ok"):
     return dict(status=status, person_detected=False, face_detected=False,
                 identity="unknown", identity_score=None, emotion="unknown",
@@ -286,20 +321,15 @@ class VisionEngine:
                 if now-self.emotion_time > settings.VISION_EMOTION_STALE_SEC:
                     self.emotion_probs = None
                 if stage == "emotion":
+                    previous_emotion_time = self.emotion_time
                     self.emotion_time = now
-                    def expression():
-                        gray = cv2.cvtColor(emotion_face_crop(frame,best),cv2.COLOR_BGR2GRAY)
-                        blob = cv2.dnn.blobFromImage(gray,1.,(64,64),swapRB=False,crop=False)
-                        self.models["emotion"].setInput(blob)
-                        logits = self.models["emotion"].forward().reshape(-1)
-                        if logits.size != 8 or not np.isfinite(logits).all():
-                            raise ValueError("Invalid FER+ logits")
-                        probs = np.exp(logits-logits.max())
-                        return probs/probs.sum()
-                    probs = self._run("emotion",expression)
+                    probs = self._run("emotion",lambda:emotion_probabilities(self.models["emotion"],frame,best))
                     if probs is not None:
                         emotion_fresh = True
-                        self.emotion_probs = probs if self.emotion_probs is None else .65*probs+.35*self.emotion_probs
+                        # Time-based smoothing keeps latency consistent when pose,
+                        # hands and objects change the actual FER sampling rate.
+                        alpha = 1-np.exp(-max(0.,now-previous_emotion_time)/max(.01,settings.VISION_EMOTION_SMOOTH_SEC))
+                        self.emotion_probs = probs if self.emotion_probs is None else alpha*probs+(1-alpha)*self.emotion_probs
                     else:
                         self.emotion_probs = None
                         self.emotion_label.reset()
