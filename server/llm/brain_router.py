@@ -16,6 +16,7 @@ class Intent(str, Enum):
     GRAMMAR_FIX = "GRAMMAR_FIX"
     PRONUNCIATION = "PRONUNCIATION"
     CURRICULUM_NEXT = "CURRICULUM_NEXT"
+    STUDY_HELP = "STUDY_HELP"
 
 
 @dataclass(frozen=True)
@@ -34,7 +35,119 @@ def _normalize(text: str) -> str:
     return "".join(char for char in decomposed if unicodedata.category(char) != "Mn").replace("đ", "d")
 
 
+STUDY_HELP_RESPONSE = "Robot rất sẵn lòng! Bé muốn học tiếng Anh hay tiếng Nhật nè? Bé đã học đến đâu rồi (như bảng chữ cái hay từ vựng chủ đề gì) để robot hỗ trợ bé tốt nhất nha!"
+
+_STUDY_HELP_SESSIONS: dict[str, dict] = {}
+
+
+def set_study_help_state(conversation_id: str, state: dict | None) -> None:
+    conv_id = str(conversation_id or "default")
+    if state is None:
+        _STUDY_HELP_SESSIONS.pop(conv_id, None)
+    else:
+        _STUDY_HELP_SESSIONS[conv_id] = state
+
+
+def get_study_help_state(conversation_id: str) -> dict | None:
+    return _STUDY_HELP_SESSIONS.get(str(conversation_id or "default"))
+
+
+def clear_study_help_state(conversation_id: str) -> None:
+    _STUDY_HELP_SESSIONS.pop(str(conversation_id or "default"), None)
+
+
+def is_study_help_query(text: str) -> bool:
+    """Nhận diện các cụm từ nhờ học tập chung chung.
+    Kết hợp các keyword như ['giúp', 'dạy', 'học', 'kèm'] và ['được không', 'với', 'nhé', 'không', 'giùm', 'hộ'].
+    Ví dụ: 'Bạn có thể giúp tôi học không?', 'Dạy mình học tiếng Anh/tiếng Nhật với', 'Kèm bé học nhé'.
+    """
+    if not text:
+        return False
+    norm = _normalize(text)
+
+    # Không cướp lời các câu hỏi tra cứu từ vựng cụ thể hoặc kiểm tra ngữ pháp cụ thể
+    specific_lookup = any(m in norm for m in [
+        "la gi", "nghia la gi", "doc la gi", "viet la gi", "dich cau", "dich sang",
+        "doc the nao", "viet the nao", "sua giup", "sua cau", "kiem tra ngu phap", "dung chua"
+    ])
+    if specific_lookup:
+        return False
+
+    # 1. Các cụm từ mẫu cố định
+    fixed_patterns = (
+        "giup toi hoc", "giup minh hoc", "giup be hoc", "giup em hoc", "giup to hoc",
+        "day minh hoc", "day to hoc", "day be hoc", "day em hoc", "day toi hoc",
+        "kem minh hoc", "kem to hoc", "kem be hoc", "kem em hoc", "kem toi hoc",
+        "hoc tieng anh voi", "hoc tieng nhat voi", "day tieng anh voi", "day tieng nhat voi",
+        "day minh tieng", "day to tieng", "day be tieng",
+        "hoc cung minh", "hoc cung be", "hoc voi minh", "hoc cung to",
+        "can you teach me", "can you help me learn", "help me learn",
+        "teach me english", "teach me japanese", "teach me",
+        "勉強を教えて", "日本語を教えて", "英語を教えて",
+    )
+    if any(p in norm for p in fixed_patterns):
+        return True
+
+    # 2. Kết hợp từ hành động (action) và từ cầu khiến/nhờ vả (request)
+    action_words = ("giup", "day", "hoc", "kem", "chi cho", "huong dan")
+    request_endings = (
+        "duoc khong", "duoc ko", "voi", "nhe", "khong", "ko", "nha", "di ma",
+        "giup toi", "giup minh", "giup be", "giup to"
+    )
+
+    has_action = any(w in norm for w in action_words)
+    has_request = any(r in norm for r in request_endings)
+
+    if has_action and has_request:
+        if any(w in norm for w in ("hoc", "day", "kem")):
+            return True
+
+    return False
+
+
+def get_fast_chitchat(text: str) -> str | None:
+    """Trả về câu phản hồi chào hỏi, cảm ơn, tạm biệt nhanh chuẩn xác tại Fast-Path (0ms)."""
+    norm = _normalize(text)
+    if not norm:
+        return None
+    # Xóa dấu câu thừa để so khớp chính xác (vd: "Chào Moon!" -> "chao moon")
+    norm = re.sub(r"[!?,.:;~]+", " ", norm).strip()
+    norm = " ".join(norm.split())
+
+    # Chào hỏi
+    greetings = (
+        "chao moon", "xin chao", "chao ban", "chao cau", "chao robot",
+        "hello moon", "hi moon", "hello", "hi robot", "konnichiwa", "こんにちは",
+    )
+    if any(norm == g or norm.startswith(f"{g} ") or norm.endswith(f" {g}") for g in greetings):
+        return "Xin chào bé yêu! Moon rất vui được gặp bé, hôm nay chúng mình cùng học gì nào?"
+
+    # Cảm ơn
+    thanks = ("cam on", "cam on nhe", "cam on moon", "thank you", "thanks", "arigatou", "ありがとう")
+    if any(norm == t or norm.startswith(f"{t} ") or norm.endswith(f" {t}") for t in thanks):
+        return "Không có chi nè! Moon luôn ở đây để đồng hành và học tập cùng bé nha!"
+
+    # Hỏi thăm sức khỏe
+    health = ("ban khoe khong", "khoe khong", "ban the nao", "hom nay the nao", "how are you", "genki", "元気ですか")
+    if any(h in norm for h in health):
+        return "Moon khỏe lắm và tràn đầy năng lượng để cùng bé khám phá bài học mới nè! Còn bé thì sao?"
+
+    # Tạm biệt
+    goodbyes = ("tam biet", "bye bye", "goodbye", "good night", "chuc ngu ngon", "hen gap lai", "sayonara", "さようなら")
+    if any(g in norm for g in goodbyes):
+        return "Tạm biệt bé nhé! Chúc bé học thật giỏi và hẹn sớm gặp lại bé nha!"
+
+    return None
+
+
 _RULES: tuple[tuple[Intent, tuple[str, ...]], ...] = (
+    (Intent.STUDY_HELP, (
+        "giup toi hoc", "giup minh hoc", "giup be hoc", "day minh hoc", "day to hoc",
+        "day be hoc", "day em hoc", "kem minh hoc", "kem to hoc", "kem be hoc",
+        "hoc tieng anh voi", "hoc tieng nhat voi", "day tieng anh voi", "day tieng nhat voi",
+        "day minh tieng", "day to tieng", "day be tieng", "can you teach me", "help me learn",
+        "teach me", "勉強を教えて", "日本語を教えて", "英語を教えて",
+    )),
     (Intent.CURRICULUM_NEXT, (
         "bai tiep theo", "hoc bai gi tiep", "tien do hoc", "hoan thanh n5",
         "hoan thanh n4", "lesson next", "learning progress", "finished n5",
@@ -75,6 +188,9 @@ class IntentRouter:
         if not normalized:
             return IntentDecision(Intent.KNOWLEDGE_QNA, 0.0, True, "empty_or_uncertain_fallback")
 
+        if is_study_help_query(text):
+            return IntentDecision(Intent.STUDY_HELP, 0.95, False, "matched_study_help_rule")
+
         for intent, markers in _RULES:
             if any(marker in normalized for marker in markers):
                 return IntentDecision(intent, 0.95, intent is Intent.KNOWLEDGE_QNA,
@@ -88,6 +204,10 @@ class IntentRouter:
 
 
 PROMPT_OVERRIDES = {
+    Intent.STUDY_HELP: (
+        "Bé đang nhờ hỗ trợ học tập hoặc trả lời về trình độ học. "
+        "Hãy động viên bé ấm áp và đưa ra hướng dẫn học tập vừa sức trong 1-2 câu ngắn."
+    ),
     Intent.CHITCHAT: (
         "Đây là trò chuyện xã giao. Hãy đáp lại tự nhiên, ngắn gọn, thân thiện như Moon; "
         "không biến câu chào hỏi thành bài giảng và không bịa thông tin thời gian thực."

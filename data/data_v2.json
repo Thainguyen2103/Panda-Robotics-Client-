@@ -5,16 +5,14 @@
     "level": "N5",
     "skill": "culture",
     "type": "sentence",
-    "title": "Mời ăn cơm (頂きます (Itadakimasu))",
+    "title": "Câu nói trước khi ăn (いただきます)",
     "content": {
-      "vi": "Mời ăn cơm",
-      "ja": "頂きます (Itadakimasu)",
-      "ja_kanji": "頂きます",
+      "vi": "Câu nói trước khi ăn",
+      "ja": "いただきます (Itadakimasu)",
+      "ja_kanji": "",
       "ja_kana": "いただきます",
-      "en": "Let's eat!",
-      "phonetic": "i-ta-đa-ki-ma-sư",
-      "example": "Put your hands together and say: Let's eat!",
-      "fact": "Chữ 頂 mang ý nghĩa nâng món ăn lên trán để cảm ơn thiên nhiên và người nấu."
+      "en": "Expression said before eating; I humbly receive this meal.",
+      "phonetic": "itadakimasu"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -28,16 +26,15 @@
       "an com",
       "let's eat!",
       "いただきます",
-      "頂きます"
+      "頂きます",
+      "いただきます (Itadakimasu)"
     ],
-    "vi": "Mời ăn cơm",
-    "ja": "頂きます (Itadakimasu)",
-    "ja_kanji": "頂きます",
+    "vi": "Câu nói trước khi ăn",
+    "ja": "いただきます (Itadakimasu)",
+    "ja_kanji": "",
     "ja_kana": "いただきます",
-    "en": "Let's eat!",
-    "phonetic": "i-ta-đa-ki-ma-sư",
-    "example": "Put your hands together and say: Let's eat!",
-    "fact": "Chữ 頂 mang ý nghĩa nâng món ăn lên trán để cảm ơn thiên nhiên và người nấu."
+    "en": "Expression said before eating; I humbly receive this meal.",
+    "phonetic": "itadakimasu"
   },
   {
     "id": "manner_gochisousama",
@@ -45,16 +42,14 @@
     "level": "N5",
     "skill": "culture",
     "type": "sentence",
-    "title": "Cảm ơn sau khi ăn (ご馳走様 (Gochisousama))",
+    "title": "Cảm ơn sau bữa ăn (ごちそうさまでした)",
     "content": {
-      "vi": "Cảm ơn sau khi ăn",
-      "ja": "ご馳走様 (Gochisousama)",
-      "ja_kanji": "ご馳走様",
-      "ja_kana": "ごちそうさま",
-      "en": "Thank you for the meal",
-      "phonetic": "gô-chi-sô-sa-ma",
-      "example": "Always thank the cook after finishing your meal.",
-      "fact": "Chữ 馳 và 走 nghĩa là chạy ngược xuôi vất vả để chuẩn bị bữa ăn ngon."
+      "vi": "Cảm ơn sau bữa ăn",
+      "ja": "ごちそうさまでした (Gochisōsama deshita)",
+      "ja_kanji": "ご馳走様でした",
+      "ja_kana": "ごちそうさまでした",
+      "en": "Thank you for the meal.",
+      "phonetic": "gochisōsama deshita"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -68,16 +63,22 @@
       "cam on bua an",
       "thank you for the meal",
       "ごちそうさま",
-      "ご馳走様"
+      "ご馳走様",
+      "ごちそうさまでした (Gochisōsama deshita)",
+      "ご馳走様でした",
+      "ごちそうさまでした",
+      "ăn xong",
+      "ăn rồi",
+      "sau khi ăn",
+      "ăn cơm xong",
+      "ăn xong nói gì"
     ],
-    "vi": "Cảm ơn sau khi ăn",
-    "ja": "ご馳走様 (Gochisousama)",
-    "ja_kanji": "ご馳走様",
-    "ja_kana": "ごちそうさま",
-    "en": "Thank you for the meal",
-    "phonetic": "gô-chi-sô-sa-ma",
-    "example": "Always thank the cook after finishing your meal.",
-    "fact": "Chữ 馳 và 走 nghĩa là chạy ngược xuôi vất vả để chuẩn bị bữa ăn ngon."
+    "vi": "Cảm ơn sau bữa ăn",
+    "ja": "ごちそうさまでした (Gochisōsama deshita)",
+    "ja_kanji": "ご馳走様でした",
+    "ja_kana": "ごちそうさまでした",
+    "en": "Thank you for the meal.",
+    "phonetic": "gochisōsama deshita"
   },
   {
     "id": "manner_gomennasai",
@@ -85,16 +86,14 @@
     "level": "N5",
     "skill": "culture",
     "type": "sentence",
-    "title": "Xin lỗi (ご免なさい (Gomennasai))",
+    "title": "Xin lỗi (ごめんなさい)",
     "content": {
       "vi": "Xin lỗi",
-      "ja": "ご免なさい (Gomennasai)",
-      "ja_kanji": "ご免なさい",
+      "ja": "ごめんなさい (Gomennasai)",
+      "ja_kanji": "",
       "ja_kana": "ごめんなさい",
       "en": "I am sorry",
-      "phonetic": "gô-men-na-sai",
-      "example": "Say 'I am sorry' when you make a mistake.",
-      "fact": "Dũng cảm nói lời xin lỗi khi làm sai là đức tính rất đáng khen."
+      "phonetic": "gomennasai"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -109,16 +108,16 @@
       "xin loi ban",
       "i am sorry",
       "ごめんなさい",
-      "ご免なさい"
+      "ご免なさい",
+      "ごめんなさい (Gomennasai)",
+      "xin lỗi tiếng nhật"
     ],
     "vi": "Xin lỗi",
-    "ja": "ご免なさい (Gomennasai)",
-    "ja_kanji": "ご免なさい",
+    "ja": "ごめんなさい (Gomennasai)",
+    "ja_kanji": "",
     "ja_kana": "ごめんなさい",
     "en": "I am sorry",
-    "phonetic": "gô-men-na-sai",
-    "example": "Say 'I am sorry' when you make a mistake.",
-    "fact": "Dũng cảm nói lời xin lỗi khi làm sai là đức tính rất đáng khen."
+    "phonetic": "gomennasai"
   },
   {
     "id": "manner_ittekimasu",
@@ -133,9 +132,7 @@
       "ja_kanji": "行ってきます",
       "ja_kana": "いってきます",
       "en": "I'm leaving!",
-      "phonetic": "ít-tê-ki-ma-sư",
-      "example": "Say 'I'm leaving' with a bright smile.",
-      "fact": "Câu chào thể hiện lời hứa 'con đi rồi con sẽ an toàn trở về'."
+      "phonetic": "ittekimasu"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -150,16 +147,15 @@
       "chào đi học/ra ngoài",
       "i'm leaving!",
       "いってきます",
-      "行ってきます"
+      "行ってきます",
+      "行ってきます (Ittekimasu)"
     ],
     "vi": "Chào đi học/ra ngoài",
     "ja": "行ってきます (Ittekimasu)",
     "ja_kanji": "行ってきます",
     "ja_kana": "いってきます",
     "en": "I'm leaving!",
-    "phonetic": "ít-tê-ki-ma-sư",
-    "example": "Say 'I'm leaving' with a bright smile.",
-    "fact": "Câu chào thể hiện lời hứa 'con đi rồi con sẽ an toàn trở về'."
+    "phonetic": "ittekimasu"
   },
   {
     "id": "manner_tadaima",
@@ -167,16 +163,14 @@
     "level": "N5",
     "skill": "culture",
     "type": "sentence",
-    "title": "Chào khi về nhà (只今 (Tadaima))",
+    "title": "Con về rồi (只今 (Tadaima))",
     "content": {
-      "vi": "Chào khi về nhà",
-      "ja": "只今 (Tadaima)",
+      "vi": "Con về rồi",
+      "ja": "ただいま (Tadaima)",
       "ja_kanji": "只今",
       "ja_kana": "ただいま",
       "en": "I'm home!",
-      "phonetic": "ta-đai-ma",
-      "example": "Say 'I'm home' when returning from school.",
-      "fact": "Chữ 只今 nghĩa là 'bây giờ con đã về tới nhà an toàn rồi'."
+      "phonetic": "tadaima"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -187,19 +181,218 @@
       "ve nha",
       "tadaima",
       "di hoc ve",
-      "chào khi về nhà",
       "i'm home!",
       "ただいま",
-      "只今"
+      "只今",
+      "ただいま (Tadaima)",
+      "về đến nhà",
+      "về tới nhà",
+      "khi về tới nhà",
+      "khi về nhà",
+      "mới về nhà nói câu gì",
+      "vừa về đến nhà",
+      "về nhà nói gì",
+      "ve den nha",
+      "ve toi nha",
+      "khi ve toi nha",
+      "khi ve nha",
+      "moi ve nha noi cau gi"
     ],
-    "vi": "Chào khi về nhà",
-    "ja": "只今 (Tadaima)",
+    "vi": "Con về rồi",
+    "ja": "ただいま (Tadaima)",
     "ja_kanji": "只今",
     "ja_kana": "ただいま",
     "en": "I'm home!",
-    "phonetic": "ta-đai-ma",
-    "example": "Say 'I'm home' when returning from school.",
-    "fact": "Chữ 只今 nghĩa là 'bây giờ con đã về tới nhà an toàn rồi'."
+    "phonetic": "tadaima"
+  },
+  {
+    "id": "manner_ohayou",
+    "language": "ja",
+    "level": "N5",
+    "skill": "culture",
+    "type": "sentence",
+    "title": "Chào buổi sáng (おはようございます (Ohayou gozaimasu))",
+    "content": {
+      "vi": "Chào buổi sáng",
+      "ja": "おはようございます (Ohayou gozaimasu)",
+      "ja_kanji": "",
+      "ja_kana": "おはようございます",
+      "en": "Good morning",
+      "phonetic": "ohayou gozaimasu"
+    },
+    "source_id": "shinjuku_city_easy_japanese_conversation_2021",
+    "source_url": "https://www.foreign.city.shinjuku.lg.jp/en/wp-content/uploads/sites/3/2023/09/ShinjukuBook_jeck_202104.pdf",
+    "stopwords_override": [],
+    "review_status": "verified",
+    "topic": "Manners",
+    "keywords": [
+      "chào buổi sáng",
+      "chao buoi sang",
+      "buổi sáng tiếng nhật",
+      "chào buổi sáng tiếng nhật",
+      "good morning",
+      "ohayou gozaimasu",
+      "ohayou",
+      "おはようございます"
+    ],
+    "vi": "Chào buổi sáng",
+    "ja": "おはようございます (Ohayou gozaimasu)",
+    "ja_kanji": "",
+    "ja_kana": "おはようございます",
+    "en": "Good morning",
+    "phonetic": "ohayou gozaimasu"
+  },
+  {
+    "id": "manner_konnichiwa",
+    "language": "ja",
+    "level": "N5",
+    "skill": "culture",
+    "type": "sentence",
+    "title": "Xin chào (こんにちは (Konnichiwa))",
+    "content": {
+      "vi": "Xin chào",
+      "ja": "こんにちは (Konnichiwa)",
+      "ja_kanji": "",
+      "ja_kana": "こんにちは",
+      "en": "Hello",
+      "phonetic": "konnichiwa"
+    },
+    "source_id": "shinjuku_city_easy_japanese_conversation_2021",
+    "source_url": "https://www.foreign.city.shinjuku.lg.jp/en/wp-content/uploads/sites/3/2023/09/ShinjukuBook_jeck_202104.pdf",
+    "stopwords_override": [],
+    "review_status": "verified",
+    "topic": "Manners",
+    "keywords": [
+      "xin chào tiếng nhật",
+      "chào hỏi bằng tiếng nhật",
+      "chào ban ngày tiếng nhật",
+      "hello in japanese",
+      "hello",
+      "konnichiwa",
+      "こんにちは"
+    ],
+    "vi": "Xin chào",
+    "ja": "こんにちは (Konnichiwa)",
+    "ja_kanji": "",
+    "ja_kana": "こんにちは",
+    "en": "Hello",
+    "phonetic": "konnichiwa"
+  },
+  {
+    "id": "manner_konbanwa",
+    "language": "ja",
+    "level": "N5",
+    "skill": "culture",
+    "type": "sentence",
+    "title": "Chào buổi tối (こんばんは (Konbanwa))",
+    "content": {
+      "vi": "Chào buổi tối",
+      "ja": "こんばんは (Konbanwa)",
+      "ja_kanji": "",
+      "ja_kana": "こんばんは",
+      "en": "Good evening",
+      "phonetic": "konbanwa"
+    },
+    "source_id": "shinjuku_city_easy_japanese_conversation_2021",
+    "source_url": "https://www.foreign.city.shinjuku.lg.jp/en/wp-content/uploads/sites/3/2023/09/ShinjukuBook_jeck_202104.pdf",
+    "stopwords_override": [],
+    "review_status": "verified",
+    "topic": "Manners",
+    "keywords": [
+      "chào buổi tối",
+      "chao buoi toi",
+      "buổi tối tiếng nhật",
+      "chào buổi tối tiếng nhật",
+      "buổi tối gặp nhau chào gì",
+      "good evening",
+      "konbanwa",
+      "こんばんは"
+    ],
+    "vi": "Chào buổi tối",
+    "ja": "こんばんは (Konbanwa)",
+    "ja_kanji": "",
+    "ja_kana": "こんばんは",
+    "en": "Good evening",
+    "phonetic": "konbanwa"
+  },
+  {
+    "id": "manner_self_introduction",
+    "language": "ja",
+    "level": "N5",
+    "skill": "conversation",
+    "type": "sentence",
+    "title": "Tự giới thiệu ngắn bằng tiếng Nhật",
+    "content": {
+      "vi": "Rất vui được gặp bạn. Tôi là [tên], đến từ [quốc gia/thành phố]. Rất mong được làm quen với bạn.",
+      "ja": "はじめまして。[名前]です。[国／町]から来ました。（どうぞ）よろしくお願いします。",
+      "ja_kanji": "はじめまして。[名前]です。[国／町]から来ました。（どうぞ）よろしくお願いします。",
+      "ja_kana": "はじめまして。[なまえ]です。[くに／まち]からきました。（どうぞ）よろしくおねがいします。",
+      "en": "Nice to meet you. I'm [name], from [country/city]. I look forward to getting to know you.",
+      "phonetic": "hajimemashite. [namae] desu. [kuni/machi] kara kimashita. (douzo) yoroshiku onegaishimasu"
+    },
+    "source_id": "shinjuku_city_easy_japanese_conversation_2021",
+    "source_url": "https://www.irodori.jpf.go.jp/assets/data/starter/pdf/X_L03.pdf",
+    "stopwords_override": [],
+    "review_status": "verified",
+    "topic": "Self-introduction",
+    "keywords": [
+      "giới thiệu bản thân",
+      "tự giới thiệu bằng tiếng nhật",
+      "giới thiệu tên bằng tiếng nhật",
+      "hướng dẫn giới thiệu bản thân",
+      "mẫu giới thiệu bản thân tiếng nhật",
+      "tên tôi là tiếng nhật",
+      "nói tên mình bằng tiếng nhật",
+      "my name is",
+      "hajimemashite",
+      "はじめまして",
+      "自己紹介",
+      "自分の名前"
+    ],
+    "vi": "Rất vui được gặp bạn. Tôi là [tên], đến từ [quốc gia/thành phố]. Rất mong được làm quen với bạn.",
+    "ja": "はじめまして。[名前]です。[国／町]から来ました。（どうぞ）よろしくお願いします。",
+    "ja_kanji": "はじめまして。[名前]です。[国／町]から来ました。（どうぞ）よろしくお願いします。",
+    "ja_kana": "はじめまして。[なまえ]です。[くに／まち]からきました。（どうぞ）よろしくおねがいします。",
+    "en": "Nice to meet you. I'm [name], from [country/city]. I look forward to getting to know you.",
+    "phonetic": "hajimemashite. [namae] desu. [kuni/machi] kara kimashita. (douzo) yoroshiku onegaishimasu"
+  },
+  {
+    "id": "manner_okaeri",
+    "language": "ja",
+    "level": "N5",
+    "skill": "culture",
+    "type": "sentence",
+    "title": "Mừng con về (お帰りなさい (Okaerinasai))",
+    "content": {
+      "vi": "Mừng con về",
+      "ja": "お帰りなさい (Okaerinasai)",
+      "ja_kanji": "お帰りなさい",
+      "ja_kana": "おかえりなさい",
+      "en": "Welcome home!",
+      "phonetic": "okaerinasai"
+    },
+    "source_id": "panda_kids_n5_curriculum",
+    "stopwords_override": [],
+    "review_status": "verified",
+    "topic": "Manners",
+    "keywords": [
+      "mừng con về",
+      "chào đón người về nhà",
+      "chào người vừa về",
+      "welcome home",
+      "okaeri",
+      "okaerinasai",
+      "おかえり",
+      "おかえりなさい",
+      "お帰りなさい",
+      "お帰りなさい (Okaerinasai)"
+    ],
+    "vi": "Mừng con về",
+    "ja": "お帰りなさい (Okaerinasai)",
+    "ja_kanji": "お帰りなさい",
+    "ja_kana": "おかえりなさい",
+    "en": "Welcome home!",
+    "phonetic": "okaerinasai"
   },
   {
     "id": "manner_oyasumi",
@@ -214,9 +407,7 @@
       "ja_kanji": "お休みなさい",
       "ja_kana": "おやすみなさい",
       "en": "Good night",
-      "phonetic": "ô-ya-sư-mi-na-sai",
-      "example": "Say good night before going to bed.",
-      "fact": "Chúc người thân có giấc ngủ thật ngon và những giấc mơ đẹp."
+      "phonetic": "oyasuminasai"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -229,16 +420,15 @@
       "oyasuminasai",
       "good night",
       "おやすみなさい",
-      "お休みなさい"
+      "お休みなさい",
+      "お休みなさい (Oyasuminasai)"
     ],
     "vi": "Chúc ngủ ngon",
     "ja": "お休みなさい (Oyasuminasai)",
     "ja_kanji": "お休みなさい",
     "ja_kana": "おやすみなさい",
     "en": "Good night",
-    "phonetic": "ô-ya-sư-mi-na-sai",
-    "example": "Say good night before going to bed.",
-    "fact": "Chúc người thân có giấc ngủ thật ngon và những giấc mơ đẹp."
+    "phonetic": "oyasuminasai"
   },
   {
     "id": "act_brush_teeth",
@@ -253,9 +443,7 @@
       "ja_kanji": "歯磨き",
       "ja_kana": "はみがき",
       "en": "Brush teeth",
-      "phonetic": "ha-mi-ga-ki",
-      "example": "I brush my teeth twice a day.",
-      "fact": "Đánh răng 2 lần mỗi ngày giúp răng chắc khỏe và ngăn ngừa sâu răng."
+      "phonetic": "hamigaki"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -268,16 +456,15 @@
       "hamigaki",
       "rang mieng",
       "はみがき",
-      "歯磨き"
+      "歯磨き",
+      "歯磨き (Hamigaki)"
     ],
     "vi": "Đánh răng",
     "ja": "歯磨き (Hamigaki)",
     "ja_kanji": "歯磨き",
     "ja_kana": "はみがき",
     "en": "Brush teeth",
-    "phonetic": "ha-mi-ga-ki",
-    "example": "I brush my teeth twice a day.",
-    "fact": "Đánh răng 2 lần mỗi ngày giúp răng chắc khỏe và ngăn ngừa sâu răng."
+    "phonetic": "hamigaki"
   },
   {
     "id": "act_wash_hands",
@@ -292,9 +479,7 @@
       "ja_kanji": "手洗い",
       "ja_kana": "てあらい",
       "en": "Wash hands",
-      "phonetic": "tê-a-rai",
-      "example": "Wash your hands before eating.",
-      "fact": "Rửa tay bằng xà phòng 30 giây giúp đánh bay vi khuẩn gây bệnh."
+      "phonetic": "tearai"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -304,19 +489,16 @@
       "rửa tay",
       "wash hands",
       "tearai",
-      "xa phong",
-      "sach se",
       "てあらい",
-      "手洗い"
+      "手洗い",
+      "手洗い (Tearai)"
     ],
     "vi": "Rửa tay",
     "ja": "手洗い (Tearai)",
     "ja_kanji": "手洗い",
     "ja_kana": "てあらい",
     "en": "Wash hands",
-    "phonetic": "tê-a-rai",
-    "example": "Wash your hands before eating.",
-    "fact": "Rửa tay bằng xà phòng 30 giây giúp đánh bay vi khuẩn gây bệnh."
+    "phonetic": "tearai"
   },
   {
     "id": "act_wake_up",
@@ -331,9 +513,7 @@
       "ja_kanji": "起きる",
       "ja_kana": "おきる",
       "en": "Wake up",
-      "phonetic": "ô-ki-ru",
-      "example": "I wake up at six in the morning.",
-      "fact": "Dậy sớm tập thể dục giúp bé tràn đầy năng lượng cho ngày mới."
+      "phonetic": "okiru"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -344,18 +524,16 @@
       "dậy sớm",
       "wake up",
       "okiru",
-      "buoi sang",
       "おきる",
-      "起きる"
+      "起きる",
+      "起きる (Okiru)"
     ],
     "vi": "Thức dậy",
     "ja": "起きる (Okiru)",
     "ja_kanji": "起きる",
     "ja_kana": "おきる",
     "en": "Wake up",
-    "phonetic": "ô-ki-ru",
-    "example": "I wake up at six in the morning.",
-    "fact": "Dậy sớm tập thể dục giúp bé tràn đầy năng lượng cho ngày mới."
+    "phonetic": "okiru"
   },
   {
     "id": "act_study",
@@ -370,9 +548,7 @@
       "ja_kanji": "勉強",
       "ja_kana": "べんきょう",
       "en": "Study",
-      "phonetic": "ben-kyô",
-      "example": "I study hard every afternoon.",
-      "fact": "Chữ 勉 (cố gắng) và 強 (mạnh mẽ) khuyên bé học tập kiên trì."
+      "phonetic": "benkyō"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -385,16 +561,15 @@
       "benkyou",
       "lam bai tap",
       "べんきょう",
-      "勉強"
+      "勉強",
+      "勉強 (Benkyou)"
     ],
     "vi": "Học bài",
     "ja": "勉強 (Benkyou)",
     "ja_kanji": "勉強",
     "ja_kana": "べんきょう",
     "en": "Study",
-    "phonetic": "ben-kyô",
-    "example": "I study hard every afternoon.",
-    "fact": "Chữ 勉 (cố gắng) và 強 (mạnh mẽ) khuyên bé học tập kiên trì."
+    "phonetic": "benkyō"
   },
   {
     "id": "act_sleep",
@@ -409,9 +584,7 @@
       "ja_kanji": "寝る",
       "ja_kana": "ねる",
       "en": "Go to sleep",
-      "phonetic": "nê-ru",
-      "example": "Go to sleep early to stay healthy.",
-      "fact": "Giấc ngủ sâu từ 9 giờ tối giúp bé phát triển chiều cao tối ưu."
+      "phonetic": "neru"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -425,16 +598,15 @@
       "giac ngu",
       "go to sleep",
       "ねる",
-      "寝る"
+      "寝る",
+      "寝る (Neru)"
     ],
     "vi": "Đi ngủ",
     "ja": "寝る (Neru)",
     "ja_kanji": "寝る",
     "ja_kana": "ねる",
     "en": "Go to sleep",
-    "phonetic": "nê-ru",
-    "example": "Go to sleep early to stay healthy.",
-    "fact": "Giấc ngủ sâu từ 9 giờ tối giúp bé phát triển chiều cao tối ưu."
+    "phonetic": "neru"
   },
   {
     "id": "act_help_parents",
@@ -449,9 +621,7 @@
       "ja_kanji": "お手伝い",
       "ja_kana": "おてつだい",
       "en": "Help parents",
-      "phonetic": "ô-têt-sư-đai",
-      "example": "I help my parents clean the table.",
-      "fact": "Giúp đỡ bố mẹ việc nhà nhỏ là cách bày tỏ tình yêu thương."
+      "phonetic": "otetsudai"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -461,20 +631,18 @@
       "giúp đỡ bố mẹ",
       "làm việc nhà",
       "otetsudai",
-      "help",
       "phu me",
       "help parents",
       "おてつだい",
-      "お手伝い"
+      "お手伝い",
+      "お手伝い (Otetsudai)"
     ],
     "vi": "Giúp đỡ bố mẹ",
     "ja": "お手伝い (Otetsudai)",
     "ja_kanji": "お手伝い",
     "ja_kana": "おてつだい",
     "en": "Help parents",
-    "phonetic": "ô-têt-sư-đai",
-    "example": "I help my parents clean the table.",
-    "fact": "Giúp đỡ bố mẹ việc nhà nhỏ là cách bày tỏ tình yêu thương."
+    "phonetic": "otetsudai"
   },
   {
     "id": "subj_math",
@@ -489,9 +657,7 @@
       "ja_kanji": "算数",
       "ja_kana": "さんすう",
       "en": "Math",
-      "phonetic": "san-sư",
-      "example": "I love solving math puzzles.",
-      "fact": "Học toán giúp rèn luyện tư duy logic và giải quyết vấn đề."
+      "phonetic": "sansū"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -505,16 +671,15 @@
       "sansuu",
       "con so",
       "さんすう",
-      "算数"
+      "算数",
+      "算数 (Sansuu)"
     ],
     "vi": "Môn Toán",
     "ja": "算数 (Sansuu)",
     "ja_kanji": "算数",
     "ja_kana": "さんすう",
     "en": "Math",
-    "phonetic": "san-sư",
-    "example": "I love solving math puzzles.",
-    "fact": "Học toán giúp rèn luyện tư duy logic và giải quyết vấn đề."
+    "phonetic": "sansū"
   },
   {
     "id": "subj_science",
@@ -529,9 +694,7 @@
       "ja_kanji": "理科",
       "ja_kana": "りか",
       "en": "Science",
-      "phonetic": "ri-ka",
-      "example": "Science experiments are fun.",
-      "fact": "Khoa học giúp chúng ta khám phá bí ẩn kỳ diệu của thế giới."
+      "phonetic": "rika"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -542,18 +705,16 @@
       "khoa học",
       "science",
       "rika",
-      "kham pha",
       "りか",
-      "理科"
+      "理科",
+      "理科 (Rika)"
     ],
     "vi": "Môn Khoa học",
     "ja": "理科 (Rika)",
     "ja_kanji": "理科",
     "ja_kana": "りか",
     "en": "Science",
-    "phonetic": "ri-ka",
-    "example": "Science experiments are fun.",
-    "fact": "Khoa học giúp chúng ta khám phá bí ẩn kỳ diệu của thế giới."
+    "phonetic": "rika"
   },
   {
     "id": "subj_art",
@@ -561,16 +722,14 @@
     "level": "N5",
     "skill": "vocab",
     "type": "word",
-    "title": "Môn Mỹ thuật (図工 (Zukou))",
+    "title": "Mỹ thuật và thủ công (図工)",
     "content": {
-      "vi": "Môn Mỹ thuật",
+      "vi": "Mỹ thuật và thủ công",
       "ja": "図工 (Zukou)",
       "ja_kanji": "図工",
       "ja_kana": "ずこう",
-      "en": "Art",
-      "phonetic": "zư-kô",
-      "example": "We paint colorful pictures in art class.",
-      "fact": "Hội họa giúp bé tự do sáng tạo và thể hiện cảm xúc qua sắc màu."
+      "en": "Arts and crafts",
+      "phonetic": "zukō"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -585,16 +744,15 @@
       "to mau",
       "môn mỹ thuật",
       "ずこう",
-      "図工"
+      "図工",
+      "図工 (Zukou)"
     ],
-    "vi": "Môn Mỹ thuật",
+    "vi": "Mỹ thuật và thủ công",
     "ja": "図工 (Zukou)",
     "ja_kanji": "図工",
     "ja_kana": "ずこう",
-    "en": "Art",
-    "phonetic": "zư-kô",
-    "example": "We paint colorful pictures in art class.",
-    "fact": "Hội họa giúp bé tự do sáng tạo và thể hiện cảm xúc qua sắc màu."
+    "en": "Arts and crafts",
+    "phonetic": "zukō"
   },
   {
     "id": "subj_music",
@@ -609,9 +767,7 @@
       "ja_kanji": "音楽",
       "ja_kana": "おんがく",
       "en": "Music",
-      "phonetic": "on-ga-kư",
-      "example": "She plays piano in music class.",
-      "fact": "Âm nhạc giúp thư giãn tâm trí và nuôi dưỡng tâm hồn vui tươi."
+      "phonetic": "ongaku"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -624,16 +780,15 @@
       "ongaku",
       "ca hat",
       "おんがく",
-      "音楽"
+      "音楽",
+      "音楽 (Ongaku)"
     ],
     "vi": "Môn Âm nhạc",
     "ja": "音楽 (Ongaku)",
     "ja_kanji": "音楽",
     "ja_kana": "おんがく",
     "en": "Music",
-    "phonetic": "on-ga-kư",
-    "example": "She plays piano in music class.",
-    "fact": "Âm nhạc giúp thư giãn tâm trí và nuôi dưỡng tâm hồn vui tươi."
+    "phonetic": "ongaku"
   },
   {
     "id": "subj_pe_football",
@@ -641,16 +796,14 @@
     "level": "N5",
     "skill": "vocab",
     "type": "word",
-    "title": "Thể dục & Bóng đá (体育 (Taiiku))",
+    "title": "Môn thể dục (体育)",
     "content": {
-      "vi": "Thể dục & Bóng đá",
+      "vi": "Môn thể dục",
       "ja": "体育 (Taiiku)",
       "ja_kanji": "体育",
       "ja_kana": "たいいく",
-      "en": "Physical Education",
-      "phonetic": "tai-i-kư",
-      "example": "We play football during PE class.",
-      "fact": "Vận động thể thao giúp cơ thể dẻo dai và rèn luyện tinh thần đồng đội."
+      "en": "Physical education",
+      "phonetic": "taiiku"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -658,25 +811,18 @@
     "topic": "School",
     "keywords": [
       "môn thể dục",
-      "đá bóng",
-      "bóng đá",
-      "football",
-      "soccer",
       "taiiku",
-      "sakkaa",
-      "thể dục & bóng đá",
       "physical education",
       "たいいく",
-      "体育"
+      "体育",
+      "体育 (Taiiku)"
     ],
-    "vi": "Thể dục & Bóng đá",
+    "vi": "Môn thể dục",
     "ja": "体育 (Taiiku)",
     "ja_kanji": "体育",
     "ja_kana": "たいいく",
-    "en": "Physical Education",
-    "phonetic": "tai-i-kư",
-    "example": "We play football during PE class.",
-    "fact": "Vận động thể thao giúp cơ thể dẻo dai và rèn luyện tinh thần đồng đội."
+    "en": "Physical education",
+    "phonetic": "taiiku"
   },
   {
     "id": "obj_backpack",
@@ -684,16 +830,14 @@
     "level": "N5",
     "skill": "vocab",
     "type": "word",
-    "title": "Cặp sách (Ba lô) (鞄 (Kaban))",
+    "title": "Túi, cặp sách (かばん)",
     "content": {
-      "vi": "Cặp sách (Ba lô)",
+      "vi": "Túi, cặp sách",
       "ja": "鞄 (Kaban)",
       "ja_kanji": "鞄",
       "ja_kana": "かばん",
-      "en": "Backpack",
-      "phonetic": "ka-ban",
-      "example": "My backpack is red and sturdy.",
-      "fact": "Chiếc cặp Randoseru của học sinh Nhật rất bền, dùng suốt 6 năm tiểu học."
+      "en": "Bag; schoolbag",
+      "phonetic": "kaban"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -701,22 +845,22 @@
     "topic": "Supplies",
     "keywords": [
       "cặp sách",
-      "ba lô",
-      "backpack",
-      "randoseru",
       "kaban",
-      "balo",
-      "cặp sách (ba lô)",
-      "かばん"
+      "かばん",
+      "鞄 (Kaban)",
+      "鞄",
+      "schoolbag",
+      "bag",
+      "cặp sách tiếng nhật",
+      "túi sách",
+      "túi đựng sách"
     ],
-    "vi": "Cặp sách (Ba lô)",
+    "vi": "Túi, cặp sách",
     "ja": "鞄 (Kaban)",
     "ja_kanji": "鞄",
     "ja_kana": "かばん",
-    "en": "Backpack",
-    "phonetic": "ka-ban",
-    "example": "My backpack is red and sturdy.",
-    "fact": "Chiếc cặp Randoseru của học sinh Nhật rất bền, dùng suốt 6 năm tiểu học."
+    "en": "Bag; schoolbag",
+    "phonetic": "kaban"
   },
   {
     "id": "obj_clock",
@@ -731,9 +875,7 @@
       "ja_kanji": "時計",
       "ja_kana": "とけい",
       "en": "Clock",
-      "phonetic": "tô-kê-i",
-      "example": "The clock on the wall shows eight.",
-      "fact": "Đồng hồ nhắc nhở chúng ta biết quý trọng và quản lý thời gian."
+      "phonetic": "tōkei"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -744,19 +886,16 @@
       "clock",
       "watch",
       "tokei",
-      "gio giac",
-      "xem gio",
       "とけい",
-      "時計"
+      "時計",
+      "時計 (Tokei)"
     ],
     "vi": "Đồng hồ",
     "ja": "時計 (Tokei)",
     "ja_kanji": "時計",
     "ja_kana": "とけい",
     "en": "Clock",
-    "phonetic": "tô-kê-i",
-    "example": "The clock on the wall shows eight.",
-    "fact": "Đồng hồ nhắc nhở chúng ta biết quý trọng và quản lý thời gian."
+    "phonetic": "tōkei"
   },
   {
     "id": "obj_umbrella",
@@ -771,9 +910,7 @@
       "ja_kanji": "傘",
       "ja_kana": "かさ",
       "en": "Umbrella",
-      "phonetic": "ka-sa",
-      "example": "Take an umbrella when it rains.",
-      "fact": "Chữ 傘 có 4 chữ nhân (人) nhỏ bên dưới chiếc mái che chở."
+      "phonetic": "kasa"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -787,16 +924,16 @@
       "kasa",
       "che mua",
       "cái ô (cây dù)",
-      "かさ"
+      "かさ",
+      "傘 (Kasa)",
+      "傘"
     ],
     "vi": "Cái ô (Cây dù)",
     "ja": "傘 (Kasa)",
     "ja_kanji": "傘",
     "ja_kana": "かさ",
     "en": "Umbrella",
-    "phonetic": "ka-sa",
-    "example": "Take an umbrella when it rains.",
-    "fact": "Chữ 傘 có 4 chữ nhân (人) nhỏ bên dưới chiếc mái che chở."
+    "phonetic": "kasa"
   },
   {
     "id": "obj_shoes",
@@ -811,9 +948,7 @@
       "ja_kanji": "靴",
       "ja_kana": "くつ",
       "en": "Shoes",
-      "phonetic": "kư-tsư",
-      "example": "Tie your shoes before running.",
-      "fact": "Học sinh Nhật đổi sang giày Uwabaki khi vào lớp để giữ sàn sạch."
+      "phonetic": "kutsu"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -825,16 +960,16 @@
       "shoes",
       "kutsu",
       "di giay",
-      "くつ"
+      "くつ",
+      "靴 (Kutsu)",
+      "靴"
     ],
     "vi": "Đôi giày",
     "ja": "靴 (Kutsu)",
     "ja_kanji": "靴",
     "ja_kana": "くつ",
     "en": "Shoes",
-    "phonetic": "kư-tsư",
-    "example": "Tie your shoes before running.",
-    "fact": "Học sinh Nhật đổi sang giày Uwabaki khi vào lớp để giữ sàn sạch."
+    "phonetic": "kutsu"
   },
   {
     "id": "obj_ruler",
@@ -849,9 +984,7 @@
       "ja_kanji": "定規",
       "ja_kana": "じょうぎ",
       "en": "Ruler",
-      "phonetic": "giô-ô-gi",
-      "example": "Use a ruler to draw a straight line.",
-      "fact": "Thước kẻ giúp bé vẽ các đường thẳng tắp và đo đạc chính xác."
+      "phonetic": "jōgi"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -864,16 +997,15 @@
       "jougi",
       "ke thang",
       "じょうぎ",
-      "定規"
+      "定規",
+      "定規 (Jougi)"
     ],
     "vi": "Thước kẻ",
     "ja": "定規 (Jougi)",
     "ja_kanji": "定規",
     "ja_kana": "じょうぎ",
     "en": "Ruler",
-    "phonetic": "giô-ô-gi",
-    "example": "Use a ruler to draw a straight line.",
-    "fact": "Thước kẻ giúp bé vẽ các đường thẳng tắp và đo đạc chính xác."
+    "phonetic": "jōgi"
   },
   {
     "id": "obj_water_bottle",
@@ -888,9 +1020,7 @@
       "ja_kanji": "水筒",
       "ja_kana": "すいとう",
       "en": "Water bottle",
-      "phonetic": "sưi-tô",
-      "example": "Drink water from your bottle.",
-      "fact": "Mang bình nước cá nhân vừa tiện lợi vừa bảo vệ môi trường."
+      "phonetic": "suitō"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -898,20 +1028,54 @@
     "topic": "Supplies",
     "keywords": [
       "bình nước",
-      "bình giữ nhiệt",
       "water bottle",
       "suitou",
       "すいとう",
-      "水筒"
+      "水筒",
+      "水筒 (Suitou)"
     ],
     "vi": "Bình nước",
     "ja": "水筒 (Suitou)",
     "ja_kanji": "水筒",
     "ja_kana": "すいとう",
     "en": "Water bottle",
-    "phonetic": "sưi-tô",
-    "example": "Drink water from your bottle.",
-    "fact": "Mang bình nước cá nhân vừa tiện lợi vừa bảo vệ môi trường."
+    "phonetic": "suitō"
+  },
+  {
+    "id": "obj_house",
+    "language": "ja",
+    "level": "N5",
+    "skill": "vocab",
+    "type": "word",
+    "title": "Ngôi nhà (家 (Ie))",
+    "content": {
+      "vi": "Ngôi nhà",
+      "ja": "家 (Ie)",
+      "ja_kanji": "家",
+      "ja_kana": "いえ",
+      "en": "House",
+      "phonetic": "ie"
+    },
+    "source_id": "panda_kids_n5_curriculum",
+    "stopwords_override": [],
+    "review_status": "verified",
+    "topic": "Home",
+    "keywords": [
+      "ngôi nhà",
+      "căn nhà",
+      "nhà ở",
+      "house",
+      "ie",
+      "いえ",
+      "家",
+      "家 (Ie)"
+    ],
+    "vi": "Ngôi nhà",
+    "ja": "家 (Ie)",
+    "ja_kanji": "家",
+    "ja_kana": "いえ",
+    "en": "House",
+    "phonetic": "ie"
   },
   {
     "id": "dish_bento",
@@ -926,9 +1090,7 @@
       "ja_kanji": "弁当",
       "ja_kana": "べんとう",
       "en": "Bento lunchbox",
-      "phonetic": "ben-tô",
-      "example": "Mom packed a delicious bento for lunch.",
-      "fact": "Cơm Bento thường được tạo hình ngộ nghĩnh giúp bé ăn ngon miệng hơn."
+      "phonetic": "bentō"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -944,16 +1106,15 @@
       "bento lunchbox",
       "bentou",
       "べんとう",
-      "弁当"
+      "弁当",
+      "弁当 (Bentou)"
     ],
     "vi": "Cơm hộp Bento",
     "ja": "弁当 (Bentou)",
     "ja_kanji": "弁当",
     "ja_kana": "べんとう",
     "en": "Bento lunchbox",
-    "phonetic": "ben-tô",
-    "example": "Mom packed a delicious bento for lunch.",
-    "fact": "Cơm Bento thường được tạo hình ngộ nghĩnh giúp bé ăn ngon miệng hơn."
+    "phonetic": "bentō"
   },
   {
     "id": "dish_ramen",
@@ -961,16 +1122,14 @@
     "level": "N5",
     "skill": "vocab",
     "type": "word",
-    "title": "Mì Ramen (拉麺 (Ramen))",
+    "title": "Mì ramen (ラーメン)",
     "content": {
       "vi": "Mì Ramen",
-      "ja": "拉麺 (Ramen)",
-      "ja_kanji": "拉麺",
+      "ja": "ラーメン (Rāmen)",
+      "ja_kanji": "",
       "ja_kana": "ラーメン",
       "en": "Ramen noodles",
-      "phonetic": "ra-men",
-      "example": "Hot ramen is delicious on rainy days.",
-      "fact": "Ở Nhật, húp mì xì xụp vừa làm mát sợi mì vừa khen đầu bếp nấu ngon."
+      "phonetic": "rāmen"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -978,22 +1137,23 @@
     "topic": "Food",
     "keywords": [
       "mì ramen",
+      "ra men",
+      "mì ra men",
+      "mi ra men",
+      "la men",
       "mì nhật",
       "ramen",
       "mi soi",
-      "noodle",
       "ramen noodles",
       "ラーメン",
-      "拉麺"
+      "ラーメン (Rāmen)"
     ],
     "vi": "Mì Ramen",
-    "ja": "拉麺 (Ramen)",
-    "ja_kanji": "拉麺",
+    "ja": "ラーメン (Rāmen)",
+    "ja_kanji": "",
     "ja_kana": "ラーメン",
     "en": "Ramen noodles",
-    "phonetic": "ra-men",
-    "example": "Hot ramen is delicious on rainy days.",
-    "fact": "Ở Nhật, húp mì xì xụp vừa làm mát sợi mì vừa khen đầu bếp nấu ngon."
+    "phonetic": "rāmen"
   },
   {
     "id": "dish_sushi",
@@ -1008,9 +1168,7 @@
       "ja_kanji": "寿司",
       "ja_kana": "すし",
       "en": "Sushi",
-      "phonetic": "sư-si",
-      "example": "Sushi is made with fresh fish and rice.",
-      "fact": "Cơm Sushi được trộn giấm chua ngọt ăn kèm hải sản tươi ngon."
+      "phonetic": "sushi"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1018,20 +1176,20 @@
     "topic": "Food",
     "keywords": [
       "sushi",
-      "cơm cuộn",
-      "com nam",
       "ca hoi",
       "すし",
-      "寿司"
+      "寿司",
+      "寿司 (Sushi)",
+      "sushi",
+      "寿司",
+      "すし"
     ],
     "vi": "Sushi",
     "ja": "寿司 (Sushi)",
     "ja_kanji": "寿司",
     "ja_kana": "すし",
     "en": "Sushi",
-    "phonetic": "sư-si",
-    "example": "Sushi is made with fresh fish and rice.",
-    "fact": "Cơm Sushi được trộn giấm chua ngọt ăn kèm hải sản tươi ngon."
+    "phonetic": "sushi"
   },
   {
     "id": "dish_icecream",
@@ -1039,16 +1197,14 @@
     "level": "N5",
     "skill": "vocab",
     "type": "word",
-    "title": "Kem (氷菓 (Aisukuriimu))",
+    "title": "Kem (アイスクリーム)",
     "content": {
       "vi": "Kem",
-      "ja": "氷菓 (Aisukuriimu)",
-      "ja_kanji": "氷菓",
+      "ja": "アイスクリーム (Aisukurīmu)",
+      "ja_kanji": "",
       "ja_kana": "アイスクリーム",
       "en": "Ice cream",
-      "phonetic": "ai-xư-kư-ri-mu",
-      "example": "I enjoy strawberry ice cream in summer.",
-      "fact": "Món tráng miệng mát lạnh ngày hè làm từ sữa và trái cây."
+      "phonetic": "aisukurīmu"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1059,18 +1215,15 @@
       "kem",
       "ice cream",
       "aisukuriimu",
-      "mat lanh",
       "アイスクリーム",
-      "氷菓"
+      "アイスクリーム (Aisukurīmu)"
     ],
     "vi": "Kem",
-    "ja": "氷菓 (Aisukuriimu)",
-    "ja_kanji": "氷菓",
+    "ja": "アイスクリーム (Aisukurīmu)",
+    "ja_kanji": "",
     "ja_kana": "アイスクリーム",
     "en": "Ice cream",
-    "phonetic": "ai-xư-kư-ri-mu",
-    "example": "I enjoy strawberry ice cream in summer.",
-    "fact": "Món tráng miệng mát lạnh ngày hè làm từ sữa và trái cây."
+    "phonetic": "aisukurīmu"
   },
   {
     "id": "dish_egg_roll",
@@ -1085,9 +1238,7 @@
       "ja_kanji": "卵焼き",
       "ja_kana": "たまごやき",
       "en": "Rolled omelet",
-      "phonetic": "ta-ma-gô-ya-ki",
-      "example": "Sweet rolled omelet is yellow.",
-      "fact": "卵 là quả trứng, 焼き là nướng hoặc rán."
+      "phonetic": "tamagoyaki"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1095,22 +1246,18 @@
     "topic": "Food",
     "keywords": [
       "trứng cuộn",
-      "trứng rán",
       "tamagoyaki",
-      "trung chien",
-      "egg",
       "rolled omelet",
       "たまごやき",
-      "卵焼き"
+      "卵焼き",
+      "卵焼き (Tamagoyaki)"
     ],
     "vi": "Trứng cuộn",
     "ja": "卵焼き (Tamagoyaki)",
     "ja_kanji": "卵焼き",
     "ja_kana": "たまごやき",
     "en": "Rolled omelet",
-    "phonetic": "ta-ma-gô-ya-ki",
-    "example": "Sweet rolled omelet is yellow.",
-    "fact": "卵 là quả trứng, 焼き là nướng hoặc rán."
+    "phonetic": "tamagoyaki"
   },
   {
     "id": "dish_fruit_juice",
@@ -1118,16 +1265,14 @@
     "level": "N5",
     "skill": "vocab",
     "type": "word",
-    "title": "Nước ép trái cây (果汁 (Juusu))",
+    "title": "Nước ép trái cây — 果汁（かじゅう, Kajū）",
     "content": {
       "vi": "Nước ép trái cây",
-      "ja": "果汁 (Juusu)",
+      "ja": "果汁（かじゅう）",
       "ja_kanji": "果汁",
-      "ja_kana": "ジュース",
+      "ja_kana": "かじゅう",
       "en": "Fruit juice",
-      "phonetic": "giu-sư",
-      "example": "Fresh orange juice is sweet and sour.",
-      "fact": "Nước ép cung cấp nhiều vitamin tự nhiên giúp bé luôn khỏe khoắn."
+      "phonetic": "kajū"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1138,20 +1283,27 @@
       "nước cam",
       "nước hoa quả",
       "juice",
-      "juusu",
       "nước ép trái cây",
       "fruit juice",
-      "ジュース",
-      "果汁"
+      "果汁",
+      "かじゅう",
+      "kajū",
+      "kajuu"
     ],
     "vi": "Nước ép trái cây",
-    "ja": "果汁 (Juusu)",
+    "ja": "果汁（かじゅう）",
     "ja_kanji": "果汁",
-    "ja_kana": "ジュース",
+    "ja_kana": "かじゅう",
     "en": "Fruit juice",
-    "phonetic": "giu-sư",
-    "example": "Fresh orange juice is sweet and sour.",
-    "fact": "Nước ép cung cấp nhiều vitamin tự nhiên giúp bé luôn khỏe khoắn."
+    "phonetic": "kajū",
+    "related_terms": [
+      {
+        "ja": "ジュース",
+        "ja_kana": "ジュース",
+        "romaji": "jūsu",
+        "meaning_vi": "Từ ジュース（jūsu） cũng được dùng để gọi juice/đồ uống dạng nước ép; đây là từ riêng, không phải cách đọc của 果汁（かじゅう）."
+      }
+    ]
   },
   {
     "id": "feel_happy",
@@ -1166,9 +1318,7 @@
       "ja_kanji": "嬉しい",
       "ja_kana": "うれしい",
       "en": "Happy",
-      "phonetic": "u-rê-si-i",
-      "example": "I feel happy playing with friends.",
-      "fact": "Cười vui giúp cơ thể tiết endorphin tăng cường sức khỏe."
+      "phonetic": "ureshii"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1183,16 +1333,15 @@
       "niem vui",
       "vui vẻ, hạnh phúc",
       "うれしい",
-      "嬉しい"
+      "嬉しい",
+      "嬉しい (Ureshii)"
     ],
     "vi": "Vui vẻ, Hạnh phúc",
     "ja": "嬉しい (Ureshii)",
     "ja_kanji": "嬉しい",
     "ja_kana": "うれしい",
     "en": "Happy",
-    "phonetic": "u-rê-si-i",
-    "example": "I feel happy playing with friends.",
-    "fact": "Cười vui giúp cơ thể tiết endorphin tăng cường sức khỏe."
+    "phonetic": "ureshii"
   },
   {
     "id": "feel_brave",
@@ -1202,14 +1351,12 @@
     "type": "word",
     "title": "Dũng cảm, Tự tin (勇敢 (Yuukan))",
     "content": {
-      "vi": "Dũng cảm, Tự tin",
+      "vi": "Dũng cảm",
       "ja": "勇敢 (Yuukan)",
       "ja_kanji": "勇敢",
       "ja_kana": "ゆうかん",
       "en": "Brave",
-      "phonetic": "yu-u-kan",
-      "example": "Be brave when trying new things.",
-      "fact": "Dũng cảm là dám đối mặt với nỗi sợ và vượt qua thử thách."
+      "phonetic": "yūkan"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1217,22 +1364,18 @@
     "topic": "Emotions",
     "keywords": [
       "dũng cảm",
-      "không sợ hãi",
       "brave",
       "yuukan",
-      "manh me",
-      "dũng cảm, tự tin",
       "ゆうかん",
-      "勇敢"
+      "勇敢",
+      "勇敢 (Yuukan)"
     ],
-    "vi": "Dũng cảm, Tự tin",
+    "vi": "Dũng cảm",
     "ja": "勇敢 (Yuukan)",
     "ja_kanji": "勇敢",
     "ja_kana": "ゆうかん",
     "en": "Brave",
-    "phonetic": "yu-u-kan",
-    "example": "Be brave when trying new things.",
-    "fact": "Dũng cảm là dám đối mặt với nỗi sợ và vượt qua thử thách."
+    "phonetic": "yūkan"
   },
   {
     "id": "feel_kind",
@@ -1242,14 +1385,12 @@
     "type": "word",
     "title": "Tốt bụng (親切 (Shinsetsu))",
     "content": {
-      "vi": "Tốt bụng",
+      "vi": "Tốt bụng, tử tế",
       "ja": "親切 (Shinsetsu)",
       "ja_kanji": "親切",
       "ja_kana": "しんせつ",
       "en": "Kind",
-      "phonetic": "sin-set-sư",
-      "example": "She is kind to everyone.",
-      "fact": "Lòng tốt và sự tử tế làm cho thế giới trở nên ấm áp hơn."
+      "phonetic": "shinsetsu"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1257,22 +1398,19 @@
     "topic": "Emotions",
     "keywords": [
       "tốt bụng",
-      "thân thiện",
       "tử tế",
       "kind",
       "shinsetsu",
-      "yeu thuong",
       "しんせつ",
-      "親切"
+      "親切",
+      "親切 (Shinsetsu)"
     ],
-    "vi": "Tốt bụng",
+    "vi": "Tốt bụng, tử tế",
     "ja": "親切 (Shinsetsu)",
     "ja_kanji": "親切",
     "ja_kana": "しんせつ",
     "en": "Kind",
-    "phonetic": "sin-set-sư",
-    "example": "She is kind to everyone.",
-    "fact": "Lòng tốt và sự tử tế làm cho thế giới trở nên ấm áp hơn."
+    "phonetic": "shinsetsu"
   },
   {
     "id": "feel_good_job",
@@ -1280,41 +1418,41 @@
     "level": "N5",
     "skill": "vocab",
     "type": "word",
-    "title": "Khen ngợi, Giỏi quá (上手 (Jouzu))",
+    "title": "Khéo, giỏi (上手)",
     "content": {
-      "vi": "Khen ngợi, Giỏi quá",
+      "vi": "Khéo, giỏi",
       "ja": "上手 (Jouzu)",
       "ja_kanji": "上手",
       "ja_kana": "じょうず",
-      "en": "Good job!",
-      "phonetic": "giô-zu",
-      "example": "You did a good job on the quiz!",
-      "fact": "Khen ngợi đúng lúc giúp bạn bè có thêm động lực cố gắng."
+      "en": "Skillful; good at something",
+      "phonetic": "jōzu"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
     "review_status": "verified",
     "topic": "Emotions",
     "keywords": [
-      "giỏi quá",
-      "làm tốt lắm",
-      "good job",
       "jouzu",
-      "khen ngoi",
-      "xuat sac",
-      "khen ngợi, giỏi quá",
-      "good job!",
       "じょうず",
-      "上手"
+      "上手",
+      "上手 (Jouzu)",
+      "khéo léo",
+      "giỏi làm việc gì đó",
+      "skillful",
+      "làm rất giỏi",
+      "làm tốt lắm",
+      "khen làm giỏi",
+      "bạn ấy làm rất giỏi",
+      "lam rat gioi",
+      "lam tot lam",
+      "khen lam gioi"
     ],
-    "vi": "Khen ngợi, Giỏi quá",
+    "vi": "Khéo, giỏi",
     "ja": "上手 (Jouzu)",
     "ja_kanji": "上手",
     "ja_kana": "じょうず",
-    "en": "Good job!",
-    "phonetic": "giô-zu",
-    "example": "You did a good job on the quiz!",
-    "fact": "Khen ngợi đúng lúc giúp bạn bè có thêm động lực cố gắng."
+    "en": "Skillful; good at something",
+    "phonetic": "jōzu"
   },
   {
     "id": "animal_cat",
@@ -1329,9 +1467,7 @@
       "ja_kanji": "猫",
       "ja_kana": "ねこ",
       "en": "Cat",
-      "phonetic": "nê-kô",
-      "example": "The cute cat loves chasing mice.",
-      "fact": "Mèo có đôi mắt nhìn rõ trong bóng đêm và bước đi không tiếng động."
+      "phonetic": "neko"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1342,17 +1478,16 @@
       "con mèo",
       "cat",
       "neko",
-      "meo meo",
-      "ねこ"
+      "ねこ",
+      "猫 (Neko)",
+      "猫"
     ],
     "vi": "Con mèo",
     "ja": "猫 (Neko)",
     "ja_kanji": "猫",
     "ja_kana": "ねこ",
     "en": "Cat",
-    "phonetic": "nê-kô",
-    "example": "The cute cat loves chasing mice.",
-    "fact": "Mèo có đôi mắt nhìn rõ trong bóng đêm và bước đi không tiếng động."
+    "phonetic": "neko"
   },
   {
     "id": "animal_dog",
@@ -1367,9 +1502,7 @@
       "ja_kanji": "犬",
       "ja_kana": "いぬ",
       "en": "Dog",
-      "phonetic": "i-nu",
-      "example": "My loyal dog wags its tail.",
-      "fact": "Chó là người bạn trung thành và thông minh của con người."
+      "phonetic": "inu"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1380,17 +1513,16 @@
       "con chó",
       "dog",
       "inu",
-      "gâu gâu",
-      "いぬ"
+      "いぬ",
+      "犬 (Inu)",
+      "犬"
     ],
     "vi": "Con chó",
     "ja": "犬 (Inu)",
     "ja_kanji": "犬",
     "ja_kana": "いぬ",
     "en": "Dog",
-    "phonetic": "i-nu",
-    "example": "My loyal dog wags its tail.",
-    "fact": "Chó là người bạn trung thành và thông minh của con người."
+    "phonetic": "inu"
   },
   {
     "id": "animal_elephant",
@@ -1405,9 +1537,7 @@
       "ja_kanji": "象",
       "ja_kana": "ぞう",
       "en": "Elephant",
-      "phonetic": "zô",
-      "example": "The big elephant has a long trunk.",
-      "fact": "Voi có chiếc vòi rất dài để uống nước và rất thích ăn mía ngọt."
+      "phonetic": "zō"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1418,21 +1548,22 @@
       "con voi",
       "elephant",
       "zou",
-      "vòi",
-      "chiếc vòi rất dài",
-      "thích ăn mía",
-      "ăn mía",
       "ぞう",
-      "象"
+      "象",
+      "象 (Zou)",
+      "con vật có vòi dài",
+      "con gì có vòi dài",
+      "vòi dài",
+      "cái vòi dài",
+      "con vật có cái vòi dài",
+      "long trunk"
     ],
     "vi": "Con voi",
     "ja": "象 (Zou)",
     "ja_kanji": "象",
     "ja_kana": "ぞう",
     "en": "Elephant",
-    "phonetic": "zô",
-    "example": "The big elephant has a long trunk.",
-    "fact": "Voi có chiếc vòi rất dài để uống nước và rất thích ăn mía ngọt."
+    "phonetic": "zō"
   },
   {
     "id": "animal_panda",
@@ -1440,16 +1571,14 @@
     "level": "N5",
     "skill": "vocab",
     "type": "word",
-    "title": "Gấu trúc  (熊猫 (Panda))",
+    "title": "Gấu trúc (パンダ)",
     "content": {
       "vi": "Gấu trúc ",
-      "ja": "熊猫 (Panda)",
-      "ja_kanji": "熊猫",
+      "ja": "パンダ (Panda)",
+      "ja_kanji": "",
       "ja_kana": "パンダ",
       "en": "Panda",
-      "phonetic": "pan-đa",
-      "example": "Moon is a cute panda robot.",
-      "fact": "Gấu trúc Panda dành phần lớn thời gian trong ngày để ăn tre trúc."
+      "phonetic": "panda"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1462,16 +1591,14 @@
       "gấu trúc",
       "panda",
       "パンダ",
-      "熊猫"
+      "パンダ (Panda)"
     ],
     "vi": "Gấu trúc ",
-    "ja": "熊猫 (Panda)",
-    "ja_kanji": "熊猫",
+    "ja": "パンダ (Panda)",
+    "ja_kanji": "",
     "ja_kana": "パンダ",
     "en": "Panda",
-    "phonetic": "pan-đa",
-    "example": "Moon is a cute panda robot.",
-    "fact": "Gấu trúc Panda dành phần lớn thời gian trong ngày để ăn tre trúc."
+    "phonetic": "panda"
   },
   {
     "id": "nature_sun",
@@ -1486,9 +1613,7 @@
       "ja_kanji": "太陽",
       "ja_kana": "たいよう",
       "en": "Sun",
-      "phonetic": "tai-yô",
-      "example": "The bright sun warms the earth.",
-      "fact": "Mặt trời cung cấp ánh sáng và nhiệt độ nuôi sống mọi loài."
+      "phonetic": "taiyō"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1499,18 +1624,16 @@
       "ông mặt trời",
       "sun",
       "taiyou",
-      "anh nang",
       "たいよう",
-      "太陽"
+      "太陽",
+      "太陽 (Taiyou)"
     ],
     "vi": "Mặt trời",
     "ja": "太陽 (Taiyou)",
     "ja_kanji": "太陽",
     "ja_kana": "たいよう",
     "en": "Sun",
-    "phonetic": "tai-yô",
-    "example": "The bright sun warms the earth.",
-    "fact": "Mặt trời cung cấp ánh sáng và nhiệt độ nuôi sống mọi loài."
+    "phonetic": "taiyō"
   },
   {
     "id": "nature_moon",
@@ -1525,9 +1648,7 @@
       "ja_kanji": "月",
       "ja_kana": "つき",
       "en": "Moon",
-      "phonetic": "tsư-ki",
-      "example": "The silver moon shines at night.",
-      "fact": "Mặt trăng phản chiếu ánh sáng mặt trời soi sáng bầu trời đêm."
+      "phonetic": "tsuki"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1538,17 +1659,16 @@
       "vầng trăng",
       "moon",
       "tsuki",
-      "ban dem",
-      "つき"
+      "つき",
+      "月 (Tsuki)",
+      "月"
     ],
     "vi": "Mặt trăng",
     "ja": "月 (Tsuki)",
     "ja_kanji": "月",
     "ja_kana": "つき",
     "en": "Moon",
-    "phonetic": "tsư-ki",
-    "example": "The silver moon shines at night.",
-    "fact": "Mặt trăng phản chiếu ánh sáng mặt trời soi sáng bầu trời đêm."
+    "phonetic": "tsuki"
   },
   {
     "id": "fruit_apple",
@@ -1563,9 +1683,7 @@
       "ja_kanji": "林檎",
       "ja_kana": "りんご",
       "en": "Apple",
-      "phonetic": "rin-gô",
-      "example": "A red apple is sweet and juicy.",
-      "fact": "Quả táo chứa nhiều vitamin C và chất xơ tốt cho hệ tiêu hóa."
+      "phonetic": "ringo"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1578,16 +1696,15 @@
       "apple",
       "ringo",
       "りんご",
-      "林檎"
+      "林檎",
+      "林檎 (Ringo)"
     ],
     "vi": "Quả táo",
     "ja": "林檎 (Ringo)",
     "ja_kanji": "林檎",
     "ja_kana": "りんご",
     "en": "Apple",
-    "phonetic": "rin-gô",
-    "example": "A red apple is sweet and juicy.",
-    "fact": "Quả táo chứa nhiều vitamin C và chất xơ tốt cho hệ tiêu hóa."
+    "phonetic": "ringo"
   },
   {
     "id": "fruit_banana",
@@ -1595,16 +1712,14 @@
     "level": "N5",
     "skill": "vocab",
     "type": "word",
-    "title": "Quả chuối (甘蕉 (Banana))",
+    "title": "Quả chuối (バナナ)",
     "content": {
       "vi": "Quả chuối",
-      "ja": "甘蕉 (Banana)",
-      "ja_kanji": "甘蕉",
+      "ja": "バナナ (Banana)",
+      "ja_kanji": "",
       "ja_kana": "バナナ",
       "en": "Banana",
-      "phonetic": "ba-na-na",
-      "example": "Monkeys love eating yellow bananas.",
-      "fact": "Chuối giàu kali giúp cơ bắp khỏe mạnh và bổ sung năng lượng nhanh."
+      "phonetic": "banana"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1616,16 +1731,14 @@
       "banana",
       "trái chuối",
       "バナナ",
-      "甘蕉"
+      "バナナ (Banana)"
     ],
     "vi": "Quả chuối",
-    "ja": "甘蕉 (Banana)",
-    "ja_kanji": "甘蕉",
+    "ja": "バナナ (Banana)",
+    "ja_kanji": "",
     "ja_kana": "バナナ",
     "en": "Banana",
-    "phonetic": "ba-na-na",
-    "example": "Monkeys love eating yellow bananas.",
-    "fact": "Chuối giàu kali giúp cơ bắp khỏe mạnh và bổ sung năng lượng nhanh."
+    "phonetic": "banana"
   },
   {
     "id": "color_red",
@@ -1640,9 +1753,7 @@
       "ja_kanji": "赤",
       "ja_kana": "あか",
       "en": "Red",
-      "phonetic": "a-ka",
-      "example": "The ripe strawberry is bright red.",
-      "fact": "Màu đỏ là màu của sự nhiệt huyết, may mắn và năng lượng dồi dào."
+      "phonetic": "aka"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1653,17 +1764,16 @@
       "đỏ",
       "red",
       "aka",
-      "akai",
-      "あか"
+      "あか",
+      "赤 (Aka)",
+      "赤"
     ],
     "vi": "Màu đỏ",
     "ja": "赤 (Aka)",
     "ja_kanji": "赤",
     "ja_kana": "あか",
     "en": "Red",
-    "phonetic": "a-ka",
-    "example": "The ripe strawberry is bright red.",
-    "fact": "Màu đỏ là màu của sự nhiệt huyết, may mắn và năng lượng dồi dào."
+    "phonetic": "aka"
   },
   {
     "id": "color_blue",
@@ -1678,9 +1788,7 @@
       "ja_kanji": "青",
       "ja_kana": "あお",
       "en": "Blue",
-      "phonetic": "a-ô",
-      "example": "The ocean is deep blue.",
-      "fact": "Màu xanh dương tượng trưng cho bầu trời bao la và biển cả yên bình."
+      "phonetic": "ao"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [
@@ -1695,18 +1803,17 @@
       "xanh dương",
       "xanh lam",
       "blue",
-      "aoi",
       "ao",
-      "あお"
+      "あお",
+      "青 (Ao)",
+      "青"
     ],
     "vi": "Màu xanh da trời",
     "ja": "青 (Ao)",
     "ja_kanji": "青",
     "ja_kana": "あお",
     "en": "Blue",
-    "phonetic": "a-ô",
-    "example": "The ocean is deep blue.",
-    "fact": "Màu xanh dương tượng trưng cho bầu trời bao la và biển cả yên bình."
+    "phonetic": "ao"
   },
   {
     "id": "color_yellow",
@@ -1721,9 +1828,7 @@
       "ja_kanji": "黄色",
       "ja_kana": "きいろ",
       "en": "Yellow",
-      "phonetic": "ki-i-rô",
-      "example": "Sunflowers are bright yellow.",
-      "fact": "Màu vàng là sắc màu của ánh nắng mặt trời và niềm vui rạng rỡ."
+      "phonetic": "kiiro"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1735,16 +1840,15 @@
       "yellow",
       "kiiro",
       "きいろ",
-      "黄色"
+      "黄色",
+      "黄色 (Kiiro)"
     ],
     "vi": "Màu vàng",
     "ja": "黄色 (Kiiro)",
     "ja_kanji": "黄色",
     "ja_kana": "きいろ",
     "en": "Yellow",
-    "phonetic": "ki-i-rô",
-    "example": "Sunflowers are bright yellow.",
-    "fact": "Màu vàng là sắc màu của ánh nắng mặt trời và niềm vui rạng rỡ."
+    "phonetic": "kiiro"
   },
   {
     "id": "color_green",
@@ -1759,9 +1863,7 @@
       "ja_kanji": "緑",
       "ja_kana": "みどり",
       "en": "Green",
-      "phonetic": "mi-đô-ri",
-      "example": "Fresh leaves are bright green.",
-      "fact": "Màu xanh lá cây tượng trưng cho thiên nhiên tươi mới và sự sống."
+      "phonetic": "midori"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1773,16 +1875,16 @@
       "green",
       "midori",
       "màu xanh lá cây",
-      "みどり"
+      "みどり",
+      "緑 (Midori)",
+      "緑"
     ],
     "vi": "Màu xanh lá cây",
     "ja": "緑 (Midori)",
     "ja_kanji": "緑",
     "ja_kana": "みどり",
     "en": "Green",
-    "phonetic": "mi-đô-ri",
-    "example": "Fresh leaves are bright green.",
-    "fact": "Màu xanh lá cây tượng trưng cho thiên nhiên tươi mới và sự sống."
+    "phonetic": "midori"
   },
   {
     "id": "family_father",
@@ -1793,13 +1895,11 @@
     "title": "Bố (Cha) (父 (Chichi))",
     "content": {
       "vi": "Bố (Cha)",
-      "ja": "父 (Chichi)",
-      "ja_kanji": "父",
-      "ja_kana": "ちち",
+      "ja": "お父さん (Otōsan)",
+      "ja_kanji": "お父さん",
+      "ja_kana": "おとうさん",
       "en": "Father",
-      "phonetic": "chi-chi",
-      "example": "My father teaches me cycling.",
-      "fact": "Bố luôn là điểm tựa vững chãi và che chở cho cả gia đình."
+      "phonetic": "otōsan"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [
@@ -1813,19 +1913,18 @@
       "cha",
       "father",
       "dad",
-      "chichi",
       "otousan",
       "bố (cha)",
-      "ちち"
+      "お父さん (Otōsan)",
+      "お父さん",
+      "おとうさん"
     ],
     "vi": "Bố (Cha)",
-    "ja": "父 (Chichi)",
-    "ja_kanji": "父",
-    "ja_kana": "ちち",
+    "ja": "お父さん (Otōsan)",
+    "ja_kanji": "お父さん",
+    "ja_kana": "おとうさん",
     "en": "Father",
-    "phonetic": "chi-chi",
-    "example": "My father teaches me cycling.",
-    "fact": "Bố luôn là điểm tựa vững chãi và che chở cho cả gia đình."
+    "phonetic": "otōsan"
   },
   {
     "id": "family_mother",
@@ -1836,13 +1935,11 @@
     "title": "Mẹ (母 (Haha))",
     "content": {
       "vi": "Mẹ",
-      "ja": "母 (Haha)",
-      "ja_kanji": "母",
-      "ja_kana": "はは",
+      "ja": "お母さん (Okāsan)",
+      "ja_kanji": "お母さん",
+      "ja_kana": "おかあさん",
       "en": "Mother",
-      "phonetic": "ha-ha",
-      "example": "My mother reads me bedtime stories.",
-      "fact": "Mẹ dành tình yêu thương bao la và sự chăm sóc dịu dàng cho bé."
+      "phonetic": "okāsan"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1853,18 +1950,17 @@
       "mẹ yêu",
       "mother",
       "mom",
-      "haha",
       "okaasan",
-      "はは"
+      "お母さん (Okāsan)",
+      "お母さん",
+      "おかあさん"
     ],
     "vi": "Mẹ",
-    "ja": "母 (Haha)",
-    "ja_kanji": "母",
-    "ja_kana": "はは",
+    "ja": "お母さん (Okāsan)",
+    "ja_kanji": "お母さん",
+    "ja_kana": "おかあさん",
     "en": "Mother",
-    "phonetic": "ha-ha",
-    "example": "My mother reads me bedtime stories.",
-    "fact": "Mẹ dành tình yêu thương bao la và sự chăm sóc dịu dàng cho bé."
+    "phonetic": "okāsan"
   },
   {
     "id": "family_grandparents",
@@ -1879,9 +1975,7 @@
       "ja_kanji": "祖父母",
       "ja_kana": "そふぼ",
       "en": "Grandparents",
-      "phonetic": "sô-phư-bô",
-      "example": "I love visiting my grandparents.",
-      "fact": "Ông bà luôn yêu thương và kể cho bé nghe những câu chuyện xưa."
+      "phonetic": "sofubo"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1889,23 +1983,18 @@
     "topic": "Family",
     "keywords": [
       "ông bà",
-      "ông",
-      "bà",
       "grandparents",
-      "ojiisan",
-      "obaasan",
       "sofubo",
       "そふぼ",
-      "祖父母"
+      "祖父母",
+      "祖父母 (Sofubo)"
     ],
     "vi": "Ông bà",
     "ja": "祖父母 (Sofubo)",
     "ja_kanji": "祖父母",
     "ja_kana": "そふぼ",
     "en": "Grandparents",
-    "phonetic": "sô-phư-bô",
-    "example": "I love visiting my grandparents.",
-    "fact": "Ông bà luôn yêu thương và kể cho bé nghe những câu chuyện xưa."
+    "phonetic": "sofubo"
   },
   {
     "id": "nature_star",
@@ -1920,9 +2009,7 @@
       "ja_kanji": "星",
       "ja_kana": "ほし",
       "en": "Star",
-      "phonetic": "hô-si",
-      "example": "Twinkle little star in the night sky.",
-      "fact": "Chữ 星 gồm chữ Nhật (mặt trời) và chữ Sinh (sinh ra)."
+      "phonetic": "hoshi"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1930,22 +2017,19 @@
     "topic": "Nature",
     "keywords": [
       "ngôi sao",
-      "những ngôi sao",
       "ông sao",
-      "chòm sao",
       "star",
       "hoshi",
-      "ngoi sao",
-      "ほし"
+      "ほし",
+      "星 (Hoshi)",
+      "星"
     ],
     "vi": "Ngôi sao",
     "ja": "星 (Hoshi)",
     "ja_kanji": "星",
     "ja_kana": "ほし",
     "en": "Star",
-    "phonetic": "hô-si",
-    "example": "Twinkle little star in the night sky.",
-    "fact": "Chữ 星 gồm chữ Nhật (mặt trời) và chữ Sinh (sinh ra)."
+    "phonetic": "hoshi"
   },
   {
     "id": "nature_flower",
@@ -1960,9 +2044,7 @@
       "ja_kanji": "花",
       "ja_kana": "はな",
       "en": "Flower",
-      "phonetic": "ha-na",
-      "example": "The pink flower smells sweet.",
-      "fact": "Hoa tô điểm cho cuộc sống và tỏa hương thơm dịu mát."
+      "phonetic": "hana"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -1973,17 +2055,16 @@
       "bông hoa",
       "flower",
       "hana",
-      "hoa dep",
-      "はな"
+      "はな",
+      "花 (Hana)",
+      "花"
     ],
     "vi": "Bông hoa",
     "ja": "花 (Hana)",
     "ja_kanji": "花",
     "ja_kana": "はな",
     "en": "Flower",
-    "phonetic": "ha-na",
-    "example": "The pink flower smells sweet.",
-    "fact": "Hoa tô điểm cho cuộc sống và tỏa hương thơm dịu mát."
+    "phonetic": "hana"
   },
   {
     "id": "nature_tree",
@@ -1998,9 +2079,7 @@
       "ja_kanji": "木",
       "ja_kana": "き",
       "en": "Tree",
-      "phonetic": "ki",
-      "example": "Birds build nests on the big tree.",
-      "fact": "Cây xanh hấp thụ khí carbon dioxide và nhả ra khí oxy trong lành."
+      "phonetic": "ki"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [
@@ -2013,17 +2092,17 @@
       "cây xanh",
       "cây cối",
       "tree",
-      "ki",
-      "cay xanh"
+      "cay xanh",
+      "木 (Ki)",
+      "木",
+      "き"
     ],
     "vi": "Cây xanh",
     "ja": "木 (Ki)",
     "ja_kanji": "木",
     "ja_kana": "き",
     "en": "Tree",
-    "phonetic": "ki",
-    "example": "Birds build nests on the big tree.",
-    "fact": "Cây xanh hấp thụ khí carbon dioxide và nhả ra khí oxy trong lành."
+    "phonetic": "ki"
   },
   {
     "id": "nature_leaf",
@@ -2038,9 +2117,7 @@
       "ja_kanji": "葉",
       "ja_kana": "は",
       "en": "Leaf",
-      "phonetic": "ha",
-      "example": "Autumn leaves turn red and yellow.",
-      "fact": "Lá cây chứa chất diệp lục giúp thực vật quang hợp dưới ánh nắng."
+      "phonetic": "ha"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [
@@ -2054,17 +2131,17 @@
       "chiếc lá",
       "lá cây",
       "leaf",
-      "ha",
-      "chiec la"
+      "chiec la",
+      "葉 (Ha)",
+      "葉",
+      "は"
     ],
     "vi": "Chiếc lá",
     "ja": "葉 (Ha)",
     "ja_kanji": "葉",
     "ja_kana": "は",
     "en": "Leaf",
-    "phonetic": "ha",
-    "example": "Autumn leaves turn red and yellow.",
-    "fact": "Lá cây chứa chất diệp lục giúp thực vật quang hợp dưới ánh nắng."
+    "phonetic": "ha"
   },
   {
     "id": "nature_grass",
@@ -2079,9 +2156,7 @@
       "ja_kanji": "草",
       "ja_kana": "くさ",
       "en": "Grass",
-      "phonetic": "kư-sa",
-      "example": "Green grass covers the field.",
-      "fact": "Những thảm cỏ xanh mượt giúp giữ ẩm đất và làm đẹp cảnh quan."
+      "phonetic": "kusa"
     },
     "source_id": "panda_kids_n5_curriculum",
     "stopwords_override": [],
@@ -2094,15 +2169,15 @@
       "grass",
       "kusa",
       "bai co",
-      "くさ"
+      "くさ",
+      "草 (Kusa)",
+      "草"
     ],
     "vi": "Ngọn cỏ",
     "ja": "草 (Kusa)",
     "ja_kanji": "草",
     "ja_kana": "くさ",
     "en": "Grass",
-    "phonetic": "kư-sa",
-    "example": "Green grass covers the field.",
-    "fact": "Những thảm cỏ xanh mượt giúp giữ ẩm đất và làm đẹp cảnh quan."
+    "phonetic": "kusa"
   }
 ]

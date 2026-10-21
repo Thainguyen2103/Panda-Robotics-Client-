@@ -4,8 +4,8 @@ from pathlib import Path
 import re
 import unicodedata
 
-# Đường dẫn tới file dữ liệu
-DATA_PATH = Path(__file__).parent / "data.json"
+# Production vocabulary is served only from the curated V2 corpus.
+DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "data_v2.json"
 ENTERTAIN_PATH = Path(__file__).parent / "entertainment_kids.json"
 
 # Biến toàn cục
@@ -73,18 +73,14 @@ def load_dictionary():
 # Tự động nạp lúc khởi động
 load_dictionary()
 
-from functools import lru_cache
-
-@lru_cache(maxsize=500)
 def lookup_vocab(question: str) -> dict | None:
-    """Tra cứu từ vựng siêu tốc và Caching siêu tốc O(1).
-    Khớp theo ranh giới từ (word boundary) ngăn ngừa false positive.
-    """
-    norm_q = _normalize(question)
-    for pattern, item in _VOCAB_PATTERNS:
-        if pattern.search(norm_q):
-            return item
-    return None
+    """Return only a lesson accepted by the shared semantic-gated RAG path."""
+    try:
+        from server.llm.rag_engine import get_learning_record
+        return get_learning_record(question)
+    except Exception as exc:
+        print(f"⚠️ [DICTIONARY] RAG lookup failed closed: {exc}")
+        return None
 
 
 def extract_display_text(question: str, item: dict) -> tuple[str, str]:

@@ -61,6 +61,20 @@ class IntentRouterTests(unittest.TestCase):
             Intent.PRONUNCIATION,
         )
 
+    def test_study_help_route_is_recognized(self):
+        questions = [
+            "Bạn có thể giúp tôi học không?",
+            "Dạy mình học tiếng Anh với",
+            "Dạy mình học tiếng Nhật với",
+            "Kèm bé học tiếng Anh nhé",
+            "Giúp tớ học với",
+        ]
+        for q in questions:
+            with self.subTest(question=q):
+                route = self.router.classify(q)
+                self.assertEqual(route.intent, Intent.STUDY_HELP)
+                self.assertFalse(route.use_rag)
+
     def test_ambiguous_input_defaults_to_grounded_knowledge_route(self):
         route = self.router.classify("Could you tell me about this?")
         self.assertEqual(route.intent, Intent.KNOWLEDGE_QNA)

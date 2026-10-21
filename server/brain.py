@@ -24,6 +24,7 @@ import json
 import re
 import sys
 import os
+import uuid
 
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
     try:
@@ -55,8 +56,18 @@ from server.voice.speech.filters import (
 from server.voice.speech.validation import safe_asr_correction
 from server.voice.tts import speak, SentencePlayer
 from server.voice import tts   # module object — cho tts.play_beep()/play_tick()
-from server.llm import engine as llm
 from server.network.topics import classify_topic, TOPIC_LABELS
+
+
+class _LazyLLMModule:
+    """Keep brain import cheap; main() initializes Qwen alongside E5 warm-up."""
+    def __getattr__(self, name):
+        from server.llm import engine as engine_module
+        globals()["llm"] = engine_module
+        return getattr(engine_module, name)
+
+
+llm = _LazyLLMModule()
 
 
 # Mic trình duyệt chạy ở process riêng nên không thấy trực tiếp cờ
@@ -102,6 +113,7 @@ _voice_lock    = threading.Lock()
 _current_topic = ["chat"]   # chủ đề hiện tại của phiên hỏi-đáp (cho caption OLED)
 _current_session_cancelled = None
 _current_player = None
+_local_voice_conversation_id = uuid.uuid4().hex
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -427,7 +439,8 @@ def _extract_inline_question(trigger_text: str) -> str | None:
 #  PIPELINE CHÍNH: Wake-word → LLM → TTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _handle_wake_word(trigger_text: str):
+def _handle_wake_word(trigger_text: str, conversation_id: str | None = None,
+                     turn_id: str | None = None):
     """
     Pipeline đầy đủ khi phát hiện wake-word "Moon":
 
@@ -529,15 +542,34 @@ def _handle_wake_word(trigger_text: str):
             change_state("IDLE")
             return
 
-        # ── FAST PATH: KIỂM TRA ROUTER TỪ VỰNG / ĐỐ VUI (BYPASS LLM) ──────────
-        from server.llm.dictionary_router import lookup_vocab, get_entertainment, extract_display_text
+        # ── FAST PATH: KIỂM TRA Ý ĐỊNH HỌC TẬP / CHÀO HỎI / TỪ VỰNG / ĐỐ VUI (BYPASS LLM) ──
+        from server.llm.dictionary_router import lookup_vocab, extract_display_text
+        from server.llm.brain_router import (
+            is_study_help_query, STUDY_HELP_RESPONSE, set_study_help_state,
+            get_fast_chitchat
+        )
         
         q_lower = question.lower()
         fast_vocab = lookup_vocab(question)
-        fast_entertain = get_entertainment(question)
         fast_answer = None
 
-        if fast_vocab:
+        # 1. Ý định nhờ hỗ trợ học tập (Study Help) -> Phản hồi gợi mở ngay lập tức (0ms)
+        if is_study_help_query(question):
+            fast_answer = STUDY_HELP_RESPONSE
+            set_study_help_state(conversation_id or _local_voice_conversation_id, {
+                "waiting_for_level": True,
+                "timestamp": time.time(),
+            })
+            fast_vocab = None
+
+        # 2. Chào hỏi, cảm ơn, tạm biệt đơn giản (Chitchat) -> Trả lời thân thiện ngay (0ms)
+        elif not fast_vocab:
+            chitchat_ans = get_fast_chitchat(question)
+            if chitchat_ans:
+                fast_answer = chitchat_ans
+
+        # 3. Tra từ vựng Tiếng Nhật / Tiếng Anh từ Hash Map
+        if not fast_answer and fast_vocab:
             # Chỉ kích hoạt Fast Path dịch từ vựng khi:
             # 1) Người dùng hỏi về từ vựng / ngôn ngữ (tiếng anh, tiếng nhật, nghĩa là gì...)
             # 2) Hoặc câu hỏi ngắn gọn trực tiếp tên từ (dưới 4 từ, ví dụ "ngôi sao", "con chó")
@@ -562,30 +594,45 @@ def _handle_wake_word(trigger_text: str):
 
                 if vi and (en or disp_kanji):
                     if any(k in q_lower for k in ["tiếng nhật", "nhật", "japanese", "日本語", "in japanese", "chữ hán", "kanji"]):
-                        fast_answer = f"Từ {vi} trong tiếng Nhật viết là {disp_kanji}, đọc là {disp_kana} ({disp_romaji}) bé nha!"
+                        if disp_kanji and disp_kanji != disp_kana:
+                            fast_answer = f"Từ {vi} trong tiếng Nhật viết là {disp_kanji}（{disp_kana}） bé nha!"
+                        else:
+                            fast_answer = f"Từ {vi} trong tiếng Nhật đọc là {disp_kana} bé nha!"
                     elif any(k in q_lower for k in ["tiếng anh", "anh", "english", "in english"]):
                         fast_answer = f"Từ {vi} trong tiếng Anh là {en} bé nha!"
                     else:
-                        fast_answer = f"Từ {vi}, tiếng Anh là {en}, tiếng Nhật là {ja or disp_kanji} bé nha!"
+                        if disp_kanji and disp_kanji != disp_kana:
+                            fast_answer = f"Từ {vi}, tiếng Anh là {en}, tiếng Nhật viết là {disp_kanji}（{disp_kana}） bé nha!"
+                        else:
+                            fast_answer = f"Từ {vi}, tiếng Anh là {en}, tiếng Nhật đọc là {disp_kana} bé nha!"
                 
-        elif fast_entertain:
-            fast_answer = fast_entertain
-
         if fast_answer:
             print(f"⚡ [BRAIN] FAST PATH BYPASS! (0 độ trễ): {fast_answer}")
+            llm.record_completed_turn(question, fast_answer,
+                conversation_id or _local_voice_conversation_id, turn_id)
             _set_voice_ai_state("speaking")
             _publish_thinking("answer", fast_answer)
             
             # Update nhanh màn hình OLED (Hiển thị đúng ngôn ngữ Kanji/Tiếng Anh/Tiếng Việt lên LED)
             if fast_vocab:
-                field, disp_text = extract_display_text(question, fast_vocab)
-                if disp_text:
-                    mqtt_bridge.publish("moon/ai/led", disp_text)
-                    mqtt_bridge.publish(settings.TOPIC_AI_TOPIC, json.dumps({
-                        "id": _tid, "cap": disp_text[:12]
-                    }))
+                llm.publish_learning_display(question, fast_vocab)
                 
-            tts.speak(fast_answer)
+            spoken_segments = None
+            if fast_vocab:
+                targets = []
+                if any(k in q_lower for k in ["tiếng nhật", "nhật", "japanese", "日本語", "in japanese", "chữ hán", "kanji"]):
+                    for target in (disp_kanji, disp_kana, disp_romaji):
+                        if target and target in fast_answer:
+                            targets.append({"text": target, "language": "ja"})
+                elif any(k in q_lower for k in ["tiếng anh", "anh", "english", "in english"]):
+                    if en and en in fast_answer:
+                        targets.append({"text": en, "language": "en"})
+                if targets:
+                    spoken_segments = tts.language_segments(fast_answer, {"targets": targets})
+            if spoken_segments:
+                tts.speak_segments(spoken_segments)
+            else:
+                tts.speak(fast_answer)
             
             # Xong việc thì reset ngay lập tức
             _publish_thinking("done")
@@ -652,8 +699,8 @@ def _handle_wake_word(trigger_text: str):
                     _publish_thinking("thinking", "Moon đang suy nghĩ...")
                     print("🧠 [BRAIN] LLM thinking...")
                 elif stage == "answering":
-                    _publish_thinking("answering", "Moon đang soạn câu trả lời...")
-                    print("✍️  [BRAIN] LLM answering...")
+                    _publish_thinking("answering", "Moon đang chuẩn bị câu trả lời...")
+                    print("✍️  [BRAIN] Preparing answer...")
 
         def on_chunk(chunk: str):
             """Stream từng token lên dashboard + tách câu đẩy sang TTS ngay."""
@@ -666,9 +713,9 @@ def _handle_wake_word(trigger_text: str):
                     "done": False,
                     "text": partial,
                 }))
-                # Tách câu tại dấu kết thúc (. ! ? …) — câu xong trước đọc trước
+                # Tách câu/vế tại dấu kết thúc (. ! ? …) hoặc dấu phẩy (,) — câu/vế xong trước đọc trước
                 sentence_buffer[0] += chunk
-                parts = re.split(r"(?<=[.!?…])\s+", sentence_buffer[0])
+                parts = re.split(r"(?<=[.!?…])\s+|(?<=[,])\s+", sentence_buffer[0])
                 if len(parts) > 1:
                     for part in parts[:-1]:
                         _push_sentence(part)
@@ -704,6 +751,9 @@ def _handle_wake_word(trigger_text: str):
             on_thinking=on_thinking,
             on_chunk=on_chunk,
             on_done=on_done,
+            conversation_id=conversation_id or _local_voice_conversation_id,
+            turn_id=turn_id,
+            should_cancel=session_cancelled.is_set,
         )
 
         # Chờ LLM với timeout
@@ -855,24 +905,37 @@ def on_browser_audio(client, userdata, msg):
 
 def on_mic_live(client, userdata, msg):
     """Dashboard bật/tắt live-mic → bảo vòng lặp server nhường đường."""
+    global _local_voice_conversation_id
     on = msg.payload.decode() == "1"
     if on:
         # Một lần bấm bắt đầu là một phiên hội thoại mới. Không để ngôn ngữ hay
         # chủ đề của phiên trước kéo lệch câu trả lời đầu tiên của phiên sau.
-        llm.clear_history()
+        llm.clear_history(_local_voice_conversation_id)
+        _local_voice_conversation_id = uuid.uuid4().hex
     voice.set_external_mic(on)
 
 
 def on_browser_question(client, userdata, msg):
     """Route text already transcribed by Moon Voice through the full pipeline."""
     try:
-        question = msg.payload.decode("utf-8",errors="strict").strip()
+        payload = msg.payload.decode("utf-8", errors="strict").strip()
     except Exception:
         return
+    conversation_id = turn_id = None
+    try:
+        data = json.loads(payload)
+        if isinstance(data, dict):
+            payload = str(data.get("text", ""))
+            conversation_id = str(data.get("conversation_id", ""))[:128] or None
+            turn_id = str(data.get("turn_id", ""))[:128] or None
+    except (json.JSONDecodeError, TypeError):
+        pass  # old clients send the question as plain text
+    question = payload.strip()
     if not question or len(question) > 1000:
         return
     print(f"✅ [BRAIN] Browser question received from MQTT chars={len(question)}")
-    threading.Thread(target=_handle_wake_word,args=(f"Moon, {question}",),daemon=True).start()
+    threading.Thread(target=_handle_wake_word,
+                     args=(f"Moon, {question}", conversation_id, turn_id), daemon=True).start()
 
 
 def on_browser_clip(client, userdata, msg):
@@ -938,6 +1001,35 @@ def main():
     print("🧠 [BRAIN] ═══════════════════════════════")
     print(f"🧠 [BRAIN]  Pipeline: Voice (Groq) → LLM (DeepSeek) → TTS (Edge Neural)")
     print()
+
+    # Start E5 before importing engine.py. Its RAG cache/model warm-up then
+    # overlaps Ollama's synchronous Qwen preload. Do not enable voice input
+    # until both have finished initializing.
+    print("⏳ [STARTUP] Đang nạp E5 và Qwen song song...")
+    from server.llm import rag_engine
+    rag_warmup = {"ok": False, "error": None}
+
+    def _warm_rag_encoder():
+        try:
+            rag_warmup["ok"] = rag_engine.warmup_embeddings()
+        except Exception as exc:
+            rag_warmup["error"] = exc
+
+    rag_thread = threading.Thread(target=_warm_rag_encoder, name="rag-e5-warmup", daemon=True)
+    rag_thread.start()
+    try:
+        from server.llm import engine as engine_module
+        globals()["llm"] = engine_module
+    except Exception:
+        rag_thread.join()
+        raise
+    rag_thread.join()
+    if rag_warmup["ok"]:
+        print("✅ [RAG-VEC] Encoder sẵn sàng; Qwen và E5 đã nạp trước khi nhận câu hỏi.")
+    elif rag_warmup["error"]:
+        print(f"⚠️ [RAG-VEC] Khởi tạo trước thất bại: {rag_warmup['error']}")
+    else:
+        print("⚠️ [RAG-VEC] Encoder chưa sẵn sàng; RAG sẽ từ chối an toàn nếu không thể truy xuất.")
 
     # Subscribe MQTT status từ robot
     mqtt_bridge.client.subscribe(settings.TOPIC_STATUS)

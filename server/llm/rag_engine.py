@@ -28,6 +28,7 @@ import re
 import hashlib
 import unicodedata
 import functools
+from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 
 import numpy as np
@@ -44,15 +45,40 @@ if sys.stderr and hasattr(sys.stderr, "reconfigure"):
     except Exception:
         pass
 
-# Đường dẫn tĩnh trỏ đến file data.json nằm cùng thư mục với file này
+# Legacy paths are kept only for explicit fixture/legacy callers. Production
+# retrieval has one source of truth and one cache under data/.
 DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data.json")
-# Đường dẫn cache embeddings (nằm cạnh data.json)
 EMBEDDINGS_CACHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".rag_embeddings.npz")
 
 # Task 13: Schema V1 / Data V2 paths
 DATA_V2_PATH = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "data_v2.json"))
-EMBEDDINGS_V2_CACHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".rag_embeddings_v2.npz")
-DEFAULT_DATA_PATH = DATA_V2_PATH if os.path.exists(DATA_V2_PATH) else DATA_PATH
+EMBEDDINGS_V2_CACHE_PATH = os.path.join(os.path.dirname(DATA_V2_PATH), ".rag_embeddings_v2.npz")
+DEFAULT_DATA_PATH = DATA_V2_PATH
+
+# A lexical match nominates a lesson but never authorizes it by itself.
+LEXICAL_VECTOR_MIN_COSINE = 0.825
+VECTOR_ONLY_MIN_COSINE = 0.85
+TOP_RESULT_MIN_MARGIN = 0.02
+
+_OUT_OF_SCOPE_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
+    r"\b(cach nau|cach lam|nguyen lieu|cong thuc|recipe|ingredients|how to cook|how to make|how many ingredients)\b",
+    r"\b(song( duoc)? bao nhieu|bao nhieu nam song|bao nhieu tuoi|tuoi tho|dan so|bao nhieu tinh|so dien thoai|cuu hoa|cap cuu|cach viet email|email xin viec|dau dau|uong thuoc|thuoc gi|thoi tiet|gia ve|ve may bay|lifespan|how long .*live|how many years .*live|how old|population|how many provinces|phone number|emergency number|weather|temperature|headache|medicine|flight price|write an email)\b",
+    r"\b(ngu phap the|grammar (?:form|tense)|conjugat(?:e|ion)|chia dong tu)\b",
+    r"(?:何歳|何年生き|人口|電話番号|救急|消防|文法|活用)",
+))
+_LANGUAGE_LOOKUP_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
+    r"\b(tieng nhat|tieng anh|japanese|english|in japanese|in english)\b.{0,28}\b(la gi|noi sao|viet sao|doc sao|how do you say|what is|how to say)\b",
+    r"\b(la gi|noi sao|viet sao|doc sao|how do you say|what is|how to say)\b.{0,28}\b(tieng nhat|tieng anh|japanese|english)\b",
+    r"(?:日本語|英語).*(?:何|どう言|どう書|読み)|(?:何|どう言|どう書|読み).*(?:日本語|英語)",
+))
+
+
+def is_out_of_scope_intent(query: str) -> bool:
+    """Reject known non-lesson intents before any lexical or vector lookup."""
+    normalized = strip_accents(unicodedata.normalize("NFC", query or "").casefold())
+    if not any(pattern.search(normalized) for pattern in _OUT_OF_SCOPE_PATTERNS):
+        return False
+    return not any(pattern.search(normalized) for pattern in _LANGUAGE_LOOKUP_PATTERNS)
 
 # ─── Embedding model (lazy init) ─────────────────────────────────────────────
 # Model multilingual-e5-small: 47M params, 384 chiều
@@ -74,11 +100,64 @@ def _get_embedder():
         if _embedder is not None:
             return _embedder
         try:
+            # Resolve the standard Hugging Face cache location without importing
+            # huggingface_hub first: its offline flag is read at import time.
+            hf_home = Path(os.environ.get("HF_HOME", Path.home() / ".cache" / "huggingface"))
+            cache_root = Path(os.environ.get("HF_HUB_CACHE", hf_home / "hub"))
+            model_cache = cache_root / "models--intfloat--multilingual-e5-small" / "snapshots"
+            cached = model_cache.is_dir() and any(path.is_dir() for path in model_cache.iterdir())
+            old_hub_offline = os.environ.get("HF_HUB_OFFLINE")
+            old_transformers_offline = os.environ.get("TRANSFORMERS_OFFLINE")
+            if cached:
+                os.environ["HF_HUB_OFFLINE"] = "1"
+                os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
             from sentence_transformers import SentenceTransformer
             import torch
 
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            _embedder = SentenceTransformer(EMBEDDING_MODEL_NAME, device=device)
+            # Avoid Hub metadata checks on every robot start when the complete
+            # model snapshot is already cached. First-time installs still use
+            # the normal online path and populate the cache.
+            if cached:
+                try:
+                    _embedder = SentenceTransformer(
+                        EMBEDDING_MODEL_NAME,
+                        device=device,
+                        model_kwargs={"local_files_only": True},
+                    )
+                except Exception as offline_error:
+                    # A partial cache can occur after an interrupted download.
+                    # Restore online behavior and let Transformers complete it.
+                    if old_hub_offline is None:
+                        os.environ.pop("HF_HUB_OFFLINE", None)
+                    else:
+                        os.environ["HF_HUB_OFFLINE"] = old_hub_offline
+                    if old_transformers_offline is None:
+                        os.environ.pop("TRANSFORMERS_OFFLINE", None)
+                    else:
+                        os.environ["TRANSFORMERS_OFFLINE"] = old_transformers_offline
+                    try:
+                        import huggingface_hub.constants as hf_constants
+                        hf_constants.HF_HUB_OFFLINE = False
+                        import transformers.utils.hub as transformer_hub
+                        if hasattr(transformer_hub, "_is_offline_mode"):
+                            transformer_hub._is_offline_mode = False
+                    except Exception:
+                        pass
+                    print(f"⚠️ [RAG-VEC] Cache offline chưa dùng được, thử tải online: {offline_error}")
+                    _embedder = SentenceTransformer(EMBEDDING_MODEL_NAME, device=device)
+                finally:
+                    if old_hub_offline is None:
+                        os.environ.pop("HF_HUB_OFFLINE", None)
+                    else:
+                        os.environ["HF_HUB_OFFLINE"] = old_hub_offline
+                    if old_transformers_offline is None:
+                        os.environ.pop("TRANSFORMERS_OFFLINE", None)
+                    else:
+                        os.environ["TRANSFORMERS_OFFLINE"] = old_transformers_offline
+            else:
+                _embedder = SentenceTransformer(EMBEDDING_MODEL_NAME, device=device)
             print(f"✅ [RAG-VEC] Sentence-Transformers loaded on {device.upper()}")
         except ImportError:
             print("⚠️ [RAG-VEC] sentence-transformers chưa cài. Chạy: pip install sentence-transformers")
@@ -120,32 +199,19 @@ def _data_file_hashes(path: str) -> tuple[str, str]:
 
 class MoonRAG:
     """
-    Kiến trúc RAG Lọc 3 Tầng (3-Tier Cascading Filter / Multi-Stage Retrieval):
+    Exact and lexical tiers nominate candidates; semantic scoring gates every result.
     --------------------------------------------------------------------------
-    Tầng 1 (Đơn giản - Fast Path, 0ms, O(1)):
-        - Khớp chính xác Từ khóa (Keywords), Chữ Hán (Kanji), Romaji, Từ tiếng Anh.
-        - Nếu tìm thấy mục tiêu xác thực cao -> Trả về NGAY LẬP TỨC (Short-circuit),
-          tiết kiệm 100% thời gian tính toán và tài nguyên CPU/GPU!
+    Tầng 1 (Exact): Khớp alias/cụm từ để đề xuất bài; không short-circuit.
 
-    Tầng 2 (Vừa - Lexical & Fuzzy Matching, ~1ms):
-        - Xử lý tiếng Việt không dấu ('con meo', 'qua tao'), viết tắt, đảo từ.
-        - Tính điểm trùng khớp Token (Jaccard) trên tên và chủ đề.
-        - Nếu độ tin cậy đạt ngưỡng -> Trả về kết quả, không cần đến Tầng 3.
+    Tầng 2 (Lexical): Dùng cụm từ dài nhất; accent folding chỉ khi input không dấu.
 
-    Tầng 3 (Vector Search - Sentence Embedding + Cosine Similarity, <1ms):
-        - Kích hoạt khi bé hỏi câu đố hoặc mô tả đặc điểm gián tiếp mà KHÔNG nói thẳng tên từ.
-        - Ví dụ: 'con gì có vòi dài', 'thứ màu vàng chiếu sáng trên trời', 'bạn gì thích ăn chuối'.
-        - Sử dụng sentence-transformers (multilingual-e5-small) chạy trên GPU RTX 4050.
-        - Hỗ trợ đầy đủ 3 ngôn ngữ: Tiếng Việt, Tiếng Nhật, Tiếng Anh.
-        - Embeddings được pre-compute và cache vào file .npz, cosine similarity trên numpy vectorized.
+    Semantic gate: mọi ứng viên cần đạt cosine; chỉ trả top-1.
     """
 
-    # Ngưỡng cosine similarity tối thiểu để Tầng 3 coi là kết quả hợp lệ.
-    # Task 12B (benchmark validated): ngưỡng hạ từ 0.85 → 0.7961 dựa trên
-    # phân tích phân phối điểm thực tế trên 25 in-corpus queries và 15 negative
-    # queries. In-corpus score range: [0.7747, 0.8711]; out-of-corpus max: 0.8290.
-    # Ngưỡng 0.7961 nằm ở vị trí 30% bias phía in-corpus trong gap an toàn.
-    VECTOR_SIMILARITY_THRESHOLD = 0.7961
+    # Expose scoring policy from the class for inspection/configuration.
+    VECTOR_SIMILARITY_THRESHOLD = VECTOR_ONLY_MIN_COSINE
+    LEXICAL_SIMILARITY_THRESHOLD = LEXICAL_VECTOR_MIN_COSINE
+    VECTOR_SIMILARITY_MARGIN = TOP_RESULT_MIN_MARGIN
 
     def __init__(self, data_file: Optional[str] = None):
         # Lưu đường dẫn file dữ liệu (ưu tiên data_v2.json theo Task 13 nếu có)
@@ -179,10 +245,8 @@ class MoonRAG:
             self.inverted_index = {}
             for item in self.knowledge_base:
                 # 1. Tiền xử lý cho Tầng 2 (Lexical): Xóa dấu & chặt từ sẵn
-                fact_unacc = strip_accents(self._normalize(item.get("fact") or item.get("fun_fact", "")))
-                ex_vi_unacc = strip_accents(self._normalize(item.get("example") or item.get("example_vi", "")))
-                doc_text = f"{fact_unacc} {ex_vi_unacc}"
-                item["_precomputed_words"] = set(doc_text.split())
+                # Only curated vocabulary and keywords participate in retrieval.
+                item["_precomputed_words"] = set()
 
                 # Tầng lexical quét toàn bộ knowledge base ở mỗi query. Chuẩn hóa
                 # metadata một lần khi nạp dữ liệu để tránh lặp strip dấu/tokenize.
@@ -226,7 +290,7 @@ class MoonRAG:
     def _build_embedding_texts(self) -> List[str]:
         """
         Tạo chuỗi đại diện cho mỗi bài học để embed cho multilingual-e5-small.
-        Tối ưu, tinh gọn: vi + en + ja + ja_kanji + ja_kana + topic + keywords + example + fact.
+        Embed only reviewed vocabulary, its Japanese spellings/readings, topic, and keywords.
         E5 model yêu cầu prefix 'passage: ' cho documents để tối ưu retrieval.
         """
         texts = []
@@ -236,11 +300,9 @@ class MoonRAG:
             ja = item.get("ja", "")
             ja_kanji = item.get("ja_kanji") or item.get("kanji", "")
             ja_kana = item.get("ja_kana") or item.get("japanese_hiragana", "")
-            example = item.get("example") or item.get("example_en") or item.get("example_vi", "")
-            fact = item.get("fact") or item.get("fun_fact", "")
             keywords = " ".join(item.get("keywords", []))
             topic = item.get("topic", "")
-            parts = [vi, en, ja, ja_kanji, ja_kana, topic, keywords, example, fact]
+            parts = [vi, en, ja, ja_kanji, ja_kana, topic, keywords]
             combined = " ".join(p for p in parts if p)
             texts.append(f"passage: {combined}")
         return texts
@@ -256,31 +318,44 @@ class MoonRAG:
             self._embeddings = None
             return
 
-        # Kiểm tra cache
-        current_sha256, current_md5 = _data_file_hashes(self.data_file)
-        current_hash = current_sha256 if "data_v2" in str(self.data_file) else current_md5
-        if "data_v2" in str(self.data_file):
-            cache_path = EMBEDDINGS_V2_CACHE_PATH if os.path.exists(EMBEDDINGS_V2_CACHE_PATH) else EMBEDDINGS_CACHE_PATH
-        else:
-            cache_path = EMBEDDINGS_CACHE_PATH
+        # Production always uses one cache alongside the single source corpus.
+        # Explicit non-production fixtures keep an adjacent cache for isolation.
+        is_source_corpus = os.path.abspath(self.data_file) == os.path.abspath(DATA_V2_PATH)
+        cache_path = (EMBEDDINGS_V2_CACHE_PATH if is_source_corpus else
+                      os.path.join(os.path.dirname(os.path.abspath(self.data_file)), ".rag_embeddings_v2.npz"))
+        current_sha256, _ = _data_file_hashes(self.data_file)
+        record_ids = [str(item.get("id", "")) for item in self.knowledge_base]
 
         if os.path.exists(cache_path):
             try:
                 cached = np.load(cache_path, allow_pickle=True)
-                cached_hash = str(cached.get("hash", ""))
-                if (cached_hash in (current_sha256, current_md5)
-                        and cached["embeddings"].shape[0] == len(self._embedding_texts)):
-                    self._embeddings = cached["embeddings"].astype(np.float32)
+                cache_sha256 = str(cached["sha256"].item())
+                cache_ids = [str(value) for value in cached["record_ids"].tolist()]
+                cached_model = str(cached["model_name"].item())
+                matrix = cached["embeddings"].astype(np.float32)
+                if (cache_sha256 == current_sha256
+                        and cache_ids == record_ids
+                        and cached_model == EMBEDDING_MODEL_NAME
+                        and matrix.ndim == 2
+                        and matrix.shape[0] == len(self._embedding_texts)
+                        and np.isfinite(matrix).all()):
+                    self._embeddings = matrix
                     print(f"⚡ [RAG-VEC] Nạp {self._embeddings.shape[0]} embeddings từ cache ({self._embeddings.shape[1]}D). KHÔNG load model e5-small.")
                     return
+                raise ValueError("SHA256, record_ids, hoặc shape cache không khớp corpus")
             except Exception as e:
                 print(f"⚠️ [RAG-VEC] Cache hỏng, tính lại: {e}")
+                try:
+                    os.remove(cache_path)
+                    print(f"🗑️ [RAG-VEC] Đã xóa cache cũ: {cache_path}")
+                except OSError as remove_error:
+                    print(f"⚠️ [RAG-VEC] Không xóa được cache cũ: {remove_error}")
 
         # Tính embeddings mới
         print("⚠️ [RAG-VEC] Không có cache hoặc data thay đổi, đang load model e5-small để tạo embeddings...")
         embedder = _get_embedder()
         if embedder is None:
-            print("⚠️ [RAG-VEC] Tầng 3 sẽ fallback về Jaccard cũ (không có sentence-transformers).")
+            print("⚠️ [RAG-VEC] Không có embedder; fail closed, không dùng lexical thay semantic gate.")
             self._embeddings = None
             return
 
@@ -298,7 +373,14 @@ class MoonRAG:
 
         # Lưu cache
         try:
-            np.savez_compressed(cache_path, embeddings=self._embeddings, hash=current_hash)
+            np.savez_compressed(
+                cache_path,
+                embeddings=self._embeddings,
+                sha256=current_sha256,
+                record_ids=np.asarray(record_ids, dtype=str),
+                model_name=EMBEDDING_MODEL_NAME,
+                created_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+            )
             print(f"💾 [RAG-VEC] Đã lưu cache embeddings vào {cache_path}")
         except Exception as e:
             print(f"⚠️ [RAG-VEC] Không thể lưu cache: {e}")
@@ -318,6 +400,9 @@ class MoonRAG:
         để không bị nhầm lẫn với bài học về con gấu trúc thực tế.
         """
         q = query.lower()
+        # Common Vietnamese STT syllable splits for the loanword "ramen".
+        # Normalize before T1/T2 and vector scoring so all tiers see one form.
+        q = re.sub(r"\b(?:mi\s+)?(?:ra|la)\s+men\b", "ramen", q, flags=re.IGNORECASE)
         # Ngoại lệ: Nếu câu hỏi thực sự hỏi về gấu trúc (con gấu trúc, loài gấu trúc) thì giữ nguyên
         if any(w in q for w in ["con gấu trúc", "loài gấu trúc", "gấu trúc tiếng", "gấu trúc ăn gì"]):
             return query
@@ -331,61 +416,87 @@ class MoonRAG:
     # ══════════════════════════════════════════════════════════════════════════
     #  TẦNG 1: BỘ LỌC ĐƠN GIẢN (FAST PATH - EXACT & KANJI MATCH) ~ 0ms
     # ══════════════════════════════════════════════════════════════════════════
+    @staticmethod
+    def _has_vietnamese_diacritics(text: str) -> bool:
+        return bool(re.search(r"[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]", text, re.IGNORECASE))
+
+    def _lexical_candidates(self, query: str) -> List[Tuple[float, Dict[str, Any], str]]:
+        """Longest-phrase-first aliases; accent folding only for unaccented input."""
+        clean = self._clean_query(query)
+        q_norm = self._normalize(clean)
+        accent_fallback = not self._has_vietnamese_diacritics(q_norm)
+        q_unaccented = strip_accents(q_norm) if accent_fallback else None
+
+        # Each alias gets a priority based on phrase length. Longer phrases
+        # reserve their spans first so "trái cây" cannot fall through to "cây".
+        alias_hits: List[Tuple[int, int, float, Dict[str, Any], str]] = []
+        q_tokens = q_norm.split()
+        for item in self.knowledge_base:
+            aliases = list(item.get("keywords", []))
+            aliases.extend(item.get(field, "") for field in (
+                "vi", "vietnamese", "en", "english", "ja_kanji", "ja_kana", "kanji", "japanese_hiragana"
+            ))
+            seen_aliases = set()
+            for alias in aliases:
+                alias_norm = self._normalize(str(alias or ""))
+                if not alias_norm or alias_norm in seen_aliases:
+                    continue
+                seen_aliases.add(alias_norm)
+                variants = [alias_norm]
+                if accent_fallback:
+                    unaccented = strip_accents(alias_norm)
+                    if unaccented != alias_norm:
+                        variants.append(unaccented)
+                for variant in variants:
+                    a_tokens = variant.split()
+                    if len(a_tokens) == 1 and a_tokens[0] in item.get("stopwords_override", []) and len(q_tokens) > 1:
+                        continue
+                    for start in range(len(q_tokens) - len(a_tokens) + 1):
+                        if q_tokens[start:start + len(a_tokens)] == a_tokens:
+                            specificity = float(len(a_tokens) * 10 + min(len(alias_norm), 20) / 20)
+                            alias_hits.append((start, start + len(a_tokens), specificity, item, alias_norm))
+                            break
+
+        # Longest spans win; ties are retained for semantic disambiguation.
+        alias_hits.sort(key=lambda hit: (-(hit[1] - hit[0]), -hit[2], hit[0]))
+        consumed: List[set[int]] = []
+        result: Dict[str, Tuple[float, Dict[str, Any], str]] = {}
+        for start, end, score, item, alias in alias_hits:
+            span = set(range(start, end))
+            overlaps = [prior for prior in consumed if span & prior]
+            if len(span) == 1 and overlaps:
+                continue
+            if len(span) > 1:
+                # Prefer a longer phrase over a shorter overlapping phrase;
+                # identical spans may nominate competing records for scoring.
+                if any(prior != span for prior in overlaps):
+                    continue
+                if not overlaps:
+                    consumed.append(span)
+            current = result.get(str(item.get("id", id(item))))
+            if current is None or score > current[0]:
+                result[str(item.get("id", id(item)))] = (score, item, alias)
+
+        # Kanji strings are exact orthographic evidence and may contain no spaces.
+        for item in self.knowledge_base:
+            kanji = (item.get("ja_kanji") or item.get("kanji") or "").strip()
+            if kanji and any("\u4e00" <= char <= "\u9fff" for char in kanji) and kanji in clean:
+                key = str(item.get("id", id(item)))
+                result[key] = (100.0, item, kanji)
+        return sorted(result.values(), key=lambda row: row[0], reverse=True)
+
     def _tier1_exact_filter(self, query: str) -> List[Dict[str, Any]]:
         """
         Tầng 1: Khớp trực tiếp 1-1. Nhanh và chính xác nhất.
         Nếu bé nói trúng y chang chữ Hán hoặc từ vựng tiếng Anh -> Trả về luôn!
         """
-        # Dọn dẹp câu hỏi
-        clean_q = self._clean_query(query)
-        q_norm = self._normalize(clean_q)
-        # Chuyển câu hỏi thành mảng các từ đơn (tập hợp set để truy vấn nhanh)
-        q_tokens = set(q_norm.split())
-
-        matches = []
-        seen_items = set()
-
-        # 1. Khớp chữ Hán (Kanji): Lặp qua với ký tự Kanji thực sự (\u4e00-\u9fff)
-        for item in self.knowledge_base:
-            kanji = (item.get("ja_kanji") or item.get("kanji", "")).strip()
-            if not kanji:
-                continue
-            kanji_chars = [c for c in kanji if '\u4e00' <= c <= '\u9fff']
-            if not kanji_chars:
-                continue
-            kanji_clean = "".join(kanji_chars)
-            if kanji in query or kanji_clean in query:
-                if id(item) not in seen_items:
-                    matches.append((15.0, item))
-                    seen_items.add(id(item))
-
-        # 2. Khớp siêu tốc bằng Mục lục ngược (Inverted Index)
-        # 2.1 Cụm từ dài (Nguyên câu hỏi)
-        if q_norm in self.inverted_index:
-            for item in self.inverted_index[q_norm]:
-                if id(item) not in seen_items:
-                    matches.append((9.0, item))
-                    seen_items.add(id(item))
-
-        # 2.2 Từng từ đơn (Ví dụ: "cat", "apple")
-        for token in q_tokens:
-            if token in self.inverted_index:
-                for item in self.inverted_index[token]:
-                    # Task 13: Bỏ qua token ngắn mạch nếu nằm trong stopwords_override của record
-                    # khi câu hỏi là câu đa từ (ví dụ: 'ba' trong câu hỏi ngữ pháp tiếng Anh/Nhật)
-                    if len(q_tokens) > 1 and token in item.get("stopwords_override", []):
-                        continue
-                    if id(item) not in seen_items:
-                        matches.append((8.0, item))
-                        seen_items.add(id(item))
-
-        # Nếu có kết quả ở Tầng 1
-        if matches:
-            # Sắp xếp theo điểm số từ cao xuống thấp
-            matches.sort(key=lambda x: x[0], reverse=True)
-            # Lấy tối đa 2 bài học tốt nhất
-            return [m[1] for m in matches[:2]]
-        return []
+        q_norm = self._normalize(self._clean_query(query))
+        candidates = self._lexical_candidates(query)
+        # Tier 1 keeps orthographic/exact aliases; semantic validation happens
+        # later in search(), never by short-circuiting here.
+        exact = [row for row in candidates if row[2] in q_norm or row[2] in query]
+        exact.extend(row for row in candidates if len(row[2].split()) > 1)
+        return list({str(item.get("id", id(item))): item for _, item, _ in exact}.values())
 
     # ══════════════════════════════════════════════════════════════════════════
     #  TẦNG 2: BỘ LỌC VỪA (LEXICAL & FUZZY TOKEN MATCHING) ~ 1ms
@@ -395,135 +506,43 @@ class MoonRAG:
         Tầng 2: Xử lý tiếng Việt không dấu, viết tắt, hoặc từ lóng.
         Ví dụ: STT nghe nhầm thành 'con meo' thay vì 'con mèo'.
         """
-        q_norm = self._normalize(query)
-        # Tạo thêm một bản sao không dấu của câu hỏi
-        q_unacc = strip_accents(q_norm)
-        q_tokens = set(q_norm.split())
-        q_unacc_tokens = set(q_unacc.split())
-
-        scored_items = []
-        for item in self.knowledge_base:
-            score = 0.0
-
-            # 1. Quét cụm từ trong keywords list (kể cả không dấu)
-            # Fallback giữ tương thích với callers/tests tự dựng knowledge_base.
-            normalized_keywords = item.get("_rag_keywords_normalized")
-            if normalized_keywords is None:
-                normalized_keywords = [
-                    (normalized, strip_accents(normalized))
-                    for normalized in (
-                        self._normalize(kw) for kw in item.get("keywords", [])
-                    )
-                ]
-            for kw_norm, kw_unacc in normalized_keywords:
-
-                # Ngoại lệ: Bỏ qua từ 'cho' (trong con chó) nếu câu hỏi là 'chỉ cho', 'nói cho'
-                if kw_unacc == "cho" and ("chi cho" in q_unacc or "noi cho" in q_unacc or "do cho" in q_unacc):
-                    continue
-
-                # Tránh các từ tiếng Việt có dấu nhưng khi bỏ dấu bị trùng với từ dừng tiếng Anh/Pháp/Đức (đỏ -> do, mẹ -> me, lá -> la...)
-                # Task 13: Bổ sung cross-lingual stopwords và stopwords_override từ metadata
-                stopwords_override_set = set(item.get("stopwords_override", []))
-                cross_lingual_stopwords = {"do", "to", "in", "an", "on", "me", "so", "no", "he", "is", "at", "as", "am", "be", "la", "et", "de", "ba"}
-                if (kw_unacc in cross_lingual_stopwords or kw_unacc in stopwords_override_set) and kw_norm != kw_unacc:
-                    if f" {kw_norm} " not in f" {q_norm} ":
-                        continue
-
-                # Task 13: Nếu là từ đơn thuộc stopwords_override (từ 1-2 ký tự dễ xung đột đa ngữ như 'ba', 'la', 'ha')
-                # Trong câu hỏi dài (nhiều từ), không cho phép từ này tự kích hoạt Lexical Match
-                if kw_unacc in stopwords_override_set and len(q_unacc_tokens) > 1:
-                    continue
-
-                if f" {kw_unacc} " in f" {q_unacc} ":
-                    # Cụm từ dài ('con meo') được điểm cao hơn cụm từ ngắn ('meo')
-                    score += 5.0 + len(kw_unacc.split()) * 3.0
-                    break
-
-            # 2. Khớp thẳng tên bài học bằng tiếng Việt (có dấu và không dấu)
-            vi = item.get("_rag_vi_normalized")
-            if vi is None:
-                vi = self._normalize(item.get("vi") or item.get("vietnamese", ""))
-            vi_unacc = item.get("_rag_vi_unaccented")
-            if vi_unacc is None:
-                vi_unacc = strip_accents(vi)
-
-            # Compare the complete title phrase, not an arbitrary substring.
-            # Without boundaries, accent-stripped "me" ("mẹ") also matches
-            # inside English words such as "names" and short-circuits vector search.
-            if (vi and f" {vi} " in f" {q_norm} ") or (
-                vi_unacc and f" {vi_unacc} " in f" {q_unacc} "
-            ):
-                score += 8.0
-            # Nếu tên bài học có chứa các từ khóa nằm rải rác trong câu hỏi
-            elif any(len(t) > 2 and t in q_unacc_tokens for t in vi_unacc.split()):
-                score += 2.0
-
-            # 3. Khớp theo chủ đề (Ví dụ: hỏi về 'động vật' -> lấy bài học nhóm động vật)
-            topic_tokens = item.get("_rag_topic_tokens")
-            if topic_tokens is None:
-                topic_unacc = strip_accents(self._normalize(item.get("topic", "")))
-                topic_tokens = set(topic_unacc.split())
-            common_topic = q_unacc_tokens.intersection(topic_tokens)
-            if common_topic:
-                score += len(common_topic) * 1.0
-
-            # Chỉ đưa vào danh sách nếu điểm số vượt ngưỡng an toàn (4.0)
-            if score >= 4.0:
-                scored_items.append((score, item))
-
-        if scored_items:
-            scored_items.sort(key=lambda x: x[0], reverse=True)
-            return [item for _, item in scored_items[:2]]
-        return []
+        return [item for _, item, _ in self._lexical_candidates(query)]
 
     # ══════════════════════════════════════════════════════════════════════════
     #  TẦNG 3: VECTOR SEARCH (SENTENCE EMBEDDING + COSINE SIMILARITY) < 1ms
     # ══════════════════════════════════════════════════════════════════════════
     def _tier3_vector_search(self, query: str) -> List[Dict[str, Any]]:
-        """
-        Tầng 3 (CẢI TIẾN v2 — Task 12B): Dùng sentence-transformers thay vì Jaccard thô.
-        - Encode câu hỏi thành vector 384 chiều trên GPU (< 5ms)
-        - Tính cosine similarity bằng numpy dot product (< 0.1ms)
-        - Trả về top-2 bài học có score >= VECTOR_SIMILARITY_THRESHOLD (0.7961)
+        """Semantic-only retrieval. Lexical evidence is handled by search()."""
+        ranked = self._semantic_scores(query)
+        eligible = [(score, item) for score, item in ranked
+                    if score >= VECTOR_ONLY_MIN_COSINE]
+        if not eligible:
+            return []
+        if len(eligible) > 1 and eligible[0][0] - eligible[1][0] < TOP_RESULT_MIN_MARGIN:
+            return []
+        return [eligible[0][1]]
 
-        Abstention Signal (Task 12B): Khi E5 chạy thành công nhưng KHÔNG có bài học nào
-        vượt ngưỡng → trả về [] (từ chối trả lời) thay vì ép Jaccard fallback.
-        Jaccard fallback CHỈ được gọi khi sentence-transformers KHÔNG khả dụng hoặc
-        xảy ra ngoại lệ kỹ thuật trong quá trình encode.
-        """
-        # ── Thử Vector Search trước ──────────────────────────────────────────
-        if self._embeddings is not None:
-            embedder = _get_embedder()
-            if embedder is not None:
-                try:
-                    # Encode câu hỏi thành vector (GPU-accelerated nếu có CUDA)
-                    # E5 model yêu cầu prefix 'query:' cho câu hỏi tìm kiếm
-                    q_vec = embedder.encode(
-                        [f"query: {query}"],
-                        normalize_embeddings=True,
-                        show_progress_bar=False,
-                    ).astype(np.float32)  # shape: (1, 384)
-
-                    # Cosine similarity = dot product (vì đã L2-normalize)
-                    scores = (self._embeddings @ q_vec.T).squeeze()  # shape: (N,)
-
-                    # Lọc theo ngưỡng và lấy top-2
-                    top_indices = np.argsort(scores)[::-1][:2]
-                    results = []
-                    for idx in top_indices:
-                        if scores[idx] >= self.VECTOR_SIMILARITY_THRESHOLD:
-                            results.append(self.knowledge_base[idx])
-
-                    # ── ABSTENTION SIGNAL (Task 12B) ──────────────────────────
-                    # E5 đã chạy thành công. Trả về kết quả ngay (có thể là []).
-                    # KHÔNG fallback về Jaccard khi không có bài học vượt ngưỡng:
-                    # đó là tín hiệu "câu hỏi nằm ngoài corpus" (out-of-corpus).
-                    return results
-                except Exception as e:
-                    print(f"⚠️ [RAG-VEC] Vector search lỗi, fallback Jaccard: {e}")
-
-        # ── Fallback: Jaccard cũ (CHỈ khi sentence-transformers không khả dụng) ──
-        return self._tier3_jaccard_fallback(query)
+    def _semantic_scores(self, query: str) -> List[Tuple[float, Dict[str, Any]]]:
+        """Return cosine-ranked records; an unavailable embedder means abstain."""
+        if self._embeddings is None or len(self._embedding_texts) != len(self.knowledge_base):
+            return []
+        embedder = _get_embedder()
+        if embedder is None:
+            return []
+        try:
+            query_vector = embedder.encode(
+                [f"query: {query}"], normalize_embeddings=True, show_progress_bar=False,
+            ).astype(np.float32)
+            scores = (self._embeddings @ query_vector.T).reshape(-1)
+            if len(scores) != len(self.knowledge_base) or not np.isfinite(scores).all():
+                return []
+            ranked = [(float(scores[index]), item)
+                      for index, item in enumerate(self.knowledge_base)]
+            ranked.sort(key=lambda row: row[0], reverse=True)
+            return ranked
+        except Exception as exc:
+            print(f"⚠️ [RAG-VEC] Vector search lỗi; fail closed: {exc}")
+            return []
 
     def _tier3_jaccard_fallback(self, query: str) -> List[Dict[str, Any]]:
         """
@@ -566,36 +585,63 @@ class MoonRAG:
     @functools.lru_cache(maxsize=100)
     def search(self, query: str, top_k: int = 2) -> List[Dict[str, Any]]:
         """
-        Hàm chính được gọi từ bên ngoài. Nó sẽ cho chạy lần lượt qua 3 Tầng:
-        Tầng 1 (Trúng từ khóa) -> Nếu có thì trả về ngay (Siêu tốc 0ms).
-        -> Nếu không có -> Chạy Tầng 2 (Fuzzy) -> Trả về (~1ms).
-        -> Nếu Tầng 2 cũng không có -> Chạy Tầng 3 (Vector Search) (<1ms).
+        Out-of-scope guard → exact/lexical candidate retrieval → semantic gate → top-1.
         """
         if not self.knowledge_base or not query.strip():
             return []
 
-        # Tách chữ "Moon" ra khỏi câu hỏi
         clean_query = self._clean_query(query)
+        if is_out_of_scope_intent(clean_query):
+            print("🛑 [RAG] Câu hỏi ngoài phạm vi bài học; từ chối trước truy xuất.")
+            return []
 
-        # Chạy Tầng 1
-        t1_results = self._tier1_exact_filter(clean_query)
-        if t1_results:
-            print("⚡ [RAG] NGẮN MẠCH: Tìm thấy ở Tầng 1 (Exact Match, 0ms), bỏ qua Vector Search!")
-            return t1_results[:top_k]
+        # T1/T2 nominate candidates, but neither tier can return directly.
+        lexical_candidates = self._tier1_exact_filter(clean_query)
+        seen = {str(item.get("id", id(item))) for item in lexical_candidates}
+        for item in self._tier2_lexical_filter(clean_query):
+            key = str(item.get("id", id(item)))
+            if key not in seen:
+                lexical_candidates.append(item)
+                seen.add(key)
 
-        # Chạy Tầng 2
-        t2_results = self._tier2_lexical_filter(clean_query)
-        if t2_results:
-            print("⚡ [RAG] NGẮN MẠCH: Tìm thấy ở Tầng 2 (Fuzzy Match, ~1ms), bỏ qua Vector Search!")
-            return t2_results[:top_k]
+        lexical_strength = {
+            str(item.get("id", id(item))): lexical_score
+            for lexical_score, item, _alias in self._lexical_candidates(clean_query)
+        }
+        ranked = self._semantic_scores(clean_query)
+        if not ranked:
+            return []
 
-        # Chạy Tầng 3 (Vector Search — với fallback Jaccard)
-        t3_results = self._tier3_vector_search(clean_query)
-        if t3_results:
-            return t3_results[:top_k]
-
-        # Nếu không có bài học nào khớp, trả về mảng rỗng
-        return []
+        # A lexical hit uses the lower calibrated gate; a pure semantic hit
+        # needs the stricter gate. Lexical phrase specificity breaks close
+        # semantic ties; vector evidence remains mandatory in either case.
+        eligible = []
+        for score, item in ranked:
+            if item.get("review_status", "verified") != "verified":
+                continue
+            item_id = str(item.get("id", id(item)))
+            strength = lexical_strength.get(item_id)
+            threshold = LEXICAL_VECTOR_MIN_COSINE if strength is not None else VECTOR_ONLY_MIN_COSINE
+            if score >= threshold:
+                phrase_words = max(1, int(strength // 10)) if strength is not None else 0
+                lexical_bonus = min(0.06, 0.02 + max(0, phrase_words - 1) * 0.015) if strength is not None else 0.0
+                eligible.append((score + lexical_bonus, score, item, strength))
+        if not eligible:
+            return []
+        eligible.sort(key=lambda row: row[0], reverse=True)
+        strong_phrase_override = (
+            eligible[0][3] is not None
+            and eligible[0][1] >= 0.88
+            and max(1, int(eligible[0][3] // 10)) >= 2
+        )
+        if (len(eligible) > 1
+                and eligible[0][0] - eligible[1][0] < TOP_RESULT_MIN_MARGIN
+                and eligible[0][3] is None
+                and not strong_phrase_override):
+            print("🛑 [RAG] Hai bài đầu quá sát nhau; từ chối kết quả mơ hồ.")
+            return []
+        print(f"✅ [RAG] Chấp nhận {eligible[0][2].get('id')} cosine={eligible[0][1]:.4f}")
+        return [eligible[0][2]]
 
     def format_context_for_prompt(self, items: List[Dict[str, Any]]) -> str:
         """
@@ -612,34 +658,56 @@ class MoonRAG:
 
         for idx, item in enumerate(items, 1):
             vi = item.get("vi") or item.get("vietnamese", "")
-            ja = item.get("ja") or item.get("kanji") or ""
             ja_kanji = item.get("ja_kanji") or item.get("kanji", "")
             ja_kana = item.get("ja_kana") or item.get("japanese_hiragana", "")
             en = item.get("en") or item.get("english", "")
-            phonetic = item.get("phonetic") or item.get("japanese_phonetic", "")
-            example = item.get("example") or item.get("example_en") or item.get("example_vi", "")
-            fact = item.get("fact") or item.get("fun_fact", "")
+            romaji = item.get("phonetic") or item.get("japanese_romaji", "")
+            related_terms = item.get("related_terms") or []
+            related_text = json.dumps(related_terms, ensure_ascii=False) if related_terms else "none"
+            example = item.get("example") or item.get("example_ja") or "none"
 
             context_lines.append(
-                f"[BÀI HỌC {idx}]:\n"
-                f"- [vi]: {vi}\n"
-                f"- [ja]: {ja} (Kanji: {ja_kanji}, Kana: {ja_kana}, đọc: {phonetic})\n"
-                f"- [en]: {en}\n"
-                f"- [example]: {example}\n"
-                f"- [fact]: {fact}"
+                f"<lesson_data id=\"{item.get('id', '')}\">\n"
+                f"title: {item.get('title', '')}\n"
+                f"ja_kanji: {ja_kanji}\n"
+                f"ja_kana: {ja_kana}\n"
+                f"romaji: {romaji}\n"
+                f"en: {en}\n"
+                f"meaning_vi: {vi}\n"
+                f"example: {example}\n"
+                f"related_terms: {related_text}\n"
+                f"</lesson_data>"
             )
 
         context_lines.append("=== [HẾT LESSON DATA] ===\n")
         return "\n".join(context_lines)
 
 
-_global_rag = MoonRAG()
+def get_learning_record(query: str) -> Dict[str, Any] | None:
+    """Return the one grounded lesson selected by the semantic-gated pipeline."""
+    results = _get_rag().search(query, top_k=1)
+    return results[0] if len(results) == 1 else None
+
+
+# Construct lazily so the process launcher can preload E5 concurrently with
+# Ollama/Qwen instead of doing cache rebuilds during module import.
+_global_rag = None
 
 def _get_rag():
     global _global_rag
     if not _global_rag:
         _global_rag = MoonRAG()
     return _global_rag
+
+
+def warmup_embeddings() -> bool:
+    """Load and run the query encoder before voice input is enabled."""
+    rag = _get_rag()
+    if _get_embedder() is None:
+        return False
+    # Exercise the same query-encoding path used by search so the first caller
+    # does not pay CUDA model initialization or kernel warm-up latency.
+    return bool(rag._semantic_scores("Moon RAG encoder warm-up"))
 
 def retrieve_context(query: str, top_k: int = 2) -> str:
     rag = _get_rag()
@@ -654,6 +722,8 @@ def get_display_info(query: str) -> dict | None:
     item = results[0]
     return {
         "id": item.get("id", ""),
+        "item_id": item.get("id", ""),
+        "title": item.get("title", ""),
         "topic": item.get("topic", ""),
         "vi": item.get("vi") or item.get("vietnamese", ""),
         "vietnamese": item.get("vi") or item.get("vietnamese", ""),
@@ -667,8 +737,9 @@ def get_display_info(query: str) -> dict | None:
         "en": item.get("en") or item.get("english", ""),
         "english": item.get("en") or item.get("english", ""),
         "phonetic": item.get("phonetic") or item.get("japanese_phonetic", ""),
-        "example": item.get("example") or item.get("example_en") or item.get("example_vi", ""),
-        "fact": item.get("fact") or item.get("fun_fact", ""),
+        "meaning_vi": item.get("vi") or item.get("vietnamese", ""),
+        "example": item.get("example") or item.get("example_ja") or "",
+        "related_terms": item.get("related_terms", []),
     }
 
 # ─── Script chạy thử nghiệm độc lập (Tự động chạy khi gọi thẳng file này) ────

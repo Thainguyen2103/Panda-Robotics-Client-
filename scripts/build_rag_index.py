@@ -6,7 +6,7 @@ scripts/build_rag_index.py  --  Task 13: Reproducible Indexing Pipeline
 2. Uses local model 'intfloat/multilingual-e5-small' (offline mode safe).
 3. Generates embedding vectors with standardized 'passage: ' prefix.
 4. Computes SHA256 checksum of corpus and saves metadata into .rag_embeddings_v2.npz.
-5. Saves index safely to both data/ and server/llm/.
+5. Saves the index at one canonical location under data/ with corpus IDs.
 """
 
 import datetime
@@ -33,7 +33,6 @@ if sys.stdout and hasattr(sys.stdout, "reconfigure"):
 SCHEMA_FILE = ROOT / "data" / "schema_v1.json"
 DATA_FILE = ROOT / "data" / "data_v2.json"
 TARGET_CACHE_DATA = ROOT / "data" / ".rag_embeddings_v2.npz"
-TARGET_CACHE_SERVER = ROOT / "server" / "llm" / ".rag_embeddings_v2.npz"
 MODEL_NAME = "intfloat/multilingual-e5-small"
 
 
@@ -104,12 +103,10 @@ def build_passage_texts(records: List[Dict[str, Any]]) -> List[str]:
         ja = item.get("ja", "")
         ja_kanji = item.get("ja_kanji") or item.get("kanji", "")
         ja_kana = item.get("ja_kana") or item.get("japanese_hiragana", "")
-        example = item.get("example") or item.get("example_en") or item.get("example_vi", "")
-        fact = item.get("fact") or item.get("fun_fact", "")
         keywords = " ".join(item.get("keywords", []))
         topic = item.get("topic", "")
 
-        parts = [vi, en, ja, ja_kanji, ja_kana, topic, keywords, example, fact]
+        parts = [vi, en, ja, ja_kanji, ja_kana, topic, keywords]
         combined = " ".join(p for p in parts if p)
         # E5 model requires 'passage: ' prefix for document passages
         texts.append(f"passage: {combined}")
@@ -174,24 +171,24 @@ def build_index():
     print("[5/5] Exporting .rag_embeddings_v2.npz...")
     record_ids = [item["id"] for item in records]
     metadata = {
-        "hash": corpus_hash,
-        "ids": np.array(record_ids),
+        "sha256": corpus_hash,
+        "record_ids": np.array(record_ids),
         "num_records": len(records),
         "embedding_dim": embeddings.shape[1],
         "model_name": MODEL_NAME,
         "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
 
-    for target_path in (TARGET_CACHE_DATA, TARGET_CACHE_SERVER):
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez_compressed(
-            target_path,
-            embeddings=embeddings,
-            hash=corpus_hash,
-            ids=record_ids,
-            created_at=metadata["created_at"],
-        )
-        print(f"      Saved index artifact: {target_path} ({target_path.stat().st_size:,} bytes)")
+    TARGET_CACHE_DATA.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(
+        TARGET_CACHE_DATA,
+        embeddings=embeddings,
+        sha256=metadata["sha256"],
+        record_ids=metadata["record_ids"],
+        model_name=metadata["model_name"],
+        created_at=metadata["created_at"],
+    )
+    print(f"      Saved index artifact: {TARGET_CACHE_DATA} ({TARGET_CACHE_DATA.stat().st_size:,} bytes)")
 
     print("=" * 72)
     print("✅ REPRODUCIBLE INDEX BUILD COMPLETED SUCCESSFULLY")
