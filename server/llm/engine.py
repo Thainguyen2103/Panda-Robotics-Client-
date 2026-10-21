@@ -59,8 +59,8 @@ try:
     GROQ_LLM_MODEL   = getattr(settings, "GROQ_LLM_MODEL", "deepseek-r1-distill-llama-70b")
     GEMINI_LLM_MODEL = getattr(settings, "GEMINI_LLM_MODEL", "gemini-3.5-flash-lite")
     OLLAMA_HOST       = getattr(settings, "OLLAMA_HOST", "http://127.0.0.1:11434")
-    OLLAMA_LLM_MODEL  = getattr(settings, "OLLAMA_LLM_MODEL", "qwen3.5:2b")
-    OLLAMA_MAX_TOKENS = getattr(settings, "OLLAMA_MAX_TOKENS", 128)
+    OLLAMA_LLM_MODEL  = getattr(settings, "OLLAMA_LLM_MODEL", "moon-tutor")
+    OLLAMA_MAX_TOKENS = getattr(settings, "OLLAMA_MAX_TOKENS", 150)
     LLM_PROVIDER     = getattr(settings, "LLM_PROVIDER", "ollama")
     LEARNING_RAG_ENABLED = getattr(settings, "LEARNING_RAG_ENABLED", True)
     QUICK_MODEL      = getattr(settings, "QUICK_MODEL", "llama-3.3-70b-versatile")
@@ -71,8 +71,8 @@ except Exception:
     GROQ_LLM_MODEL   = "deepseek-r1-distill-llama-70b"
     GEMINI_LLM_MODEL = "gemini-3.5-flash-lite"
     OLLAMA_HOST = "http://127.0.0.1:11434"
-    OLLAMA_LLM_MODEL = "qwen3.5:2b"
-    OLLAMA_MAX_TOKENS = 128
+    OLLAMA_LLM_MODEL = "moon-tutor"
+    OLLAMA_MAX_TOKENS = 150
     LLM_PROVIDER     = "ollama"
     LEARNING_RAG_ENABLED = True
     QUICK_MODEL      = "llama-3.3-70b-versatile"

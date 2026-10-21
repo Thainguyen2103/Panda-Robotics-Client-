@@ -129,8 +129,8 @@ FISH_TTS_MODEL = "s2.1-pro-free"
 
 # ─── Ollama Local LLM Configuration ───────────────────────────────────────────
 LLM_PROVIDER = "ollama"
-OLLAMA_LLM_MODEL = "qwen3.5:2b"
-OLLAMA_MAX_TOKENS = 128
+OLLAMA_LLM_MODEL = "moon-tutor"
+OLLAMA_MAX_TOKENS = 150
 
 # ─── DeepSeek API (LLM) ─────────────────────────────────────────────────────
 # Lấy key tại: https://platform.deepseek.com/api_keys

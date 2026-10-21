@@ -91,13 +91,13 @@ class OllamaTextClient:
                     # ── GPU Offloading ────────────────────────────────
                     "num_gpu": 99,          # Offload TẤT CẢ layers vào GPU
                     # ── Context & Generation ─────────────────────────
-                    "num_ctx": 2048,        # Context window (RAG + history + system)
+                    "num_ctx": 1024,        # Context window (RAG + history + system)
                     "num_predict": max_tokens,
                     "num_batch": 256,       # Prompt eval batch size (GPU nhanh hơn)
                     # ── Sampling ─────────────────────────────────────
-                    "temperature": temperature,
-                    "top_p": 0.85,          # Nucleus sampling
-                    "top_k": 30,            # Giới hạn token candidates
+                    "temperature": 0.0,
+                    "top_p": 0.1,          # Nucleus sampling
+                    "top_k": 1,            # Giới hạn token candidates
                     "repeat_penalty": 1.15, # Chống lặp từ
                     # ── Performance ──────────────────────────────────
                     "f16_kv": True,         # KV cache FP16 → tiết kiệm 50% VRAM
