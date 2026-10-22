@@ -1,0 +1,6 @@
+.pio/
+.venv/
+__pycache__/
+models/*.onnx
+models/*.task
+models/private/

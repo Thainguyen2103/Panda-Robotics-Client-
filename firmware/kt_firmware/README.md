@@ -77,3 +77,16 @@ log cảnh báo ra Serial, cách khắc phục là đổi `FONT_JP` sang `u8g2_f
   được gì — cần cập nhật khi quay lại làm phần dashboard.
 - Khi ghép với AI thật: cho topic nhận từ vựng gọi thẳng `displaySetWord(english, kanji, kana)`
   trong `display.h` — đó là cửa duy nhất để đổi từ đang hiển thị, không cần sửa `display.cpp`.
+
+## Thư mục con trên phần cứng thật (ESP32-S3-N16R8, từ tuần 9)
+
+Mỗi thư mục là một project PlatformIO **độc lập** (mở riêng thư mục đó trong VS Code để build).
+`pio run` ở `kt_firmware/` chỉ build `src/` nên không bị ảnh hưởng.
+
+- `cam-emotion/` — camera OV5640 + màn TFT + AI cảm xúc của Thái (`server/vision`, gọi nguyên
+  bản, **không sửa code AI**). Ảnh đi qua USB lên laptop, laptop gửi lại tên mặt robot. Hướng
+  dẫn chi tiết ở `cam-emotion/README.md`. Mô hình AI không đưa lên git; `chay-cam-xuc.bat` tự tải.
+- `hw-tests/` — test từng linh kiện: `board-selftest`, `cam-selftest` (video USB lên laptop),
+  `mic-selftest`, `tft-selftest`, `head-hw-test`.
+- Lưu ý: board S3 cần `board_build.arduino.memory_type = qio_opi` để bật PSRAM 8MB
+  (thiếu dòng này camera tụt xuống 320×240, rất mờ).
