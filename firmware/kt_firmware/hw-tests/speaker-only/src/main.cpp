@@ -12,6 +12,7 @@
 //   0..7  phát bài tương ứng (lặp lại tới khi gõ phím khác)
 //   a     chạy lại cả lượt 8 bài
 //   s     dừng (im lặng)
+//   + / - tăng / giảm âm lượng tổng (bài đang lặp vẫn phát tiếp)
 //
 // Chỉ cần nối khuếch đại: VIN→5V (hoặc 3V3, xem README), GND→GND, BCLK→47, LRC→48, DIN→21,
 // loa vào 2 cực +/− của module. KHÔNG cần nối mic.
@@ -35,21 +36,27 @@ struct Test
 static const Test TESTS[] = {
     {"Im lang (gui toan so 0)", 0, 0, 0, 4,
      "Phai IM HOAN TOAN (ghe sat tai chi nghe xi rat nho). Nghe u/re/lach tach -> loi NGUON hoac MACH KHUECH DAI, khong phai loa/mic."},
-    {"Bip 440Hz - NHO (5%)", 440, 440, 0.05f, 2.5f,
+    // Cập nhật: tăng âm lượng các bài (bản đầu 5/20/60% nghe quá nhỏ trên loa thật).
+    {"Bip 440Hz - NHO (15%)", 440, 440, 0.15f, 2.5f,
      "Tieng 'tu' tron, nho, deu. Re ngay o muc nho -> LOA hong (mang rach / cuon day co) hoac mach khuech dai hong."},
-    {"Bip 440Hz - VUA (20%)", 440, 440, 0.20f, 2.5f,
+    {"Bip 440Hz - VUA (45%)", 440, 440, 0.45f, 2.5f,
      "Nhu tren, to hon, van tron."},
-    {"Bip 440Hz - TO (60%)", 440, 440, 0.60f, 2.5f,
+    {"Bip 440Hz - TO (90%)", 440, 440, 0.90f, 2.5f,
      "Re CHI o muc nay ma nho/vua thi sach -> qua tai: nguon yeu (VIN 3V3) hoac loa cong suat nho. Board tu reset -> sut nguon."},
-    {"Bip 1000Hz - VUA", 1000, 1000, 0.20f, 2.5f,
+    {"Bip 1000Hz - VUA", 1000, 1000, 0.45f, 2.5f,
      "Tieng 'tit' cao, sach."},
-    {"Am tram 150Hz - VUA", 150, 150, 0.30f, 3,
+    {"Am tram 150Hz - VUA", 150, 150, 0.60f, 3,
      "Tieng 'u' tram. Nghe lach xach / re rung -> mang loa rach, hoac loa cham vo/day/vat gi do."},
-    {"Quet 100Hz -> 5000Hz", 100, 5000, 0.20f, 5,
+    {"Quet 100Hz -> 5000Hz", 100, 5000, 0.45f, 5,
      "Tieng tang dan deu tu tram len cao. Re o 1 doan tan so -> mang loa hong hoac vo loa cong huong."},
-    {"Giai dieu 5 not", -1, -1, 0.25f, 2.5f,
+    {"Giai dieu 5 not", -1, -1, 0.60f, 2.5f,
      "Do-Re-Mi-Fa-Sol ro rang, khong re."},
 };
+
+// Âm lượng tổng, nhân vào mọi bài. Gõ '+' / '-' trong Monitor để đổi lúc đang chạy.
+// Mẫu âm thanh không được vượt ±32767 (giới hạn của số 16-bit), nên kết quả cuối được
+// kẹp lại; vặn quá to sẽ bị "cắt đỉnh" và nghe rè: đó là do vặn quá, không phải loa hư.
+static float masterVolume = 1.0f;
 static const int TEST_COUNT = sizeof(TESTS) / sizeof(TESTS[0]);
 
 static bool setupAmp()
@@ -134,7 +141,8 @@ static void playTest(const Test &t)
         phase += 2.0f * PI * freq / SAMPLE_RATE;
         if (phase > 2.0f * PI)
           phase -= 2.0f * PI;
-        s = (int16_t)(sinf(phase) * t.volume * env * 32767.0f);
+        float v = sinf(phase) * t.volume * masterVolume * env * 32767.0f;
+        s = (int16_t)constrain(v, -32767.0f, 32767.0f);
       }
       frame[2 * n] = s;     // kênh trái
       frame[2 * n + 1] = s; // kênh phải
@@ -163,7 +171,7 @@ static void runAll()
     delay(400);
   }
   Serial.println();
-  Serial.println("Xong. Go 0-7 de phat lai 1 bai, 'a' chay lai ca luot, 's' dung.");
+  Serial.println("Xong. Go 0-7 de phat lai 1 bai, 'a' chay lai ca luot, 's' dung, '+'/'-' tang/giam am luong.");
 }
 
 void setup()
@@ -204,6 +212,12 @@ void loop()
       looping = -1;
       i2s_zero_dma_buffer(I2S_NUM_1);
       Serial.println("Da dung.");
+    }
+    else if (c == '+' || c == '-')
+    {
+      masterVolume = constrain(masterVolume + (c == '+' ? 0.25f : -0.25f), 0.25f, 3.0f);
+      Serial.printf("Am luong tong: x%.2f%s\n", masterVolume,
+                    masterVolume > 1.0f ? " (bai to co the bi cat dinh -> re do vang qua to)" : "");
     }
   }
   if (looping >= 0)
