@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "author": "Nguyen Viet Minh Khoa",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-ili9341",
+      "id": "tft",
+      "top": -30,
+      "left": 260,
+      "rotate": 90,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnCorrect",
+      "top": 280,
+      "left": 30,
+      "attrs": { "color": "green", "label": "DUNG" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnWrong",
+      "top": 280,
+      "left": 150,
+      "attrs": { "color": "red", "label": "SAI" }
+    }
+  ],
+  "connections": [
+    ["esp:TX0", "$serialMonitor:RX", "", []],
+    ["esp:RX0", "$serialMonitor:TX", "", []],
+
+    ["tft:VCC", "esp:3V3", "red", []],
+    ["tft:GND", "esp:GND.2", "black", []],
+    ["tft:LED", "esp:3V3", "red", []],
+    ["tft:CS", "esp:D5", "yellow", []],
+    ["tft:RST", "esp:D4", "orange", []],
+    ["tft:D/C", "esp:D2", "blue", []],
+    ["tft:MOSI", "esp:D23", "green", []],
+    ["tft:SCK", "esp:D18", "purple", []],
+    ["tft:MISO", "esp:D19", "cyan", []],
+
+    ["btnCorrect:1.l", "esp:D25", "green", []],
+    ["btnCorrect:2.l", "esp:GND.1", "black", []],
+    ["btnWrong:1.l", "esp:D26", "red", []],
+    ["btnWrong:2.l", "esp:GND.3", "black", []]
+  ]
+}
