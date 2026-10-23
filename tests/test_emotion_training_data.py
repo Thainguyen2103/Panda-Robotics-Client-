@@ -57,7 +57,7 @@ class TrainingDataTests(unittest.TestCase):
             fer, plus = make_csvs(root)
             text = plus.read_text().replace('fer0000001.png', 'invalid.png')
             plus.write_text(text)
-            with self.assertRaisesRegex(ValueError, 'Invalid or duplicate'):
+            with self.assertRaisesRegex(ValueError, 'Invalid FER'):
                 prepare(fer, plus, root / 'out')
             self.assertFalse((root / 'out').exists())
             plus.write_text('\n'.join(text.splitlines()[:-1]) + '\n')
@@ -72,6 +72,16 @@ class TrainingDataTests(unittest.TestCase):
             fer, plus = make_csvs(root)
             plus.write_text(plus.read_text().replace('fer0000001.png', 'fer0000060.png'))
             prepare(fer, plus, root / 'prepared')
+            _, _, ids, _ = load_split(root / 'prepared', 'validation')
+            self.assertEqual(ids.tolist(), ['fer0000001.png'])
+
+    def test_repeated_official_annotation_names_preserve_independent_rows(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fer, plus = make_csvs(root)
+            plus.write_text(plus.read_text().replace('fer0000001.png', 'fer0000000.png'))
+            manifest = prepare(fer, plus, root / 'prepared')
+            self.assertEqual(manifest['repeated_annotation_names'], {'fer0000000.png': 2})
             _, _, ids, _ = load_split(root / 'prepared', 'validation')
             self.assertEqual(ids.tolist(), ['fer0000001.png'])
 

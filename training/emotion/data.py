@@ -43,7 +43,7 @@ def prepare(fer2013, ferplus, output):
     rejected = {name: Counter() for name in SPLITS.values()}
     hashes = defaultdict(list)
     raw_counts = Counter()
-    annotation_names = set()
+    annotation_names = Counter()
     with Path(fer2013).open(newline='', encoding='utf-8-sig') as images, \
             Path(ferplus).open(newline='', encoding='utf-8-sig') as labels:
         image_rows, label_rows = csv.DictReader(images), csv.DictReader(labels)
@@ -64,9 +64,11 @@ def prepare(fer2013, ferplus, output):
             identity = f'fer{index:07d}.png'
             annotation_name = label['Image name'].strip()
             if annotation_name:
-                if not re.fullmatch(r'fer\d{7}\.png', annotation_name) or annotation_name in annotation_names:
-                    raise ValueError(f'Invalid or duplicate FER+ image name at row {index}')
-                annotation_names.add(annotation_name)
+                if not re.fullmatch(r'fer\d{7}\.png', annotation_name):
+                    raise ValueError(f'Invalid FER+ image name at row {index}')
+                # The official annotation CSV itself repeats four filenames.
+                # Keep row alignment and independent row IDs; report repetitions.
+                annotation_names[annotation_name] += 1
             split = SPLITS[usage]
             raw_counts[split] += 1
             try:
@@ -98,6 +100,7 @@ def prepare(fer2013, ferplus, output):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     summary = dict(schema=1, **identity_data, fingerprint=fingerprint, raw_rows=row_count,
+                   repeated_annotation_names={name: count for name, count in annotation_names.items() if count > 1},
                    evaluation_target='unique_argmax_of_filtered_votes',
                    cross_split_duplicate_groups=duplicates,
                    has_cross_split_duplicates=bool(duplicates), splits={})

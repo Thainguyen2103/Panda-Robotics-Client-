@@ -34,6 +34,10 @@ ngân sách train. Không coi B/C là tái lập kiến trúc/kết quả công 
 
 ## Giao thức nhãn shared-v1
 
+Ghép bằng thứ tự dòng CSV và Usage. Tên ảnh trong file nhãn gốc không luôn
+bằng chỉ số dòng và có bốn tên bị lặp; chỉ báo các tên lặp trong manifest,
+không loại hay đổi thứ tự mẫu vì tên ảnh. ID mẫu nội bộ dựa trên dòng CSV.
+
 Giao thức riêng, công bố rõ để tránh nhầm với bộ lọc trong code CNTK gốc:
 
 - Bỏ phiếu đơn lẻ (cột có <= 1 phiếu).
