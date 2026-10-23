@@ -56,7 +56,9 @@ TOPIC_CAMERA = "moon/camera"
 # AI Models Configuration
 WEBCAM_INDEX = 0
 YOLO_MODEL   = "yolov8n-pose.pt" # pose model
-EMOTION_MODEL = "emotion-ferplus-8.onnx"
+# Optional offline-trained ONNX; default remains the original pretrained model.
+# Custom exports must keep the raw 0..255 input contract and eight-logit order.
+EMOTION_MODEL = os.environ.get("MOON_EMOTION_MODEL", "emotion-ferplus-8.onnx")
 
 # Webcam index or an ESP32-CAM MJPEG / RTSP URL.
 VISION_SOURCE = os.environ.get("MOON_CAMERA_SOURCE", str(WEBCAM_INDEX))

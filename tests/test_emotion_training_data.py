@@ -73,6 +73,9 @@ class TrainingDataTests(unittest.TestCase):
         self.assertFalse(metrics['complete_eight_classes'])
         self.assertEqual(metrics['per_class']['contempt']['support'], 0)
         self.assertEqual(metrics['confusion_matrix'][1][0], 1)
+        complete = classification_metrics(list(range(8)), list(range(8)))
+        self.assertTrue(complete['complete_eight_classes'])
+        self.assertEqual(complete['macro_f1'], 1.)
 
 
 if __name__ == '__main__':

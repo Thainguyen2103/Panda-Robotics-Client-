@@ -108,19 +108,25 @@ def train(args):
     model = EmotionCNN().to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
-    history, best_score, bad_epochs, start = [], -1., 0, 0
+    history, best_score, best_epoch, bad_epochs, start = [], -1., 0, 0, 0
     if args.resume:
         state = load_checkpoint(output / 'last.pt')
         if state['config'] != config:
             raise ValueError('Resume config or dataset changed. Start a separate experiment.')
-        if not (output / 'best.pt').is_file():
-            raise ValueError('Resume requires the matching best.pt in the same run directory')
+        # last.pt is committed first. Repair a session interrupted before best.pt
+        # was updated, using the complete model/optimizer/RNG state in last.pt.
+        best_path = output / 'best.pt'
+        if state['best_epoch'] == state['epoch']:
+            if not best_path.exists() or load_checkpoint(best_path)['epoch'] != state['best_epoch']:
+                save_checkpoint(best_path, state)
+        if not best_path.exists() or load_checkpoint(best_path)['epoch'] != state['best_epoch']:
+            raise ValueError('Resume needs the matching best.pt from this run')
         model.load_state_dict(state['model'])
         optimizer.load_state_dict(state['optimizer'])
         scheduler.load_state_dict(state['scheduler'])
         restore_rng(state['rng'], generator)
-        history, best_score, bad_epochs, start = (state[key] for key in
-                                                ('history', 'best_score', 'bad_epochs', 'epoch'))
+        history, best_score, best_epoch, bad_epochs, start = (state[key] for key in
+            ('history', 'best_score', 'best_epoch', 'bad_epochs', 'epoch'))
     output.mkdir(parents=True, exist_ok=True)
     try:
         revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True,
@@ -145,16 +151,18 @@ def train(args):
         improved = score > best_score
         if improved:
             best_score, bad_epochs = score, 0
+            best_epoch = epoch + 1
         else:
             bad_epochs += 1
         scheduler.step()
         state = dict(schema=1, architecture=ARCHITECTURE, labels=list(LABELS), protocol=PROTOCOL,
             config=config, model=model.state_dict(), optimizer=optimizer.state_dict(),
             scheduler=scheduler.state_dict(), rng=rng_state(generator), epoch=epoch + 1,
-            history=history, best_score=best_score, bad_epochs=bad_epochs, environment=environment)
+            history=history, best_score=best_score, best_epoch=best_epoch,
+            bad_epochs=bad_epochs, environment=environment)
+        save_checkpoint(output / 'last.pt', state)
         if improved:
             save_checkpoint(output / 'best.pt', state)
-        save_checkpoint(output / 'last.pt', state)
         write_json(output / 'history.json', history)
         print(json.dumps(dict(epoch=epoch + 1, train_loss=training['loss'],
             val_loss=validation['loss'], val_macro_f1=score, best=best_score)), flush=True)

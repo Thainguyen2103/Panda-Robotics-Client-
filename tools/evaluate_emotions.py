@@ -52,6 +52,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('dataset',type=Path)
     parser.add_argument('--output',type=Path,help='Optional JSON report; contains relative image filenames, no images')
+    parser.add_argument('--model',type=Path,help='Override the ONNX classifier for this evaluation only')
     parser.add_argument('--allow-partial',action='store_true',help='Allow missing emotion classes; report clearly marks partial results')
     args = parser.parse_args()
     samples = [(path,label) for label in EMOTIONS for path in sorted((args.dataset/label).rglob('*'))
@@ -66,7 +67,8 @@ def main():
     cv2.setNumThreads(settings.VISION_CV_THREADS)
     detector = cv2.FaceDetectorYN_create(str(model_path('face_detection_yunet_2023mar.onnx')),
         '',(320,320),settings.VISION_FACE_THRESHOLD)
-    model = cv2.dnn.readNetFromONNX(str(model_path(settings.EMOTION_MODEL)))
+    emotion_model = args.model if args.model is not None else settings.EMOTION_MODEL
+    model = cv2.dnn.readNetFromONNX(str(model_path(emotion_model)))
     details = FaceDetails(model_path(settings.VISION_FACE_DETAILS_MODEL),video=False) if settings.VISION_FACE_DETAILS_ENABLED else None
     rows,timings,failures = [],[],Counter()
     try:
@@ -113,9 +115,9 @@ def main():
     expected = [row['expected'] for row in rows]
     report = dict(evaluation='independent_images_no_temporal_confirmation',
         notes='FER argmax and fused candidates use the same new preprocessing. This is not a before/after accuracy benchmark. Failures count as unknown; macro averages use present classes.',
-        missing_classes=missing,model=settings.EMOTION_MODEL,
+        missing_classes=missing,model=str(emotion_model),
         model_sha256={name:hashlib.sha256(model_path(name).read_bytes()).hexdigest()
-            for name in (settings.EMOTION_MODEL,'face_detection_yunet_2023mar.onnx',
+            for name in (str(emotion_model),'face_detection_yunet_2023mar.onnx',
                          *((settings.VISION_FACE_DETAILS_MODEL,) if settings.VISION_FACE_DETAILS_ENABLED else ()))},
         configuration=dict(opencv=cv2.__version__,numpy=np.__version__,
             face_threshold=settings.VISION_FACE_THRESHOLD,min_face_size=settings.VISION_MIN_FACE_SIZE,

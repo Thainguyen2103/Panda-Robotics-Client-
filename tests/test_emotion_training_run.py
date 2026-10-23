@@ -37,6 +37,8 @@ class TrainingRunTests(unittest.TestCase):
                       '--batch-size', '2', '--device', 'cpu', '--threads', '1']
             train(parse_args([*common, '--output', str(root / 'full')]))
             train(parse_args([*common, '--output', str(root / 'resumed'), '--session-epochs', '1']))
+            # Simulate a disconnect after last.pt was saved but before best.pt.
+            (root / 'resumed' / 'best.pt').unlink()
             train(parse_args([*common, '--output', str(root / 'resumed'), '--resume']))
             full = load_checkpoint(root / 'full' / 'last.pt')
             resumed = load_checkpoint(root / 'resumed' / 'last.pt')
