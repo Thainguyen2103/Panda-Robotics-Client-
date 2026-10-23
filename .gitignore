@@ -37,3 +37,13 @@ Thumbs.db
 
 # ═══ Build firmware (binary local, không push) ═══
 firmware/*/build/
+
+# Offline emotion training: datasets, face photos, weights and run outputs
+training/emotion/datasets/
+training/emotion/runs/
+training/emotion/exports/
+**/.ipynb_checkpoints/
+fer2013.csv
+fer2013new.csv
+*.pth
+*.ckpt
