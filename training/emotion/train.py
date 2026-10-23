@@ -166,6 +166,8 @@ def train(args):
         write_json(output / 'history.json', history)
         print(json.dumps(dict(epoch=epoch + 1, train_loss=training['loss'],
             val_loss=validation['loss'], val_macro_f1=score, best=best_score)), flush=True)
+    # Regenerate derived logs even if resume has no epochs left to execute.
+    write_json(output / 'history.json', history)
     write_json(output / 'status.json', dict(epochs_completed=len(history), best_validation_macro_f1=best_score,
         status='complete' if len(history) >= args.epochs or bad_epochs >= args.patience else 'resumable',
         updated_utc=datetime.now(timezone.utc).isoformat(), test_used=False))

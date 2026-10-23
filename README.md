@@ -7,6 +7,10 @@ thái trên màn OLED theo phong cách robot Vector (Anki).
 
 ## ✨ Tính năng nổi bật
 
+Huấn luyện biểu cảm trên Colab: xem [hướng dẫn FER+](docs/emotion-training.md)
+và [notebook](notebooks/ferplus_training_colab.ipynb). Model pretrained vẫn là
+mặc định; model tự train được lưu riêng để so sánh.
+
 - **Live Voice trên dashboard**: bật hội thoại trực tiếp hoặc chờ wakeword Moon,
   sau đó nói chuyện nhiều lượt tới khi bấm **Kết thúc**. Chỉ một tab được giữ
   microphone và mic tạm dừng khi Moon đang phát âm thanh để chống tự nghe. Với
