@@ -5,6 +5,7 @@ import csv
 import hashlib
 from itertools import zip_longest
 import json
+import re
 from pathlib import Path
 
 import cv2
@@ -42,6 +43,7 @@ def prepare(fer2013, ferplus, output):
     rejected = {name: Counter() for name in SPLITS.values()}
     hashes = defaultdict(list)
     raw_counts = Counter()
+    annotation_names = set()
     with Path(fer2013).open(newline='', encoding='utf-8-sig') as images, \
             Path(ferplus).open(newline='', encoding='utf-8-sig') as labels:
         image_rows, label_rows = csv.DictReader(images), csv.DictReader(labels)
@@ -57,10 +59,14 @@ def prepare(fer2013, ferplus, output):
             usage = image['Usage'].strip()
             if usage not in SPLITS or usage != label['Usage'].strip():
                 raise ValueError(f'Usage mismatch or unknown split at row {index}')
-            # fer0000000.png is the original zero-based CSV row, even across splits.
+            # Row order aligns the CSVs. Published FER+ image names are NOT
+            # guaranteed to equal the CSV row index (first divergence: row 60).
             identity = f'fer{index:07d}.png'
-            if label['Image name'].strip() not in ('', identity):
-                raise ValueError(f'FER+ image identity mismatch at row {index}')
+            annotation_name = label['Image name'].strip()
+            if annotation_name:
+                if not re.fullmatch(r'fer\d{7}\.png', annotation_name) or annotation_name in annotation_names:
+                    raise ValueError(f'Invalid or duplicate FER+ image name at row {index}')
+                annotation_names.add(annotation_name)
             split = SPLITS[usage]
             raw_counts[split] += 1
             try:

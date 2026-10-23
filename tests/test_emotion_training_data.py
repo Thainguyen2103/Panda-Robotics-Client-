@@ -55,16 +55,25 @@ class TrainingDataTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             fer, plus = make_csvs(root)
-            text = plus.read_text().replace('fer0000001.png', 'fer0000009.png')
+            text = plus.read_text().replace('fer0000001.png', 'invalid.png')
             plus.write_text(text)
-            with self.assertRaisesRegex(ValueError, 'identity mismatch'):
+            with self.assertRaisesRegex(ValueError, 'Invalid or duplicate'):
                 prepare(fer, plus, root / 'out')
             self.assertFalse((root / 'out').exists())
             plus.write_text('\n'.join(text.splitlines()[:-1]) + '\n')
             # Restore identity so the test reaches the missing-row check.
-            plus.write_text(plus.read_text().replace('fer0000009.png', 'fer0000001.png'))
+            plus.write_text(plus.read_text().replace('invalid.png', 'fer0000001.png'))
             with self.assertRaisesRegex(ValueError, 'row counts differ'):
                 prepare(fer, plus, root / 'out')
+
+    def test_annotation_filename_need_not_equal_csv_row_index(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fer, plus = make_csvs(root)
+            plus.write_text(plus.read_text().replace('fer0000001.png', 'fer0000060.png'))
+            prepare(fer, plus, root / 'prepared')
+            _, _, ids, _ = load_split(root / 'prepared', 'validation')
+            self.assertEqual(ids.tolist(), ['fer0000001.png'])
 
     def test_metrics_include_all_eight_classes(self):
         metrics = classification_metrics([0, 1, 1], [0, 0, 1])
