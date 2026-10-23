@@ -47,3 +47,4 @@ fer2013.csv
 fer2013new.csv
 *.pth
 *.ckpt
+models/vision/ferplus-custom-v1/
