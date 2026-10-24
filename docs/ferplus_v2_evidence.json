@@ -1,0 +1,1484 @@
+{
+  "date": "2026-10-24",
+  "labels": [
+    "neutral",
+    "happy",
+    "surprised",
+    "sad",
+    "angry",
+    "disgust",
+    "fear",
+    "contempt"
+  ],
+  "source_report_sha256": "fb093120cf93e3d706821d726bf6fc75dbcf37bf5387b40c583954d44872b87b",
+  "runtime": {
+    "opencv": "5.0.0",
+    "onnxruntime": "1.29.0",
+    "backend": "OpenCV CPU",
+    "threads": 2
+  },
+  "full_samples": 3376,
+  "subset_samples": 3074,
+  "excluded_samples": 302,
+  "results": [
+    {
+      "name": "pretrained",
+      "metrics": {
+        "full": {
+          "samples": 3376,
+          "accuracy": 0.8255331753554502,
+          "macro_f1": 0.6184174606680273,
+          "balanced_accuracy": 0.5838937592935332,
+          "macro_classes": 8,
+          "complete_eight_classes": true,
+          "labels": [
+            "neutral",
+            "happy",
+            "surprised",
+            "sad",
+            "angry",
+            "disgust",
+            "fear",
+            "contempt"
+          ],
+          "confusion_matrix": [
+            [
+              1088,
+              18,
+              11,
+              44,
+              4,
+              1,
+              0,
+              0
+            ],
+            [
+              44,
+              843,
+              16,
+              2,
+              4,
+              0,
+              0,
+              0
+            ],
+            [
+              33,
+              15,
+              364,
+              2,
+              5,
+              0,
+              2,
+              0
+            ],
+            [
+              163,
+              18,
+              2,
+              220,
+              12,
+              2,
+              7,
+              0
+            ],
+            [
+              45,
+              17,
+              15,
+              6,
+              229,
+              4,
+              0,
+              0
+            ],
+            [
+              1,
+              1,
+              2,
+              3,
+              9,
+              6,
+              0,
+              0
+            ],
+            [
+              9,
+              0,
+              37,
+              8,
+              2,
+              0,
+              36,
+              0
+            ],
+            [
+              18,
+              0,
+              1,
+              2,
+              3,
+              1,
+              0,
+              1
+            ]
+          ],
+          "per_class": {
+            "neutral": {
+              "support": 1166,
+              "precision": 0.7765881513204854,
+              "recall": 0.9331046312178388,
+              "f1": 0.847682119205298
+            },
+            "happy": {
+              "support": 909,
+              "precision": 0.9243421052631579,
+              "recall": 0.9273927392739274,
+              "f1": 0.9258649093904449
+            },
+            "surprised": {
+              "support": 421,
+              "precision": 0.8125,
+              "recall": 0.8646080760095012,
+              "f1": 0.8377445339470655
+            },
+            "sad": {
+              "support": 424,
+              "precision": 0.7665505226480837,
+              "recall": 0.5188679245283019,
+              "f1": 0.6188466947960618
+            },
+            "angry": {
+              "support": 316,
+              "precision": 0.8544776119402985,
+              "recall": 0.7246835443037974,
+              "f1": 0.7842465753424657
+            },
+            "disgust": {
+              "support": 22,
+              "precision": 0.42857142857142855,
+              "recall": 0.2727272727272727,
+              "f1": 0.33333333333333326
+            },
+            "fear": {
+              "support": 92,
+              "precision": 0.8,
+              "recall": 0.391304347826087,
+              "f1": 0.5255474452554745
+            },
+            "contempt": {
+              "support": 26,
+              "precision": 1.0,
+              "recall": 0.038461538461538464,
+              "f1": 0.07407407407407407
+            }
+          }
+        },
+        "no_exact_overlap": {
+          "samples": 3074,
+          "accuracy": 0.8233571893298633,
+          "macro_f1": 0.58951925000293,
+          "balanced_accuracy": 0.559084327901829,
+          "macro_classes": 8,
+          "complete_eight_classes": true,
+          "labels": [
+            "neutral",
+            "happy",
+            "surprised",
+            "sad",
+            "angry",
+            "disgust",
+            "fear",
+            "contempt"
+          ],
+          "confusion_matrix": [
+            [
+              1043,
+              17,
+              11,
+              40,
+              4,
+              1,
+              0,
+              0
+            ],
+            [
+              43,
+              805,
+              13,
+              2,
+              3,
+              0,
+              0,
+              0
+            ],
+            [
+              29,
+              13,
+              250,
+              2,
+              5,
+              0,
+              2,
+              0
+            ],
+            [
+              150,
+              18,
+              2,
+              203,
+              12,
+              1,
+              6,
+              0
+            ],
+            [
+              44,
+              17,
+              12,
+              6,
+              197,
+              2,
+              0,
+              0
+            ],
+            [
+              1,
+              1,
+              2,
+              2,
+              8,
+              3,
+              0,
+              0
+            ],
+            [
+              9,
+              0,
+              31,
+              8,
+              2,
+              0,
+              30,
+              0
+            ],
+            [
+              17,
+              0,
+              1,
+              2,
+              3,
+              1,
+              0,
+              0
+            ]
+          ],
+          "per_class": {
+            "neutral": {
+              "support": 1116,
+              "precision": 0.780688622754491,
+              "recall": 0.9345878136200717,
+              "f1": 0.8507340946166395
+            },
+            "happy": {
+              "support": 866,
+              "precision": 0.9242250287026407,
+              "recall": 0.9295612009237876,
+              "f1": 0.9268854346574554
+            },
+            "surprised": {
+              "support": 301,
+              "precision": 0.7763975155279503,
+              "recall": 0.8305647840531561,
+              "f1": 0.8025682182985554
+            },
+            "sad": {
+              "support": 392,
+              "precision": 0.7660377358490567,
+              "recall": 0.5178571428571429,
+              "f1": 0.6179604261796043
+            },
+            "angry": {
+              "support": 278,
+              "precision": 0.8418803418803419,
+              "recall": 0.7086330935251799,
+              "f1": 0.7695312499999999
+            },
+            "disgust": {
+              "support": 17,
+              "precision": 0.375,
+              "recall": 0.17647058823529413,
+              "f1": 0.24
+            },
+            "fear": {
+              "support": 80,
+              "precision": 0.7894736842105263,
+              "recall": 0.375,
+              "f1": 0.5084745762711864
+            },
+            "contempt": {
+              "support": 24,
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0
+            }
+          }
+        }
+      },
+      "sha256": "a2a2ba6a335a3b29c21acb6272f962bd3d47f84952aaffa03b60986e04efa61c",
+      "resize": "PIL LANCZOS",
+      "opencv_ort_32_samples": {
+        "disagreements": 0,
+        "max_abs_logit_error": 1.1444091796875e-05
+      },
+      "changed_vs_old_report": 109
+    },
+    {
+      "name": "hard-seed42",
+      "metrics": {
+        "full": {
+          "samples": 3376,
+          "accuracy": 0.8495260663507109,
+          "macro_f1": 0.7308478821928808,
+          "balanced_accuracy": 0.6939786691283644,
+          "macro_classes": 8,
+          "complete_eight_classes": true,
+          "labels": [
+            "neutral",
+            "happy",
+            "surprised",
+            "sad",
+            "angry",
+            "disgust",
+            "fear",
+            "contempt"
+          ],
+          "confusion_matrix": [
+            [
+              1042,
+              23,
+              19,
+              66,
+              12,
+              1,
+              3,
+              0
+            ],
+            [
+              24,
+              853,
+              18,
+              4,
+              8,
+              1,
+              0,
+              1
+            ],
+            [
+              20,
+              9,
+              373,
+              4,
+              9,
+              0,
+              6,
+              0
+            ],
+            [
+              105,
+              8,
+              4,
+              286,
+              15,
+              1,
+              2,
+              3
+            ],
+            [
+              32,
+              12,
+              9,
+              12,
+              247,
+              2,
+              2,
+              0
+            ],
+            [
+              2,
+              0,
+              2,
+              2,
+              5,
+              10,
+              1,
+              0
+            ],
+            [
+              7,
+              2,
+              26,
+              9,
+              2,
+              0,
+              46,
+              0
+            ],
+            [
+              8,
+              0,
+              0,
+              4,
+              2,
+              0,
+              1,
+              11
+            ]
+          ],
+          "per_class": {
+            "neutral": {
+              "support": 1166,
+              "precision": 0.8403225806451613,
+              "recall": 0.8936535162950258,
+              "f1": 0.8661679135494597
+            },
+            "happy": {
+              "support": 909,
+              "precision": 0.9404630650496141,
+              "recall": 0.9383938393839384,
+              "f1": 0.9394273127753305
+            },
+            "surprised": {
+              "support": 421,
+              "precision": 0.8270509977827051,
+              "recall": 0.8859857482185273,
+              "f1": 0.8555045871559632
+            },
+            "sad": {
+              "support": 424,
+              "precision": 0.7390180878552972,
+              "recall": 0.6745283018867925,
+              "f1": 0.7053020961775586
+            },
+            "angry": {
+              "support": 316,
+              "precision": 0.8233333333333334,
+              "recall": 0.7816455696202531,
+              "f1": 0.8019480519480519
+            },
+            "disgust": {
+              "support": 22,
+              "precision": 0.6666666666666666,
+              "recall": 0.45454545454545453,
+              "f1": 0.5405405405405405
+            },
+            "fear": {
+              "support": 92,
+              "precision": 0.7540983606557377,
+              "recall": 0.5,
+              "f1": 0.6013071895424836
+            },
+            "contempt": {
+              "support": 26,
+              "precision": 0.7333333333333333,
+              "recall": 0.4230769230769231,
+              "f1": 0.5365853658536585
+            }
+          }
+        },
+        "no_exact_overlap": {
+          "samples": 3074,
+          "accuracy": 0.8376707872478855,
+          "macro_f1": 0.6814092940883627,
+          "balanced_accuracy": 0.6466185891723326,
+          "macro_classes": 8,
+          "complete_eight_classes": true,
+          "labels": [
+            "neutral",
+            "happy",
+            "surprised",
+            "sad",
+            "angry",
+            "disgust",
+            "fear",
+            "contempt"
+          ],
+          "confusion_matrix": [
+            [
+              996,
+              22,
+              19,
+              63,
+              12,
+              1,
+              3,
+              0
+            ],
+            [
+              24,
+              812,
+              16,
+              4,
+              8,
+              1,
+              0,
+              1
+            ],
+            [
+              20,
+              8,
+              254,
+              4,
+              9,
+              0,
+              6,
+              0
+            ],
+            [
+              103,
+              8,
+              4,
+              256,
+              15,
+              1,
+              2,
+              3
+            ],
+            [
+              32,
+              12,
+              9,
+              12,
+              209,
+              2,
+              2,
+              0
+            ],
+            [
+              2,
+              0,
+              2,
+              2,
+              5,
+              5,
+              1,
+              0
+            ],
+            [
+              7,
+              2,
+              26,
+              9,
+              2,
+              0,
+              34,
+              0
+            ],
+            [
+              8,
+              0,
+              0,
+              4,
+              2,
+              0,
+              1,
+              9
+            ]
+          ],
+          "per_class": {
+            "neutral": {
+              "support": 1116,
+              "precision": 0.8355704697986577,
+              "recall": 0.8924731182795699,
+              "f1": 0.8630849220103985
+            },
+            "happy": {
+              "support": 866,
+              "precision": 0.9398148148148148,
+              "recall": 0.9376443418013857,
+              "f1": 0.9387283236994219
+            },
+            "surprised": {
+              "support": 301,
+              "precision": 0.7696969696969697,
+              "recall": 0.8438538205980066,
+              "f1": 0.8050713153724247
+            },
+            "sad": {
+              "support": 392,
+              "precision": 0.7231638418079096,
+              "recall": 0.6530612244897959,
+              "f1": 0.6863270777479893
+            },
+            "angry": {
+              "support": 278,
+              "precision": 0.7977099236641222,
+              "recall": 0.7517985611510791,
+              "f1": 0.7740740740740741
+            },
+            "disgust": {
+              "support": 17,
+              "precision": 0.5,
+              "recall": 0.29411764705882354,
+              "f1": 0.37037037037037035
+            },
+            "fear": {
+              "support": 80,
+              "precision": 0.6938775510204082,
+              "recall": 0.425,
+              "f1": 0.5271317829457365
+            },
+            "contempt": {
+              "support": 24,
+              "precision": 0.6923076923076923,
+              "recall": 0.375,
+              "f1": 0.48648648648648646
+            }
+          }
+        }
+      },
+      "sha256": "71c297f36305c1958c4fca3b4b2d9c23f037fe27a78621989d39a06130f37762",
+      "resize": "OpenCV INTER_AREA",
+      "opencv_ort_32_samples": {
+        "disagreements": 0,
+        "max_abs_logit_error": 1.1444091796875e-05
+      },
+      "changed_vs_old_report": 0
+    },
+    {
+      "name": "soft-seed42",
+      "metrics": {
+        "full": {
+          "samples": 3376,
+          "accuracy": 0.8311611374407583,
+          "macro_f1": 0.6970707806272585,
+          "balanced_accuracy": 0.6806339352098045,
+          "macro_classes": 8,
+          "complete_eight_classes": true,
+          "labels": [
+            "neutral",
+            "happy",
+            "surprised",
+            "sad",
+            "angry",
+            "disgust",
+            "fear",
+            "contempt"
+          ],
+          "confusion_matrix": [
+            [
+              957,
+              43,
+              18,
+              115,
+              24,
+              1,
+              6,
+              2
+            ],
+            [
+              13,
+              855,
+              17,
+              9,
+              13,
+              0,
+              2,
+              0
+            ],
+            [
+              18,
+              12,
+              355,
+              3,
+              15,
+              0,
+              18,
+              0
+            ],
+            [
+              79,
+              5,
+              4,
+              313,
+              17,
+              1,
+              4,
+              1
+            ],
+            [
+              23,
+              13,
+              5,
+              12,
+              257,
+              3,
+              3,
+              0
+            ],
+            [
+              0,
+              1,
+              2,
+              2,
+              7,
+              10,
+              0,
+              0
+            ],
+            [
+              8,
+              1,
+              21,
+              7,
+              3,
+              0,
+              52,
+              0
+            ],
+            [
+              8,
+              0,
+              0,
+              4,
+              3,
+              3,
+              1,
+              7
+            ]
+          ],
+          "per_class": {
+            "neutral": {
+              "support": 1166,
+              "precision": 0.8652802893309223,
+              "recall": 0.8207547169811321,
+              "f1": 0.8424295774647887
+            },
+            "happy": {
+              "support": 909,
+              "precision": 0.9193548387096774,
+              "recall": 0.9405940594059405,
+              "f1": 0.929853181076672
+            },
+            "surprised": {
+              "support": 421,
+              "precision": 0.8412322274881516,
+              "recall": 0.8432304038004751,
+              "f1": 0.8422301304863582
+            },
+            "sad": {
+              "support": 424,
+              "precision": 0.6731182795698925,
+              "recall": 0.7382075471698113,
+              "f1": 0.7041619797525309
+            },
+            "angry": {
+              "support": 316,
+              "precision": 0.7581120943952803,
+              "recall": 0.8132911392405063,
+              "f1": 0.7847328244274809
+            },
+            "disgust": {
+              "support": 22,
+              "precision": 0.5555555555555556,
+              "recall": 0.45454545454545453,
+              "f1": 0.5
+            },
+            "fear": {
+              "support": 92,
+              "precision": 0.6046511627906976,
+              "recall": 0.5652173913043478,
+              "f1": 0.5842696629213482
+            },
+            "contempt": {
+              "support": 26,
+              "precision": 0.7,
+              "recall": 0.2692307692307692,
+              "f1": 0.3888888888888889
+            }
+          }
+        },
+        "no_exact_overlap": {
+          "samples": 3074,
+          "accuracy": 0.824658425504229,
+          "macro_f1": 0.6647503903122752,
+          "balanced_accuracy": 0.6472992238588233,
+          "macro_classes": 8,
+          "complete_eight_classes": true,
+          "labels": [
+            "neutral",
+            "happy",
+            "surprised",
+            "sad",
+            "angry",
+            "disgust",
+            "fear",
+            "contempt"
+          ],
+          "confusion_matrix": [
+            [
+              919,
+              41,
+              16,
+              109,
+              24,
+              0,
+              5,
+              2
+            ],
+            [
+              13,
+              815,
+              14,
+              9,
+              13,
+              0,
+              2,
+              0
+            ],
+            [
+              18,
+              11,
+              244,
+              3,
+              14,
+              0,
+              11,
+              0
+            ],
+            [
+              78,
+              5,
+              4,
+              283,
+              17,
+              1,
+              3,
+              1
+            ],
+            [
+              22,
+              13,
+              5,
+              12,
+              221,
+              3,
+              2,
+              0
+            ],
+            [
+              0,
+              1,
+              2,
+              1,
+              7,
+              6,
+              0,
+              0
+            ],
+            [
+              7,
+              1,
+              20,
+              7,
+              3,
+              0,
+              42,
+              0
+            ],
+            [
+              8,
+              0,
+              0,
+              4,
+              3,
+              3,
+              1,
+              5
+            ]
+          ],
+          "per_class": {
+            "neutral": {
+              "support": 1116,
+              "precision": 0.8629107981220657,
+              "recall": 0.8234767025089605,
+              "f1": 0.8427326914259513
+            },
+            "happy": {
+              "support": 866,
+              "precision": 0.9188275084554679,
+              "recall": 0.941108545034642,
+              "f1": 0.9298345693097547
+            },
+            "surprised": {
+              "support": 301,
+              "precision": 0.8,
+              "recall": 0.8106312292358804,
+              "f1": 0.8052805280528053
+            },
+            "sad": {
+              "support": 392,
+              "precision": 0.6612149532710281,
+              "recall": 0.7219387755102041,
+              "f1": 0.6902439024390243
+            },
+            "angry": {
+              "support": 278,
+              "precision": 0.7317880794701986,
+              "recall": 0.7949640287769785,
+              "f1": 0.7620689655172413
+            },
+            "disgust": {
+              "support": 17,
+              "precision": 0.46153846153846156,
+              "recall": 0.35294117647058826,
+              "f1": 0.4000000000000001
+            },
+            "fear": {
+              "support": 80,
+              "precision": 0.6363636363636364,
+              "recall": 0.525,
+              "f1": 0.5753424657534246
+            },
+            "contempt": {
+              "support": 24,
+              "precision": 0.625,
+              "recall": 0.20833333333333334,
+              "f1": 0.3125
+            }
+          }
+        }
+      },
+      "sha256": "a3a7e95768059e8fc816765e3d3992eace7b6adf696869a0b7b7078c63dd91b7",
+      "resize": "OpenCV INTER_AREA",
+      "opencv_ort_32_samples": {
+        "disagreements": 0,
+        "max_abs_logit_error": 4.76837158203125e-06
+      },
+      "changed_vs_old_report": 0
+    }
+  ],
+  "correctness_patterns_subset": {
+    "000": 262,
+    "001": 76,
+    "010": 64,
+    "011": 141,
+    "100": 78,
+    "101": 83,
+    "110": 135,
+    "111": 2235
+  },
+  "example_selection": "Within each specified correctness pattern on the no-exact-overlap subset, highest original FER+ reference-vote fraction, then smallest zero-based CSV row index.",
+  "examples": [
+    {
+      "row_index": 32415,
+      "row_id": "fer0032415.png",
+      "annotation_name": "fer0032337.png",
+      "pixel_sha256": "ba87cace8766f405e80f44910cd4abf8317d87e4a151c87f3220aced08bf93c0",
+      "votes": [
+        0,
+        10,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "target": [
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "expected": 1,
+      "predictions": [
+        {
+          "class_id": 0,
+          "scores": [
+            0.8007404208183289,
+            0.08718772232532501,
+            0.0011874421034008265,
+            0.0981859639286995,
+            0.0014064377173781395,
+            0.0007921517826616764,
+            0.0005565620376728475,
+            0.009943288750946522
+          ]
+        },
+        {
+          "class_id": 1,
+          "scores": [
+            0.00020192643569316715,
+            0.9994598031044006,
+            1.7606810160941677e-06,
+            0.0003217838821001351,
+            1.8778457615553634e-06,
+            2.2840618285613346e-08,
+            1.2608914403244853e-05,
+            1.7434666688131983e-07
+          ]
+        },
+        {
+          "class_id": 1,
+          "scores": [
+            0.11608613282442093,
+            0.6579489707946777,
+            0.0014360506320372224,
+            0.1825527846813202,
+            0.039200443774461746,
+            0.00031618191860616207,
+            0.0022392012178897858,
+            0.00022023537894710898
+          ]
+        }
+      ],
+      "case_pattern": "011",
+      "case_description": "A sai B và C đúng"
+    },
+    {
+      "row_index": 32327,
+      "row_id": "fer0032327.png",
+      "annotation_name": "fer0032249.png",
+      "pixel_sha256": "64e3c3f7531c931ff5fbc889f85e07b81412fc3c1175515c81d1b513dc1c2c4e",
+      "votes": [
+        0,
+        10,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "target": [
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "expected": 1,
+      "predictions": [
+        {
+          "class_id": 1,
+          "scores": [
+            0.060375768691301346,
+            0.3641290068626404,
+            0.2756950259208679,
+            0.015312119387090206,
+            0.013904004357755184,
+            0.004448290448635817,
+            0.2573210299015045,
+            0.008814750239253044
+          ]
+        },
+        {
+          "class_id": 0,
+          "scores": [
+            0.9739729762077332,
+            8.763970981817693e-05,
+            2.0505767679424025e-05,
+            0.006611160468310118,
+            0.015911487862467766,
+            0.00024435570230707526,
+            0.001860064803622663,
+            0.001291795400902629
+          ]
+        },
+        {
+          "class_id": 6,
+          "scores": [
+            0.09935102611780167,
+            0.049453914165496826,
+            0.13288211822509766,
+            0.156338632106781,
+            0.08932863920927048,
+            0.022916002199053764,
+            0.4490138590335846,
+            0.000715815753210336
+          ]
+        }
+      ],
+      "case_pattern": "100",
+      "case_description": "A đúng B và C sai"
+    },
+    {
+      "row_index": 33520,
+      "row_id": "fer0033520.png",
+      "annotation_name": "fer0033440.png",
+      "pixel_sha256": "c452ceaec0180fd3f7ede6642b92b13fb3fc932d9508f10a03dacfb0cc564a7f",
+      "votes": [
+        0,
+        10,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "target": [
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "expected": 1,
+      "predictions": [
+        {
+          "class_id": 0,
+          "scores": [
+            0.5575598478317261,
+            0.4277234673500061,
+            0.001310751074925065,
+            0.0038369763642549515,
+            0.00031838222639635205,
+            0.000223222014028579,
+            0.00012080226588295773,
+            0.008906550705432892
+          ]
+        },
+        {
+          "class_id": 0,
+          "scores": [
+            0.9861589074134827,
+            0.006695620249956846,
+            0.0031067298259586096,
+            0.0016640201210975647,
+            9.337058145320043e-05,
+            0.00023154508380685002,
+            0.0019633236806839705,
+            8.648139919387177e-05
+          ]
+        },
+        {
+          "class_id": 1,
+          "scores": [
+            0.011504510417580605,
+            0.9878496527671814,
+            0.00018266924598719925,
+            0.0001894300221465528,
+            4.771352905663662e-06,
+            2.9317527150851674e-05,
+            6.913566903676838e-05,
+            0.00017042842227965593
+          ]
+        }
+      ],
+      "case_pattern": "001",
+      "case_description": "Chỉ C đúng"
+    },
+    {
+      "row_index": 32695,
+      "row_id": "fer0032695.png",
+      "annotation_name": "fer0032615.png",
+      "pixel_sha256": "afdd792fa90fc8ceac7a83f832e59448ddc8fe1caef46ed116bfda5fc4732202",
+      "votes": [
+        0,
+        0,
+        10,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "expected": 2,
+      "predictions": [
+        {
+          "class_id": 1,
+          "scores": [
+            0.2688976526260376,
+            0.3336816430091858,
+            0.024873880669474602,
+            0.25230672955513,
+            0.09774142503738403,
+            0.00585030484944582,
+            0.013521228916943073,
+            0.0031271004118025303
+          ]
+        },
+        {
+          "class_id": 1,
+          "scores": [
+            0.05682242661714554,
+            0.5577442646026611,
+            0.00412956764921546,
+            0.2248649150133133,
+            0.15203900635242462,
+            8.585434443375561e-06,
+            0.004390691872686148,
+            5.516743044609029e-07
+          ]
+        },
+        {
+          "class_id": 3,
+          "scores": [
+            0.3099241852760315,
+            0.044885627925395966,
+            0.06357831507921219,
+            0.3622082471847534,
+            0.2085259109735489,
+            0.0014432797906920314,
+            0.008998780511319637,
+            0.00043566012755036354
+          ]
+        }
+      ],
+      "case_pattern": "000",
+      "case_description": "Cả ba sai"
+    }
+  ],
+  "dataset_sources": {
+    "fer2013": "3b8d9617d1017f34733c8f2474d7784c563ce86c40a86ac12c2d37cc968f871b",
+    "ferplus": "9206e20d62f56475939f516847d61753e4860caeac9718b560129541b776fc2c"
+  },
+  "dataset_fingerprint": "031b2f600ccd8c57a8c7a1ce00f5483980b22e0195424689730f51303b7dc000",
+  "split_summary": {
+    "train": {
+      "raw": 28709,
+      "accepted": 26940,
+      "rejected": {
+        "tied_top_emotion": 1213,
+        "missing_image_annotation": 148,
+        "unknown_or_nonface": 408
+      },
+      "class_counts": {
+        "neutral": 9365,
+        "happy": 7410,
+        "surprised": 3378,
+        "sad": 3403,
+        "angry": 2399,
+        "disgust": 175,
+        "fear": 648,
+        "contempt": 162
+      },
+      "sha256": "88e22c9b31e701b21beef763df9fd3e5a0c00e0d3d07b11e436f6185dd8abdc3"
+    },
+    "validation": {
+      "raw": 3589,
+      "accepted": 3396,
+      "rejected": {
+        "tied_top_emotion": 128,
+        "unknown_or_nonface": 55,
+        "missing_image_annotation": 10
+      },
+      "class_counts": {
+        "neutral": 1242,
+        "happy": 880,
+        "surprised": 441,
+        "sad": 395,
+        "angry": 310,
+        "disgust": 31,
+        "fear": 73,
+        "contempt": 24
+      },
+      "sha256": "a780dfa84aeb32967b97713d64c4c5b9c96d8830dbb953e3461194e28c018f7a"
+    },
+    "test": {
+      "raw": 3589,
+      "accepted": 3376,
+      "rejected": {
+        "missing_image_annotation": 15,
+        "unknown_or_nonface": 53,
+        "tied_top_emotion": 145
+      },
+      "class_counts": {
+        "neutral": 1166,
+        "happy": 909,
+        "surprised": 421,
+        "sad": 424,
+        "angry": 316,
+        "disgust": 22,
+        "fear": 92,
+        "contempt": 26
+      },
+      "sha256": "b33e881db0a2ced16a1ba4539998e719cb9418c5e4d07df9e19a0c6f40c924e4"
+    }
+  },
+  "metadata": {
+    "B": {
+      "schema": 1,
+      "architecture": "fer-cnn-v1",
+      "protocol": "ferplus-shared-v1",
+      "labels": [
+        "neutral",
+        "happy",
+        "surprised",
+        "sad",
+        "angry",
+        "disgust",
+        "fear",
+        "contempt"
+      ],
+      "input": {
+        "shape": [
+          1,
+          1,
+          64,
+          64
+        ],
+        "dtype": "float32",
+        "range": [
+          0,
+          255
+        ]
+      },
+      "normalization": "inside_graph: pixels / 127.5 - 1",
+      "output": "eight_logits_no_softmax",
+      "checkpoint_sha256": "49a8d11e628fffbfdb44b2f6539e8dcf376a36c51e218a569624946f3b491b80",
+      "model_sha256": "71c297f36305c1958c4fca3b4b2d9c23f037fe27a78621989d39a06130f37762",
+      "dataset_fingerprint": "031b2f600ccd8c57a8c7a1ce00f5483980b22e0195424689730f51303b7dc000",
+      "training": {
+        "architecture": "fer-cnn-v1",
+        "mode": "hard",
+        "seed": 42,
+        "epochs": 80,
+        "batch_size": 128,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "patience": 12,
+        "augment": true,
+        "dataset_fingerprint": "031b2f600ccd8c57a8c7a1ce00f5483980b22e0195424689730f51303b7dc000"
+      },
+      "epoch": 73,
+      "best_validation_macro_f1": 0.7539329860869339,
+      "parity": {
+        "validation_ids": [
+          "fer0028710.png",
+          "fer0028711.png",
+          "fer0028713.png",
+          "fer0028714.png",
+          "fer0028715.png",
+          "fer0028716.png",
+          "fer0028717.png",
+          "fer0028718.png",
+          "fer0028719.png",
+          "fer0028720.png",
+          "fer0028721.png",
+          "fer0028722.png",
+          "fer0028723.png",
+          "fer0028724.png",
+          "fer0028725.png",
+          "fer0028726.png"
+        ],
+        "boundary_probes": 3,
+        "ort_max_abs_error": 1.52587890625e-05,
+        "opencv_max_abs_error": 4.172325134277344e-05,
+        "rtol": 0.001,
+        "atol": 0.0001,
+        "opencv": "4.14.0",
+        "onnxruntime": "1.31.0"
+      }
+    },
+    "C": {
+      "schema": 1,
+      "architecture": "fer-cnn-v1",
+      "protocol": "ferplus-shared-v1",
+      "labels": [
+        "neutral",
+        "happy",
+        "surprised",
+        "sad",
+        "angry",
+        "disgust",
+        "fear",
+        "contempt"
+      ],
+      "input": {
+        "shape": [
+          1,
+          1,
+          64,
+          64
+        ],
+        "dtype": "float32",
+        "range": [
+          0,
+          255
+        ]
+      },
+      "normalization": "inside_graph: pixels / 127.5 - 1",
+      "output": "eight_logits_no_softmax",
+      "checkpoint_sha256": "f6236552baf3acacc6c8b531c784bfee999b7bdd5ea45a82828e9297d1bb4144",
+      "model_sha256": "a3a7e95768059e8fc816765e3d3992eace7b6adf696869a0b7b7078c63dd91b7",
+      "dataset_fingerprint": "031b2f600ccd8c57a8c7a1ce00f5483980b22e0195424689730f51303b7dc000",
+      "training": {
+        "architecture": "fer-cnn-v1",
+        "mode": "soft",
+        "seed": 42,
+        "epochs": 80,
+        "batch_size": 128,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "patience": 12,
+        "augment": true,
+        "dataset_fingerprint": "031b2f600ccd8c57a8c7a1ce00f5483980b22e0195424689730f51303b7dc000"
+      },
+      "epoch": 40,
+      "best_validation_macro_f1": 0.7267710106840661,
+      "parity": {
+        "validation_ids": [
+          "fer0028710.png",
+          "fer0028711.png",
+          "fer0028713.png",
+          "fer0028714.png",
+          "fer0028715.png",
+          "fer0028716.png",
+          "fer0028717.png",
+          "fer0028718.png",
+          "fer0028719.png",
+          "fer0028720.png",
+          "fer0028721.png",
+          "fer0028722.png",
+          "fer0028723.png",
+          "fer0028724.png",
+          "fer0028725.png",
+          "fer0028726.png"
+        ],
+        "boundary_probes": 3,
+        "ort_max_abs_error": 1.1444091796875e-05,
+        "opencv_max_abs_error": 1.8596649169921875e-05,
+        "rtol": 0.001,
+        "atol": 0.0001,
+        "opencv": "4.14.0",
+        "onnxruntime": "1.31.0"
+      }
+    }
+  },
+  "notes": [
+    "A uses model-card PIL LANCZOS; B/C use training-time INTER_AREA.",
+    "Subset analysis is not retraining with clean splits; no near-duplicate or identity exclusion.",
+    "Examples selected by correctness patterns, not random quality estimates."
+  ]
+}
