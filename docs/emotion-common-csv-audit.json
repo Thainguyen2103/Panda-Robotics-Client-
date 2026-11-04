@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "protocol": "ferplus-common-csv-70-15-15-v1",
+  "sources": {
+    "train.csv": "5643c546a81c2c6e65e479af366b481277b8ed6f8207b06638a425743af457b1",
+    "val.csv": "281fc6fbb430aab0cb75c894786044dcea9a0101bcad10d6d6afa75f6fd99311",
+    "test.csv": "809d5efc481c1809a573eebda05553c10cefb1d264b4bcee4c884af9b0b56393"
+  },
+  "labels": [
+    "neutral",
+    "happy",
+    "surprised",
+    "sad",
+    "angry",
+    "disgust",
+    "fear",
+    "contempt"
+  ],
+  "fingerprint": "8e394fbff54b3fc22ed15b6d823ae8fc057c86a86c0569b58049936783fce727",
+  "split_method": "provider custom stratified 70/15/15 seed 42; membership imported verbatim",
+  "split_reproduced_from_source": false,
+  "evaluation_target": "argmax_of_shared_soft_label",
+  "has_cross_split_duplicates": false,
+  "cross_split_duplicate_groups": [],
+  "near_duplicate_check": {
+    "method": "equal 64bit dHash INTER_AREA 9x8 and raw MAD<=15",
+    "cross_split_pairs": [],
+    "subject_disjoint_verified": false
+  },
+  "original_checkpoint_reuse_allowed": false,
+  "splits": {
+    "train": {
+      "raw": 22295,
+      "accepted": 22295,
+      "rejected": {},
+      "class_counts": {
+        "neutral": 8028,
+        "happy": 6270,
+        "surprised": 2443,
+        "sad": 2802,
+        "angry": 1977,
+        "disgust": 135,
+        "fear": 502,
+        "contempt": 138
+      },
+      "sha256": "116919b23dc9c99289012cf993cae0f3ff789394c7cec329bc02b974add72e76"
+    },
+    "validation": {
+      "raw": 4777,
+      "accepted": 4777,
+      "rejected": {},
+      "class_counts": {
+        "neutral": 1720,
+        "happy": 1344,
+        "surprised": 523,
+        "sad": 600,
+        "angry": 423,
+        "disgust": 29,
+        "fear": 108,
+        "contempt": 30
+      },
+      "sha256": "073b63fe99cc13e69ca563e8ccc2067ed6b27581bc3946c58e4ceb43b04580ae"
+    },
+    "test": {
+      "raw": 4778,
+      "accepted": 4778,
+      "rejected": {},
+      "class_counts": {
+        "neutral": 1720,
+        "happy": 1344,
+        "surprised": 524,
+        "sad": 601,
+        "angry": 424,
+        "disgust": 29,
+        "fear": 107,
+        "contempt": 29
+      },
+      "sha256": "fbc97f96f2cd3a61e16e4ca056f2d02528bf354595eb2364199794d2111e7612"
+    }
+  }
+}
