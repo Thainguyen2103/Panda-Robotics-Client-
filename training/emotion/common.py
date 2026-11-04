@@ -6,6 +6,8 @@ from pathlib import Path
 
 LABELS = ('neutral', 'happy', 'surprised', 'sad', 'angry', 'disgust', 'fear', 'contempt')
 PROTOCOL = 'ferplus-shared-v1'
+CSV_PROTOCOL = 'ferplus-common-csv-70-15-15-v1'
+SUPPORTED_PROTOCOLS = (PROTOCOL, CSV_PROTOCOL)
 SPLITS = {'Training': 'train', 'PublicTest': 'validation', 'PrivateTest': 'test'}
 
 

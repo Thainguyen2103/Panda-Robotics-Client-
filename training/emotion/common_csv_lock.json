@@ -1,0 +1,23 @@
+{
+  "sources": {
+    "train.csv": "5643c546a81c2c6e65e479af366b481277b8ed6f8207b06638a425743af457b1",
+    "val.csv": "281fc6fbb430aab0cb75c894786044dcea9a0101bcad10d6d6afa75f6fd99311",
+    "test.csv": "809d5efc481c1809a573eebda05553c10cefb1d264b4bcee4c884af9b0b56393"
+  },
+  "counts": {
+    "train": 22295,
+    "validation": 4777,
+    "test": 4778
+  },
+  "provider_readme_sha256": "7a3df1d6d0e84c6bac27b6c15b29f0c938f6d25b4c1c99f83b2b982904a4feb9",
+  "agreed_label_order": [
+    "Neutral",
+    "Happiness",
+    "Surprise",
+    "Sadness",
+    "Anger",
+    "Disgust",
+    "Fear",
+    "Contempt"
+  ]
+}

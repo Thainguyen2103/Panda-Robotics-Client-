@@ -11,7 +11,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from .common import LABELS, PROTOCOL, SPLITS, sha256, write_json
+from .common import LABELS, PROTOCOL, SUPPORTED_PROTOCOLS, SPLITS, sha256, write_json
 
 VOTE_COLUMNS = ('neutral', 'happiness', 'surprise', 'sadness', 'anger',
                 'disgust', 'fear', 'contempt', 'unknown', 'NF')
@@ -120,7 +120,7 @@ def prepare(fer2013, ferplus, output):
 def load_split(root, split):
     root = Path(root)
     manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
-    if manifest['protocol'] != PROTOCOL or manifest['labels'] != list(LABELS):
+    if manifest['protocol'] not in SUPPORTED_PROTOCOLS or manifest['labels'] != list(LABELS):
         raise ValueError('Unsupported dataset protocol or label order')
     path = root / f'{split}.npz'
     if sha256(path) != manifest['splits'][split]['sha256']:

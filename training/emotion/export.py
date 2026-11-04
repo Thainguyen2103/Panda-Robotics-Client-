@@ -66,7 +66,7 @@ def export(checkpoint, data, output, samples=16):
         os.replace(temporary, output)
     finally:
         temporary.unlink(missing_ok=True)
-    metadata = dict(schema=1, architecture=state['architecture'], protocol=PROTOCOL,
+    metadata = dict(schema=1, architecture=state['architecture'], protocol=manifest['protocol'],
         labels=list(LABELS), input=dict(shape=[1, 1, 64, 64], dtype='float32', range=[0, 255]),
         normalization='inside_graph: pixels / 127.5 - 1', output='eight_logits_no_softmax',
         checkpoint_sha256=sha256(checkpoint), model_sha256=sha256(output),

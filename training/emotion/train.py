@@ -13,7 +13,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from .common import LABELS, PROTOCOL, write_json
+from .common import LABELS, PROTOCOL, SUPPORTED_PROTOCOLS, write_json
 from .data import load_split
 from .metrics import classification_metrics
 from .model import ARCHITECTURE, EmotionCNN, FaceDataset
@@ -55,7 +55,7 @@ def save_checkpoint(path, state):
 def load_checkpoint(path):
     checkpoint = torch.load(path, map_location='cpu', weights_only=True)
     if (checkpoint['architecture'] != ARCHITECTURE or checkpoint['labels'] != list(LABELS)
-            or checkpoint['protocol'] != PROTOCOL):
+            or checkpoint['protocol'] not in SUPPORTED_PROTOCOLS):
         raise ValueError('Checkpoint architecture/labels/protocol mismatch')
     return checkpoint
 
@@ -155,7 +155,7 @@ def train(args):
         else:
             bad_epochs += 1
         scheduler.step()
-        state = dict(schema=1, architecture=ARCHITECTURE, labels=list(LABELS), protocol=PROTOCOL,
+        state = dict(schema=1, architecture=ARCHITECTURE, labels=list(LABELS), protocol=manifest['protocol'],
             config=config, model=model.state_dict(), optimizer=optimizer.state_dict(),
             scheduler=scheduler.state_dict(), rng=rng_state(generator), epoch=epoch + 1,
             history=history, best_score=best_score, best_epoch=best_epoch,
