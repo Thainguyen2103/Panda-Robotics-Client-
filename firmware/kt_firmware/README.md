@@ -86,7 +86,15 @@ Mỗi thư mục là một project PlatformIO **độc lập** (mở riêng thư
 - `cam-emotion/` — camera OV5640 + màn TFT + AI cảm xúc của Thái (`server/vision`, gọi nguyên
   bản, **không sửa code AI**). Ảnh đi qua USB lên laptop, laptop gửi lại tên mặt robot. Hướng
   dẫn chi tiết ở `cam-emotion/README.md`. Mô hình AI không đưa lên git; `chay-cam-xuc.bat` tự tải.
+- `head-demo/` — đầu robot chạy **không dây**: camera, mic, loa của ESP32-S3 đi qua WiFi
+  (hotspot laptop) hoặc USB, laptop chạy AI cảm xúc + giọng nói của nhóm (`server/`, gọi
+  nguyên bản). Lái thân bằng bàn phím (W/S tiến lùi, A/D xoay, L phanh) hoặc **tay cầm trên
+  điện thoại** (`http://192.168.137.1:8080`). Nạp code qua WiFi (OTA). Xem `head-demo/README.md`.
+- `body-test/` — thân robot ESP32 DevKit C: 2 bánh (TB6612) + cảm biến siêu âm HC-SR04, nhận
+  lệnh qua WiFi, tự dừng trước vật cản 12cm. Sơ đồ nối dây ở `body-test/so-do-noi-day.html`.
+- WiFi của 2 board nằm trong `src/wifi_secrets.h` (không lên git) — chép từ
+  `src/wifi_secrets.example.h` rồi điền tên/mật khẩu hotspot.
 - `hw-tests/` — test từng linh kiện: `board-selftest`, `cam-selftest` (video USB lên laptop),
-  `mic-selftest`, `tft-selftest`, `head-hw-test`.
+  `mic-selftest`, `tft-selftest`, `head-hw-test`, `mic-only`, `speaker-only`.
 - Lưu ý: board S3 cần `board_build.arduino.memory_type = qio_opi` để bật PSRAM 8MB
   (thiếu dòng này camera tụt xuống 320×240, rất mờ).

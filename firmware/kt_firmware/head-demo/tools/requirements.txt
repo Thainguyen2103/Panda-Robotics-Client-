@@ -1,0 +1,11 @@
+# Nhan dien cam xuc (giong cam-emotion, dung phien ban Thai dung)
+opencv-contrib-python==5.0.0.93
+numpy==2.5.2
+mediapipe==0.10.35
+pyserial
+# Giong noi: Gemini Transcribe (nghe), Groq (LLM tuy chon), Edge TTS (noi), giai ma MP3 cho loa robot
+groq>=0.11,<1
+google-genai>=2.22,<3
+edge-tts>=7,<8
+sounddevice
+miniaudio
