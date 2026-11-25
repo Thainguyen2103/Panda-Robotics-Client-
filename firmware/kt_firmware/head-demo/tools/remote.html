@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0f1115">
+<title>Moon Remote</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #181b22; --btn: #232733; --btn-on: #3b82f6; --text: #e6e8ee;
+    --muted: #8b92a5; --ok: #22c55e; --warn: #f59e0b; --bad: #ef4444;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 15px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  body { display: grid; gap: 10px; padding: 10px; height: 100dvh;
+    grid-template-areas: "cam" "status" "pad" "side"; grid-template-rows: auto auto 1fr auto; }
+  @media (orientation: landscape) {
+    body { grid-template-areas: "pad cam side" "pad status side";
+      grid-template-columns: 1fr minmax(0, 1.3fr) 1fr; grid-template-rows: 1fr auto; }
+  }
+  button { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none;
+    border: 0; border-radius: 14px; background: var(--btn); color: var(--text); font: inherit;
+    font-weight: 600; cursor: pointer; }
+  button.on { background: var(--btn-on); }
+  .cam { grid-area: cam; background: #000; border-radius: 14px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; min-height: 0; }
+  .cam img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+  .status { grid-area: status; background: var(--panel); border-radius: 12px; padding: 8px 12px;
+    display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); }
+  .status b { color: var(--text); font-weight: 600; }
+  .status .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--bad);
+    margin-right: 6px; vertical-align: middle; }
+  .status .dot.ok { background: var(--ok); }
+  .status.blocked { outline: 2px solid var(--bad); }
+  .pad { grid-area: pad; display: grid; gap: 8px; align-self: center; justify-self: center;
+    grid-template-columns: repeat(3, min(22vw, 92px)); grid-template-rows: repeat(3, min(22vw, 92px)); }
+  @media (orientation: landscape) {
+    .pad { grid-template-columns: repeat(3, min(13vw, 88px)); grid-template-rows: repeat(3, min(13vw, 88px)); }
+  }
+  .pad button { font-size: 26px; }
+  .pad .w { grid-column: 2; grid-row: 1; } .pad .a { grid-column: 1; grid-row: 2; }
+  .pad .d { grid-column: 3; grid-row: 2; } .pad .s { grid-column: 2; grid-row: 3; }
+  .pad .hint { grid-column: 2; grid-row: 2; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 12px; text-align: center; }
+  .side { grid-area: side; display: grid; gap: 8px; align-content: center;
+    grid-template-columns: 1fr 1fr; }
+  .side .brake { grid-column: 1 / -1; background: var(--bad); font-size: 20px; padding: 18px 0; }
+  .side .brake:active { filter: brightness(1.2); }
+  .side button { padding: 14px 0; }
+  .side .talk { grid-column: 1 / -1; }
+  .side label { grid-column: 1 / -1; color: var(--muted); font-size: 12px; text-align: center; margin-top: 2px; }
+  kbd { font: 11px ui-monospace, monospace; color: var(--muted); margin-left: 4px; }
+</style>
+</head>
+<body>
+  <div class="cam"><img id="cam" src="/cam.mjpg" alt="Camera đầu robot"></div>
+
+  <div class="status" id="status"><span><span class="dot" id="dot"></span><b id="conn">Đang nối…</b></span></div>
+
+  <div class="pad">
+    <button class="w" data-mode="run" aria-label="Tiến">▲</button>
+    <button class="a" data-mode="left" aria-label="Xoay trái">◀</button>
+    <div class="hint">Giữ để chạy<br>thả là phanh</div>
+    <button class="d" data-mode="right" aria-label="Xoay phải">▶</button>
+    <button class="s" data-mode="back" aria-label="Lùi">▼</button>
+  </div>
+
+  <div class="side">
+    <button class="brake" id="brake">PHANH<kbd>L</kbd></button>
+    <button id="faster">Tăng tốc<kbd>E</kbd></button>
+    <button id="slower">Giảm tốc<kbd>R</kbd></button>
+    <label>Đi thẳng mà xe lệch? Kéo về:</label>
+    <button id="trimL">‹ Trái<kbd>,</kbd></button>
+    <button id="trimR">Phải ›<kbd>.</kbd></button>
+    <button class="talk" id="talk">🎤 Nói với Moon</button>
+  </div>
+
+<script>
+  // Giữ nút = gửi lệnh mỗi 150ms. Laptop không nhận được lệnh 0,5 giây (thả nút, mất sóng,
+  // khoá màn hình) thì tự phanh — nên an toàn kể cả khi điện thoại rớt mạng giữa chừng.
+  const post = (path, body = {}) =>
+    fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(r => r.json()).then(show).catch(() => offline());
+
+  let held = null, timer = null;
+  function press(mode) {
+    if (held === mode) return;
+    held = mode;
+    clearInterval(timer);
+    post("/drive", { mode });
+    timer = setInterval(() => held && post("/drive", { mode: held }), 150);
+    mark();
+  }
+  function release(mode) {
+    if (mode && held !== mode) return;
+    held = null;
+    clearInterval(timer);
+    post("/drive", { mode: "stop" });
+    mark();
+  }
+  const mark = () => document.querySelectorAll(".pad button").forEach(b => b.classList.toggle("on", b.dataset.mode === held));
+
+  document.querySelectorAll(".pad button").forEach(b => {
+    b.addEventListener("pointerdown", e => { b.setPointerCapture(e.pointerId); press(b.dataset.mode); });
+    ["pointerup", "pointercancel", "lostpointercapture"].forEach(ev => b.addEventListener(ev, () => release(b.dataset.mode)));
+    b.addEventListener("contextmenu", e => e.preventDefault());
+  });
+  document.getElementById("brake").addEventListener("pointerdown", () => release());
+  document.getElementById("faster").addEventListener("click", () => post("/speed", { step: 25 }));
+  document.getElementById("slower").addEventListener("click", () => post("/speed", { step: -25 }));
+  document.getElementById("trimL").addEventListener("click", () => post("/trim", { delta: 0.02 }));
+  document.getElementById("trimR").addEventListener("click", () => post("/trim", { delta: -0.02 }));
+  document.getElementById("talk").addEventListener("click", () => post("/talk"));
+  document.addEventListener("visibilitychange", () => document.hidden && held && release());
+
+  // Bàn phím (mở trang này trên máy khác cũng lái được): giữ W/A/S/D, L phanh.
+  const KEYS = { w: "run", s: "back", a: "left", d: "right" };
+  addEventListener("keydown", e => {
+    const k = e.key.toLowerCase();
+    if (e.repeat) return;
+    if (KEYS[k]) press(KEYS[k]);
+    else if (k === "l") release();
+    else if (k === "e") post("/speed", { step: 25 });
+    else if (k === "r") post("/speed", { step: -25 });
+    else if (k === ",") post("/trim", { delta: 0.02 });
+    else if (k === ".") post("/trim", { delta: -0.02 });
+  });
+  addEventListener("keyup", e => { const m = KEYS[e.key.toLowerCase()]; if (m) release(m); });
+
+  // Trạng thái
+  const $ = id => document.getElementById(id);
+  const MODE = { stop: "đứng yên", run: "đang tiến", back: "đang lùi", left: "xoay trái", right: "xoay phải" };
+  function show(s) {
+    if (!s || s.online === undefined) return;
+    $("dot").classList.toggle("ok", s.online);
+    $("status").classList.toggle("blocked", !!s.blocked);
+    if (!s.online) { $("status").innerHTML = `<span><span class="dot" id="dot"></span><b id="conn">Thân chưa nối WiFi</b></span>`; return; }
+    const dist = s.dist == null || s.dist < 0 ? "trống" : `${Math.round(s.dist)} cm`;
+    $("status").innerHTML =
+      `<span><span class="dot ok" id="dot"></span><b id="conn">${s.blocked ? "VẬT CẢN" : MODE[s.mode] || s.mode}</b></span>` +
+      `<span>Phía trước: <b>${dist}</b></span><span>Tốc độ: <b>${s.speed}</b></span>` +
+      `<span>Lệch: <b>${s.trim}</b></span><span>Camera: <b>${s.cam_fps} hình/s</b></span>`;
+  }
+  function offline() {
+    $("status").innerHTML = `<span><span class="dot" id="dot"></span><b id="conn">Mất kết nối với laptop</b></span>`;
+  }
+  setInterval(() => !held && fetch("/status").then(r => r.json()).then(show).catch(offline), 400);
+  // Video MJPEG đứt (laptop khởi động lại, mất sóng) → tự mở lại
+  $("cam").addEventListener("error", () => setTimeout(() => { $("cam").src = "/cam.mjpg?" + Date.now(); }, 1000));
+</script>
+</body>
+</html>

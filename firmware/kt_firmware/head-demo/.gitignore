@@ -1,0 +1,13 @@
+.pio/
+.venv/
+__pycache__/
+models/*.onnx
+models/*.task
+models/private/
+groq-key.txt
+gemini-key.txt
+ghi-am/
+fish-key.txt
+debug_mic_last*.wav
+src/wifi_secrets.h
+body-trim.txt
