@@ -61,7 +61,7 @@
   <div class="pad">
     <button class="w" data-mode="run" aria-label="Tiến">▲</button>
     <button class="a" data-mode="left" aria-label="Xoay trái">◀</button>
-    <div class="hint">Giữ để chạy<br>thả là phanh</div>
+    <div class="hint">Giữ để chạy<br>▲+◀ = cua</div>
     <button class="d" data-mode="right" aria-label="Xoay phải">▶</button>
     <button class="s" data-mode="back" aria-label="Lùi">▼</button>
   </div>
@@ -74,6 +74,7 @@
     <button id="trimL">‹ Trái<kbd>,</kbd></button>
     <button id="trimR">Phải ›<kbd>.</kbd></button>
     <button class="talk" id="talk">🎤 Nói với Moon</button>
+    <button class="talk" id="auto">🚗 Tự đi dạo<kbd>X</kbd></button>
   </div>
 
 <script>
@@ -83,35 +84,44 @@
     fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
       .then(r => r.json()).then(show).catch(() => offline());
 
+  // Nhiều nút giữ cùng lúc (nhiều ngón / nhiều phím) → ghép như xe điều khiển:
+  // ▲ + ◀ = tiến + rẽ trái (cua vòng, xe không dừng), ▼ + ▶ = lùi + rẽ phải, ◀ một mình = xoay tại chỗ.
+  const down = new Set();
   let held = null, timer = null;
-  function press(mode) {
-    if (held === mode) return;
+  function combined() {
+    const f = down.has("run"), b = down.has("back"), l = down.has("left"), r = down.has("right");
+    const turn = l && !r ? "l" : r && !l ? "r" : "";
+    if (f && !b) return { l: "fl", r: "fr" }[turn] || "run";
+    if (b && !f) return { l: "bl", r: "br" }[turn] || "back";
+    return { l: "left", r: "right" }[turn] || null;
+  }
+  function update() {
+    const mode = combined();
+    if (mode === held) return;
     held = mode;
     clearInterval(timer);
-    post("/drive", { mode });
-    timer = setInterval(() => held && post("/drive", { mode: held }), 150);
+    post("/drive", { mode: mode || "stop" });
+    if (mode) timer = setInterval(() => held && post("/drive", { mode: held }), 150);
     mark();
   }
-  function release(mode) {
-    if (mode && held !== mode) return;
-    held = null;
-    clearInterval(timer);
-    post("/drive", { mode: "stop" });
-    mark();
-  }
-  const mark = () => document.querySelectorAll(".pad button").forEach(b => b.classList.toggle("on", b.dataset.mode === held));
+  const press = m => { down.add(m); update(); };
+  const release = m => { if (m) down.delete(m); else down.clear(); update(); };
+  const mark = () => document.querySelectorAll(".pad button").forEach(b => b.classList.toggle("on", down.has(b.dataset.mode)));
 
   document.querySelectorAll(".pad button").forEach(b => {
     b.addEventListener("pointerdown", e => { b.setPointerCapture(e.pointerId); press(b.dataset.mode); });
     ["pointerup", "pointercancel", "lostpointercapture"].forEach(ev => b.addEventListener(ev, () => release(b.dataset.mode)));
     b.addEventListener("contextmenu", e => e.preventDefault());
   });
-  document.getElementById("brake").addEventListener("pointerdown", () => release());
+  document.getElementById("brake").addEventListener("pointerdown", () => { release(); post("/drive", { mode: "stop" }); });
   document.getElementById("faster").addEventListener("click", () => post("/speed", { step: 25 }));
   document.getElementById("slower").addEventListener("click", () => post("/speed", { step: -25 }));
   document.getElementById("trimL").addEventListener("click", () => post("/trim", { delta: 0.02 }));
   document.getElementById("trimR").addEventListener("click", () => post("/trim", { delta: -0.02 }));
   document.getElementById("talk").addEventListener("click", () => post("/talk"));
+  // Tự đi dạo: bật/tắt. Đang tự đi mà bấm nút lái / PHANH cũng tắt luôn (người cầm lái).
+  let autoOn = false;
+  document.getElementById("auto").addEventListener("click", () => post("/auto", { on: !autoOn }));
   document.addEventListener("visibilitychange", () => document.hidden && held && release());
 
   // Bàn phím (mở trang này trên máy khác cũng lái được): giữ W/A/S/D, L phanh.
@@ -120,7 +130,8 @@
     const k = e.key.toLowerCase();
     if (e.repeat) return;
     if (KEYS[k]) press(KEYS[k]);
-    else if (k === "l") release();
+    else if (k === "l") { release(); post("/drive", { mode: "stop" }); }
+    else if (k === "x") post("/auto", { on: !autoOn });
     else if (k === "e") post("/speed", { step: 25 });
     else if (k === "r") post("/speed", { step: -25 });
     else if (k === ",") post("/trim", { delta: 0.02 });
@@ -130,15 +141,19 @@
 
   // Trạng thái
   const $ = id => document.getElementById(id);
-  const MODE = { stop: "đứng yên", run: "đang tiến", back: "đang lùi", left: "xoay trái", right: "xoay phải" };
+  const MODE = { stop: "đứng yên", run: "đang tiến", back: "đang lùi", left: "xoay trái", right: "xoay phải",
+                 fl: "tiến + rẽ trái", fr: "tiến + rẽ phải", bl: "lùi + rẽ trái", br: "lùi + rẽ phải" };
   function show(s) {
     if (!s || s.online === undefined) return;
+    autoOn = !!s.auto_on;
+    $("auto").classList.toggle("on", autoOn);
+    $("auto").firstChild.textContent = autoOn ? `🚗 Đang đi dạo (${s.auto_left}) — bấm để dừng` : "🚗 Tự đi dạo";
     $("dot").classList.toggle("ok", s.online);
     $("status").classList.toggle("blocked", !!s.blocked);
     if (!s.online) { $("status").innerHTML = `<span><span class="dot" id="dot"></span><b id="conn">Thân chưa nối WiFi</b></span>`; return; }
     const dist = s.dist == null || s.dist < 0 ? "trống" : `${Math.round(s.dist)} cm`;
     $("status").innerHTML =
-      `<span><span class="dot ok" id="dot"></span><b id="conn">${s.blocked ? "VẬT CẢN" : MODE[s.mode] || s.mode}</b></span>` +
+      `<span><span class="dot ok" id="dot"></span><b id="conn">${autoOn ? "Tự đi: " + s.auto_state : s.blocked ? "VẬT CẢN" : MODE[s.mode] || s.mode}</b></span>` +
       `<span>Phía trước: <b>${dist}</b></span><span>Tốc độ: <b>${s.speed}</b></span>` +
       `<span>Lệch: <b>${s.trim}</b></span><span>Camera: <b>${s.cam_fps} hình/s</b></span>`;
   }

@@ -25,6 +25,11 @@ try:
     import msvcrt  # doc phim go o cua so den (chi co tren Windows)
 except ImportError:
     msvcrt = None
+try:
+    import ctypes
+    _user32 = ctypes.windll.user32  # doc trang thai phim DANG GIU (nhieu phim cung luc)
+except (ImportError, AttributeError):
+    _user32 = None
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent  # thu muc head-demo
@@ -172,6 +177,75 @@ def body_command(text):
     return None
 
 
+# Che do TU DI DAO (tools/auto_drive.py). Cau dai hon lenh lai (toi 10 tu) vi tre hay noi
+# "Moon oi tu di dao di". Cau hoi ("xe tu hanh la gi?") thi KHONG bat — de LLM tra loi.
+AUTO_START_PHRASES = ("tự đi", "tự chạy", "đi dạo", "tự hành", "tự động", "khám phá", "lòng vòng",
+                      "chạy quanh", "đi quanh", "explore", "auto")
+# (cach noi khac, vd "Moon di tham quan can phong di": LLM tu hieu va gan [move:explore] -> moon_brain)
+AUTO_STOP_WORDS = {"dừng", "thôi", "stop", "đứng", "tắt", "nghỉ"}
+QUESTION_WORDS = {"gì", "sao", "nào", "không", "chưa", "what", "how", "why"}
+
+
+def auto_command(text, running):
+    """'start' / 'stop' / None. Dang tu di thi chi can cau co chu "dung/thoi/tat..." la dung."""
+    t = unicodedata.normalize("NFC", text or "").lower()
+    words = re.findall(r"\w+", t)
+    if not words or len(words) > 10:
+        return None
+    wset = set(words)
+    if AUTO_STOP_WORDS & wset:
+        # "tat tu di" / "dung tu di dao" (ke ca luc chua chay) hoac dang chay ma noi "dung lai"
+        return "stop" if running or any(p in t for p in AUTO_START_PHRASES) else None
+    if "?" in t or QUESTION_WORDS & wset:
+        return None
+    return "start" if any(p in t for p in AUTO_START_PHRASES) else None
+
+
+def held_drive_mode():
+    """W/A/S/D dang giu -> che do lai (xem body_link.keyboard_mode). Chi khi cua so camera hoac
+    cua so den "MOON head-demo" dang duoc chon."""
+    import body_link
+    body_link._user32 = _user32  # (test gia lap ban phim thay _user32 o day)
+    return body_link.keyboard_mode(("PANDA head-demo", "MOON head-demo"))
+
+
+def loudness(samples, volume):
+    """Chinh 1 cau TTS ve cung muc to roi nhan volume.
+    - Moi giong/dich vu TTS tra ve to nho khac nhau -> dua dinh ve ~92% toi da (bo qua 0,1% mau
+      to nhat de 1 tieng "bup" le khong lam ca cau bi thu nho).
+    - volume > 1: muon to hon muc toi da -> "nen" dinh song bang tanh (meo nhe, em tai) thay vi
+      cat phang (re, rat chua tai)."""
+    x = samples.astype(np.float64)
+    peak = float(np.percentile(np.abs(x), 99.9)) if len(x) else 0.0
+    if peak < 1:
+        return samples
+    x *= min(30000.0 / peak, 8.0) * volume
+    if volume > 1.0:
+        x = 32000.0 * np.tanh(x / 32000.0)
+    return np.clip(x, -32767, 32767).astype(np.int16)
+
+
+def arg(name, default=None):
+    """Gia tri dung sau 1 co dong lenh: 'chay-demo.bat --vision api' -> arg("--vision") = "api"."""
+    if name in sys.argv:
+        i = sys.argv.index(name)
+        if i + 1 < len(sys.argv) and not sys.argv[i + 1].startswith("--"):
+            return sys.argv[i + 1].lower()
+    return default
+
+
+# Cau hoi ve thu robot dang NHIN thay -> chup anh camera gui API truoc khi hoi LLM.
+VISUAL_WORDS = ("đây là", "cái này", "con này", "cái gì đây", "con gì đây", "nhìn", "thấy gì",
+                "thấy không", "trên tay", "đang cầm", "cầm gì", "màu gì", "ở đâu đây", "ai đây",
+                "what is this", "what's this", "what is that", "look", "see", "holding", "what color",
+                "これ", "それ", "見て", "見える")
+
+
+def is_visual_question(text):
+    low = unicodedata.normalize("NFC", text or "").lower()
+    return any(w in low for w in VISUAL_WORDS)
+
+
 def robot_command(result):
     if not result.get("face_detected"):
         return "sleepy", "KHONG THAY AI"
@@ -256,6 +330,10 @@ class WifiLink:
     def name(self):
         return f"WiFi {self.ip or '(dang tim board dau)'}"
 
+    BOOT_REASON = {"POWERON": "vua cap nguon", "SW": "vua nap code / tu reset",
+                   "BROWNOUT": "SUT AP - nguon 5V bi keo tut (motor than, loa to): xem README muc 4c 'Nguon'",
+                   "PANIC": "firmware bi loi (crash)", "WDT": "firmware bi treo", "EXT": "bam nut RESET"}
+
     def _discover(self):
         try:
             while True:
@@ -267,6 +345,18 @@ class WifiLink:
         if ip != self.ip:
             print(f"[WIFI] tim thay board dau: {ip}")
         self.ip = ip
+        # Firmware moi: "PANDA-HEAD 4300 <ly do khoi dong> <so giay tu luc bat>"
+        parts = data.decode(errors="replace").split()
+        if len(parts) >= 4 and parts[3].isdigit():
+            reason, up = parts[2], int(parts[3])
+            seen = getattr(self, "_seen_boot", None)
+            if seen is None or up < 30:
+                if seen is not None:
+                    print(f"[WIFI] !!! board DAU vua TU KHOI DONG LAI ({up}s truoc): {reason} - "
+                          f"{self.BOOT_REASON.get(reason, reason)}")
+                else:
+                    print(f"[WIFI] board dau chay duoc {up}s, lan khoi dong gan nhat: {reason}")
+            self._seen_boot = up
 
     def reopen(self):
         with self.lock:
@@ -408,9 +498,17 @@ def reader(link, shared):
                     frames, t0 = 0, now
 
 
-def ai_worker(shared):
-    engine = VisionEngine()
-    print("Mo hinh cam xuc da nap:", ", ".join(m for m in ("face", "emotion", "face_details") if m in engine.models))
+def ai_worker(shared, eyes=None):
+    """Nhan dien mat + cam xuc lien tuc cho mat robot.
+    eyes=None: model local cua Thai (nhanh, mien phi, anh khong ra khoi laptop) - mac dinh.
+    eyes=ApiVision (--vision api): API thay hoan toan, 1 lan / vai giay. Ca 2 deu co ham
+    process(frame) tra cung kieu ket qua -> sau nay thay model cua Thai/Anh vao y nhu vay."""
+    if eyes is not None:
+        engine = eyes
+        print(f"Mat robot: API ({' > '.join(eyes.models)}), toi da 1 lan / {eyes.interval:.0f} giay")
+    else:
+        engine = VisionEngine()
+        print("Mo hinh cam xuc da nap:", ", ".join(m for m in ("face", "emotion", "face_details") if m in engine.models))
     last_id = -1
     while not shared.stop:
         with shared.lock:
@@ -451,6 +549,12 @@ class Voice:
     WAIT_SEC = 4.0     # bam SPACE xong co toi da 4 giay de bat dau noi (mic laptop cua nhom: 6)
     SILENCE_SEC = 1.5  # noi xong, im 1,5 giay la chot cau ("stop" phai nhanh)
     MAX_SEC = 10.0     # dai nhat 1 lan ghi, phong khi cho on qua AI tuong la noi mai
+    # NGHE TU DONG (khong can SPACE): mic robot mo san luc robot ranh, tu nhan ra luc co nguoi noi.
+    ONSET_SEC = 0.3        # tieng noi phai keo dai >= 0,3 giay moi tinh la "bat dau noi"
+    AUTO_MIN_SPEECH = 0.5  # ca cau < 0,5 giay (ho, go ban, "a") -> bo, khong ton luot Gemini
+    AUTO_MIN_LEVEL = 60    # to toi thieu (cao hon MIN_VOICE_LEVEL=40 cua SPACE): bot nghe nham on nen
+    PRE_ROLL_SEC = 0.6     # giu lai 0,6 giay truoc luc phat hien -> khong mat chu dau cau
+    ECHO_GUARD_SEC = 0.8   # robot noi xong 0,8 giay moi nghe lai -> khong tu nghe tieng loa minh
 
     def __init__(self, link, mic_queue):
         self.link = link
@@ -459,9 +563,15 @@ class Voice:
         self.info = "Dang nap AI giong noi..."
         self.caption = ""
         self.question = self.answer = ""
-        # 0.5: giong TTS da to sat muc toi da; phat 100% qua MAX98357 khi nguon USB con
-        # nuoi ca camera + man hinh thi ap bi tut -> tieng re. Can to hon thi bam '+'.
-        self.volume = 0.5
+        # Am luong: moi cau TTS duoc chinh ve cung 1 muc (dinh ~92% toi da) roi nhan volume.
+        # 1.0 = to het muc ma chua meo; > 1.0 (bam '+') to hon nua nhung bat dau "nen" dinh song
+        # (hoi meo nhe); bam '-' de nho lai. Doi mac dinh: "--volume 0.8".
+        # Neu tieng re/tat giua chung khi to: nguon yeu (cam USB laptop nuoi ca camera + man) ->
+        # dung sac du phong / cuc sac 5V 2A cho dau robot.
+        self.volume = float(arg("--volume", "1.0"))
+        # Nghe tu dong (mac dinh): noi la robot nghe, khong can SPACE. Phim M tat/bat (vd lop on
+        # qua robot nghe nham). "--ptt" = chi nghe khi bam SPACE nhu cu.
+        self.hands_free = "--ptt" not in sys.argv
         # Mac dinh dung mic ROBOT (INMP441 qua day USB). "--laptop-mic" de quay lai mic laptop
         # (vd robot chua gan mic, hoac dang nghi ngo mic robot co van de) ma khong phai sua code.
         self.use_robot_mic = "--laptop-mic" not in sys.argv
@@ -471,8 +581,16 @@ class Voice:
         if "--tts" in sys.argv:
             self.tts_mode = sys.argv[sys.argv.index("--tts") + 1].lower()
         self.gemini_key = os.environ.get("GEMINI_API_KEY", "")
+        self.shared = None           # khung hinh camera (main() gan vao) de "nhin" khi be hoi
+        self.eyes = None             # vision_api.ApiVision, None neu tat gui anh len API
+        self.vision_context = ""     # "Camera cua Moon dang thay..." chen vao prompt cau dang hoi
         self.body = None             # phan than (body_link.Body), None neu chua cam
         self.flash = None            # (mat, chu, het_han): mat tam thoi, vd gap vat can
+        self.brain = None            # brain.Brain (main() gan vao), None neu chay --brain off
+        self.auto = None             # auto_drive.AutoDrive: che do tu di dao (phim X / noi "tu di dao")
+        # Khoa "luot noi": phim SPACE (luong chinh) va brain tu noi (luong rieng) co the cung
+        # luc thay robot ranh -> chi 1 ben duoc chiem luot, ben kia doi lan sau.
+        self._turn_lock = threading.Lock()
         self.local = self.engine = None
         threading.Thread(target=self._load, daemon=True).start()
 
@@ -483,19 +601,21 @@ class Voice:
             self.info = "THIEU GEMINI KEY: tao file head-demo/gemini-key.txt (xem README)"
             print(self.info)
             return
-        # LLM = LLM LOCAL cua Ngoc Anh: settings.py dat LLM_PROVIDER="ollama", model
-        # OLLAMA_LLM_MODEL (qwen3.5:2b) chay tren card do hoa laptop, khong len mang.
-        # Chi khi chay voi --llm-online moi cho phep doi sang Groq/Gemini (du phong).
+        # LLM (phan "suy nghi"): mac dinh goi API mien phi (llm_online.py: Gemini Flash-Lite,
+        # het quota thi Groq, roi Ollama). Nhom da duoc thay cho dung API cho phan AI ngoai
+        # computer vision; qwen3.5:2b chay local qua yeu va cham.
+        # "--llm local" = quay lai dung Ollama nhu cu (vd demo khong co mang).
         settings.GEMINI_API_KEY = self.gemini_key
-        if not ollama_running():
-            if "--llm-online" in sys.argv:
-                settings.LLM_PROVIDER = "groq" if os.environ.get("GROQ_API_KEY") else "gemini"
-            else:
-                self.state = "error"
-                self.info = (f"CHUA BAT OLLAMA (LLM local cua Ngoc Anh, model {settings.OLLAMA_LLM_MODEL}): "
-                             "mo app Ollama roi chay lai (xem README muc 3)")
-                print(self.info)
-                return
+        use_local = "--llm" in sys.argv and sys.argv[sys.argv.index("--llm") + 1:][:1] == ["local"]
+        has_ollama = ollama_running()
+        if use_local and not has_ollama:
+            self.state = "error"
+            self.info = (f"CHUA BAT OLLAMA (LLM local cua Ngoc Anh, model {settings.OLLAMA_LLM_MODEL}): "
+                         "mo app Ollama roi chay lai, hoac bo '--llm local' de dung API")
+            print(self.info)
+            return
+        # Bao engine cua nhom dung Gemini tu luc import -> khong mat thoi gian do Ollama.
+        settings.LLM_PROVIDER = "ollama" if use_local else "gemini"
         try:
             from server.voice.runtime import local
             from server.llm import engine
@@ -504,17 +624,91 @@ class Voice:
             self.state, self.info = "error", f"Loi nap AI giong noi: {e}"
             print(self.info)
             return
+        import llm_online
+        # Chen them vao prompt: luat the lenh + cau do dang cho (brain), "camera dang thay gi"
+        # (chi khi be hoi ve thu nhin thay).
+        llm_online.add_context(engine, lambda: "\n".join(
+            x for x in (self.brain.context() if self.brain else "", self.vision_context) if x))
+        if not use_local:
+            llm_online.install(engine, llm_online.build(
+                self.gemini_key, os.environ.get("GROQ_API_KEY"),
+                getattr(settings, "GROQ_LLM_MODEL", "openai/gpt-oss-120b"),
+                (settings.OLLAMA_LLM_MODEL, getattr(settings, "OLLAMA_HOST", "http://127.0.0.1:11434"))
+                if has_ollama else None))
+            print("[LLM] thu tu thu:", engine._model_name)
         self.local, self.engine, self.stt = local, engine, gemini_stt
         self.state = "ready"
         self.info = (f"San sang. Nghe: Gemini Transcribe | LLM: "
-                     f"{getattr(engine, '_provider_name', None) or settings.LLM_PROVIDER} | "
-                     f"Giong: {self.tts_name()}. Bam SPACE de noi.")
+                     f"{'Ollama local' if use_local else 'API (Gemini Flash-Lite)'} | "
+                     f"Giong: {self.tts_name()}. "
+                     + ("Cu noi, Moon tu nghe." if self.auto_listening() else "Bam SPACE de noi."))
         print(self.info)
+        if self.use_robot_mic:
+            threading.Thread(target=self._auto_listen, daemon=True).start()
 
-    def _listen(self):
+    def auto_listening(self):
+        return self.hands_free and self.use_robot_mic
+
+    def _auto_listen(self):
+        """NGHE TU DONG: robot ranh thi mo mic, doc lien tuc, thay co nguoi noi (to hon on nen
+        >= 0,3 giay) thi chiem luot "listening" va ghi tiep toi khi nguoi noi ngung -> tra loi
+        nhu khi bam SPACE. Robot dang nghi/noi thi khong nghe (khong tu nghe tieng loa minh)."""
+        from collections import deque
+        mic_on = False
+        levels, pre = deque(maxlen=250), deque()
+        voiced = 0.0
+        while not (self.shared and self.shared.stop):
+            idle = (not self.auto_listening() or self.state != "ready"
+                    or time.monotonic() < getattr(self, "_play_end", 0.0) + self.ECHO_GUARD_SEC)
+            if idle:
+                if mic_on:
+                    mic_on = False
+                    # Dang co luot SPACE ("listening") thi mic la cua no -> de no tu tat.
+                    if self.state != "listening":
+                        self.link.send(b"mic off\n")
+                time.sleep(0.05)
+                continue
+            if not mic_on:
+                while not self.mic_queue.empty():  # bo tieng cu (vd tieng loa robot vua noi)
+                    try:
+                        self.mic_queue.get_nowait()
+                    except queue.Empty:
+                        break
+                self.link.send(b"mic on\n")
+                mic_on, voiced = True, 0.0
+                levels.clear()
+                pre.clear()
+                skip = mic_clean.SKIP_START_SEC
+            try:
+                data = self.mic_queue.get(timeout=0.2)
+            except queue.Empty:
+                continue
+            samples = np.frombuffer(data, dtype=np.int16)
+            dur = len(samples) / SAMPLE_RATE
+            if skip > 0:
+                skip -= dur
+                continue
+            level = mic_clean.voice_level(samples)
+            levels.append(level)
+            pre.append((data, level))
+            while len(pre) > 1 and sum(len(d) for d, _ in pre) / 2 / SAMPLE_RATE > self.PRE_ROLL_SEC:
+                pre.popleft()
+            if len(levels) < 10:  # can ~vai tram ms dau de biet on nen cua phong
+                continue
+            lv = list(levels)
+            loud = mic_clean.is_voice(lv) and float(np.median(lv[-5:])) > self.AUTO_MIN_LEVEL
+            voiced = voiced + dur if loud else 0.0
+            if voiced < self.ONSET_SEC or not self._claim("listening"):
+                continue
+            print("[NGHE] co nguoi noi -> ghi...")
+            mic_on = False  # tu day mic thuoc ve luot nay; _listen_robot_mic tu tat khi xong
+            self._conversation(pre=(list(pre), lv[:-len(pre)] if len(lv) > len(pre) else []))
+            voiced = 0.0
+
+    def _listen(self, pre=None):
         """Ghi am (mic robot, hoac mic laptop neu chay --laptop-mic / chua gan mic that),
-        roi gui Gemini chep thanh chu."""
-        audio = self._listen_robot_mic() if self.use_robot_mic else self._listen_laptop_mic()
+        roi gui Gemini chep thanh chu. pre = doan dau cau da nghe duoc (che do nghe tu dong)."""
+        audio = self._listen_robot_mic(pre) if self.use_robot_mic else self._listen_laptop_mic()
         if not audio:
             print("[nghe] khong co tieng noi nao de gui Gemini.")
             return ""
@@ -534,24 +728,35 @@ class Voice:
             yield_on_pause=False,
         )
 
-    def _listen_robot_mic(self):
+    def _listen_robot_mic(self, pre=None):
         """Duong moi: ghi am bang MIC ROBOT (INMP441 tren head-demo, gui PCM qua day USB).
         Tu doc buffer trong luc "mic on", tu nhan ra luc bat dau / ngung noi NGAY TRONG HAM NAY
-        (firmware chi lo gui tho), roi lam sach (mic_clean.py) truoc khi tra ve de gui Gemini."""
-        # Bo khung cu con sot tu lan ghi truoc (vd mic "on" tre, hoac "off" truoc chua kip
-        # don het) de khong lay nham tieng cua lan hoi truoc vao dau lan nay.
-        while not self.mic_queue.empty():
-            try:
-                self.mic_queue.get_nowait()
-            except queue.Empty:
-                break
-        self.link.send(b"mic on\n")
+        (firmware chi lo gui tho), roi lam sach (mic_clean.py) truoc khi tra ve de gui Gemini.
+        pre = (cac khung dau cau, muc on truoc do): nghe tu dong da phat hien nguoi noi, mic dang mo."""
         chunks, levels = [], []
-        skip = mic_clean.SKIP_START_SEC
         # Thoi gian dem theo SO MAU nhan duoc, khong theo dong ho: khung qua day USB co luc den
         # don cuc, dem theo dong ho se tuong im lang trong khi tieng noi van dang nam tren day.
         pos = 0.0
         voice_start = voice_end = None
+        if pre is None:
+            # Bo khung cu con sot tu lan ghi truoc (vd mic "on" tre, hoac "off" truoc chua kip
+            # don het) de khong lay nham tieng cua lan hoi truoc vao dau lan nay.
+            while not self.mic_queue.empty():
+                try:
+                    self.mic_queue.get_nowait()
+                except queue.Empty:
+                    break
+            self.link.send(b"mic on\n")
+            skip = mic_clean.SKIP_START_SEC
+        else:
+            pre_chunks, history = pre
+            levels = list(history)  # muc on nen vai giay truoc -> nguong "con dang noi" dung ngay
+            for data, lv in pre_chunks:
+                chunks.append(data)
+                levels.append(lv)
+                pos += len(data) / 2 / SAMPLE_RATE
+            voice_start, voice_end = max(0.0, pos - self.ONSET_SEC - 0.1), pos
+            skip = 0
         deadline = time.time() + self.MAX_SEC + 2  # phong khi board ngung gui han
         try:
             while pos < self.MAX_SEC and time.time() < deadline:
@@ -589,6 +794,9 @@ class Voice:
                   " nap lai head-demo (pio run -t upload)!")
         if voice_end is None:
             return b""
+        if pre is not None and voice_end - voice_start < self.AUTO_MIN_SPEECH:
+            print(f"[NGHE] tieng qua ngan ({voice_end - voice_start:.1f}s, chac on/go ban) -> bo qua")
+            return b""
         audio, gain = mic_clean.clean(audio, voice_start, voice_end)
         mic_clean.save_wav(HERE / "debug_mic_last_clean.wav", audio)
         print(f"[mic] lam sach: giu {len(audio) / 32000:.1f}s quanh tieng noi, to len x{gain:.1f}. Nghe thu:"
@@ -603,8 +811,12 @@ class Voice:
         if self.flash and time.time() < self.flash[2]:
             return self.flash[0], self.flash[1]
         if self.state not in self.FACE:
+            if self.auto and self.auto.running:
+                return "happy", "MOON DI DAO"
             if self.body and self.body.running:
-                caption = {"run": "MOON DANG CHAY", "left": "MOON RE TRAI", "right": "MOON RE PHAI"}
+                caption = {"run": "MOON DANG CHAY", "left": "MOON RE TRAI", "right": "MOON RE PHAI",
+                           "fl": "MOON RE TRAI", "fr": "MOON RE PHAI", "back": "MOON LUI",
+                           "bl": "MOON LUI", "br": "MOON LUI"}
                 return "happy", caption.get(self.body.mode, "MOON DANG CHAY")
             return None
         face, text = self.FACE[self.state]
@@ -620,42 +832,70 @@ class Voice:
         if self.state not in ("error",):
             self.info = f"{what}: {reason}"
 
+    def _claim(self, state):
+        """Chiem luot: robot dang ranh ("ready") thi chuyen sang state, tra True."""
+        with self._turn_lock:
+            if self.state != "ready":
+                return False
+            self.state = state
+            return True
+
     def talk(self):
-        if self.state != "ready":
+        if not self._claim("listening"):
             return self._not_ready("SPACE")
         print("[SPACE] Bat dau nghe...")
         threading.Thread(target=self._conversation, daemon=True).start()
 
     def say(self, text):
-        if self.state != "ready":
+        if not self._claim("speaking"):
             return self._not_ready("T")
         print("[T] Thu loa robot...")
         threading.Thread(target=self._speak_only, args=(text,), daemon=True).start()
+
+    def speak_proactive(self, text, face, caption):
+        """Brain tu noi (chao, do bai) khi robot dang ranh. Tra False neu dang ban."""
+        if not self._claim("speaking"):
+            return False
+        self.question, self.answer = "", text
+        self.flash = (face, caption, time.time() + max(3.0, len(text) / 14))
+        threading.Thread(target=self._speak_only, args=(text,), daemon=True).start()
+        return True
 
     def _speak_only(self, text):
         self._speak(text)
         self.state = "ready"
 
-    def _conversation(self):
+    def _conversation(self, pre=None):
         self.caption = ""
         where = "mic robot (dinh dau)" if self.use_robot_mic else "mic laptop"
         self.state, self.info = "listening", f"Dang nghe... noi vao {where}"
+        again = "Noi lai nhe." if self.auto_listening() else "Bam SPACE noi lai."
         try:
-            text = self._listen()
+            text = self._listen(pre)
         except Exception as e:
             print("Loi thu am/Gemini:", repr(e))
             self.state = "ready"
-            self.info = f"Loi Gemini ({type(e).__name__}): kiem tra key + internet. Bam SPACE thu lai."
+            self.info = f"Loi Gemini ({type(e).__name__}): kiem tra key + internet. {again}"
             return
         if not text:
-            self.state, self.info = "ready", "Khong nghe ro. Bam SPACE noi lai."
+            self.state, self.info = "ready", f"Khong nghe ro. {again}"
             return
         self.question = text
         print(f"\nBan noi: {text}")
+        if self.brain:
+            self.brain.on_heard(text)
 
+        # Xet "tu di dao" TRUOC lenh lai: "tu chay" co chu "chay" -> body_command hieu la "run".
+        acmd = auto_command(text, self.auto.running) if self.auto else None
+        if acmd:
+            return self._auto_command(acmd)
         cmd = body_command(text)
         if cmd:
             return self._body_command(cmd)
+
+        self.vision_context = ""
+        if self.eyes and self.shared is not None and is_visual_question(text):
+            self._look(text)
 
         self.state, self.info = "thinking", "Dang nghi..."
         try:
@@ -666,8 +906,6 @@ class Voice:
         if not reply:
             self.state, self.info = "ready", "LLM khong tra loi (xem cua so den)."
             return
-        self.answer = reply
-        print(f"Moon:    {reply}")
 
         # Cau hoi tu vung (vd "con meo tieng Nhat la gi") -> hien tu len man robot
         info = None
@@ -679,9 +917,33 @@ class Voice:
             en = ascii_vi(str(info.get("en") or "")).upper()
             romaji = ascii_vi(str(info.get("ja_romaji") or info.get("romaji") or "")).upper()
             self.caption = " / ".join(x for x in (en, romaji) if x)[:22]
+        if self.brain:  # cat the lenh [face:..] [move:..] [word:..] ra va thuc hien
+            reply = self.brain.apply(reply)
+        self.answer = reply
+        print(f"Moon:    {reply}")
         self._speak(reply)
+        if self.brain:
+            self.brain.after_reply()
         self.state = "ready"
-        self.info = "Xong. Bam SPACE de noi tiep."
+        self.info = "Xong. " + ("Cu noi tiep." if self.auto_listening() else "Bam SPACE de noi tiep.")
+
+    def _look(self, question):
+        """Be hoi ve thu dang nhin thay ("day la con gi?") -> chup khung hinh hien tai, gui API
+        hieu anh (~2 giay), roi de LLM tra loi kem mo ta do."""
+        with self.shared.lock:
+            frame = None if self.shared.frame is None else self.shared.frame.copy()
+        if frame is None:
+            return
+        self.state, self.info = "thinking", "Moon dang nhin..."
+        import vision_api
+        result = self.eyes.latest(max_age=2) or self.eyes.look(frame)
+        self.vision_context = vision_api.describe(result)
+        print("[MAT]", self.vision_context or "API khong nhin duoc -> tra loi khong kem camera")
+        if result and result.get("holding"):
+            self.caption = ascii_vi(result["holding"]["en"]).upper()[:22]
+        # Cung 1 cau hoi nhung vat khac -> khong duoc lay cau tra loi cu trong bo nho dem
+        for q in (question, self.engine.normalize_user_question(question)):
+            self.engine._semantic_cache.pop(q, None)
 
     BODY_REPLY = {"run": "Moon chạy đây!", "back": "Moon lùi lại đây!",
                   "left": "Moon rẽ trái đây!", "right": "Moon rẽ phải đây!"}
@@ -690,6 +952,8 @@ class Voice:
     def _body_command(self, cmd):
         """Lenh "run"/"left"/"right"/"stop": khong hoi LLM, ra lenh cho phan than roi noi
         xac nhan ngan."""
+        if self.auto:
+            self.auto.stop("lenh noi " + cmd)  # be ra lenh lai -> thoi tu di, nghe lenh be
         if not (self.body and self.body.online):
             reply = "Mình chưa nối được phần thân, bạn cắm cáp và nạp body-test giúp mình nhé."
         elif cmd == "stop":
@@ -703,26 +967,75 @@ class Voice:
         self.answer = reply
         self._speak(reply)
         self.state = "ready"
-        self.info = "Xong. Bam SPACE de noi tiep (\"stop\" de dung)."
+        self.info = "Xong. Noi tiep (\"stop\" de dung)."
 
-    def body_key(self, cmd):
-        """Phim W / S / A / D / L: tien / lui / re trai / re phai / dung, khong can noi
-        (du phong khi lop on). Bam 1 lan la chay tiep cho toi khi bam phim khac hoac L."""
+    def _auto_command(self, cmd):
+        """Noi "Moon tu di dao di" / "dung lai": bat / tat che do tu di, khong hoi LLM."""
+        if cmd == "start":
+            why = self.auto.start()
+            minutes = self.auto.duration / 60
+            reply = (f"Moon đi dạo {minutes:.0f} phút đây! Bạn nói dừng lại thì Moon dừng nhé." if not why
+                     else "Moon đang tự đi rồi mà!" if why == "dang tu di roi"
+                     else "Mình chưa nối được phần thân nên chưa đi dạo được.")
+        else:
+            reply = "Moon dừng đi dạo rồi nè." if self.auto.stop("lenh noi") else "Moon đang đứng yên mà."
+        print(f"[TU DI] lenh noi {cmd} -> {reply}")
+        self.answer = reply
+        self._speak(reply)
+        self.state = "ready"
+        self.info = "Xong. Noi tiep."
+
+    def toggle_auto(self, source="phim X"):
+        if not self.auto:
+            print("[TU DI] chua co phan than.")
+        elif not self.auto.stop(source):
+            why = self.auto.start()
+            if why:
+                print(f"[TU DI] khong bat duoc: {why}")
+
+    def on_auto_event(self, kind, info):
+        """auto_drive bao: doi mat robot cho de hieu no dang lam gi; vai luc quan trong thi noi."""
+        now = time.time()
+        if kind == "scan":
+            self.flash = ("questioning", "TIM DUONG...", now + 3)
+        elif kind == "go":
+            self.flash = ("happy", "DI BEN TRAI" if info == "left" else "DI BEN PHAI", now + 1.5)
+        elif kind in ("back", "stuck"):
+            self.flash = ("surprised", "BI CHAN - LUI", now + 2)
+        elif kind == "end":
+            self.speak_proactive("Hết giờ đi dạo rồi, Moon nghỉ một chút nhé!", "sleepy", "NGHI CHUT")
+        elif kind == "trapped":
+            self.speak_proactive("Ôi, Moon bị kẹt rồi, bạn giúp Moon ra với!", "dizzy", "MOON BI KET")
+        elif kind == "lost":
+            self.flash = ("dizzy", "MAT KET NOI THAN", now + 3)
+
+    def body_key(self, cmd, hold=False):
+        """Phim lai than (body_link.MODES: run/back/left/right/fl/fr/bl/br, hoac stop).
+        hold=True (giu phim tren Windows): chi chay khi con duoc goi lai lien tuc.
+        hold=False (may khong doc duoc phim dang giu): bam 1 lan chay toi khi bam phim khac / L."""
+        if self.auto:
+            self.auto.stop("lai bang phim")  # nguoi cam lai -> thoi tu di (khong dang tu di: bo qua)
         if not self.body:
-            print("[THAN] chua cam board than (body-test).")
+            if not getattr(self, "_warned_no_body", False):
+                self._warned_no_body = True
+                print("[THAN] chua cam board than (body-test).")
             return
-        if cmd == "stop":
-            self.body.stop()
-        elif not getattr(self.body, self.BODY_ACTION[cmd])():
-            print("[THAN] dang co vat can, khong chay.")
-        print(f"[THAN] phim -> {self.body.status_text()}")
+        moving = self.body.drive(cmd, hold=hold)
+        if not moving and getattr(self, "_key_log", (None,))[0] != cmd:
+            print("[THAN] dang co vat can phia truoc, khong tien duoc (lui / xoay de thoat).")
+        # Goi lien tuc khi giu phim: chi in khi doi lenh, hoac 1 lan/2 giay
+        last_cmd, last_t = getattr(self, "_key_log", (None, 0.0))
+        if cmd != last_cmd or time.time() - last_t > 2:
+            self._key_log = (cmd, time.time())
+            print(f"[THAN] phim {cmd.upper()} -> {self.body.status_text()}")
 
     def on_obstacle(self):
         """Goi tu body_link khi dang chay ma gap vat can (board da tu dung banh)."""
+        if self.auto and self.auto.running:
+            return  # dang tu di: auto_drive tu tim duong, khong noi "co vat can" moi lan
         print("[THAN] VAT CAN -> dung")
         self.flash = ("surprised", "VAT CAN!", time.time() + 2.5)
-        if self.state == "ready":
-            self.state = "speaking"
+        if self._claim("speaking"):
             self._speak("Có vật cản phía trước, Moon dừng lại nhé!")
             self.state = "ready"
 
@@ -775,8 +1088,7 @@ class Voice:
             if len(loud):
                 samples = samples[max(0, loud[0] - 800) : loud[-1] + 800]
             samples = np.concatenate([samples, np.zeros(SAMPLE_RATE * 15 // 100, np.int16)])
-            if self.volume != 1.0:
-                samples = np.clip(samples * self.volume, -32767, 32767).astype(np.int16)
+            samples = loudness(samples, self.volume)
             self.info = "Robot dang noi..."
             # Chi cho loa phat het o cau CUOI; cac cau giua gui noi duoi lien mach.
             self._stream(samples.tobytes(), wait=(job is jobs[-1]))
@@ -845,7 +1157,7 @@ def draw(frame, result, cam_fps, sent, voice):
     y += 24
     cv2.putText(panel, f"-> Man hinh: {sent[0]}", (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 220, 255), 1)
     if REMOTE_URL:
-        cv2.putText(panel, f"Tay cam: {REMOTE_URL}", (10, view.shape[0] - 22 * 6), cv2.FONT_HERSHEY_SIMPLEX,
+        cv2.putText(panel, f"Tay cam: {REMOTE_URL}", (10, view.shape[0] - 22 * 8), cv2.FONT_HERSHEY_SIMPLEX,
                     0.45, (200, 160, 255), 1)
     if result and result.get("face_detected"):
         y += 30
@@ -858,13 +1170,21 @@ def draw(frame, result, cam_fps, sent, voice):
             bar(panel, y, NAME_VI[name], scores.get(name, 0.0), (80, 200, 80))
     else:
         cv2.putText(panel, "Khong thay mat nao", (10, y + 34), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+        y += 34
+    if result and result.get("scene"):  # chi co khi chay --vision api: API mo ta canh
+        for ln in wrap("Thay: " + result["scene"], 38)[:3]:
+            y += 20
+            cv2.putText(panel, ln, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 200, 120), 1)
     if voice.body:
         body = voice.body
         col = (60, 60, 255) if body.blocked or not body.online else ((0, 255, 255) if body.running else (180, 180, 180))
         parts = body.status_text().split(" | ")
+        if voice.auto and voice.auto.running:
+            parts = [voice.auto.status_text()[:46]] + parts
         for i, part in enumerate(parts):
+            c = (0, 215, 255) if part.startswith("TU DI") else col
             cv2.putText(panel, part, (10, view.shape[0] - 22 * len(parts) + 14 + i * 22),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, col, 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, c, 1)
 
     top = np.hstack([view, panel])
     strip = np.full((VOICE_H, top.shape[1], 3), 18, np.uint8)
@@ -905,9 +1225,28 @@ def main():
         print("Khong thay day USB toi board dau -> dung WiFi (board dau phai bat + vao cung hotspot).")
         print("Dang nap AI (lan dau mat vai chuc giay)...")
     ser = link  # cac cho cu goi ser.close() luc thoat
-    for target, args in ((reader, (link, shared)), (ai_worker, (shared,))):
+    # Mat robot (xem vision_api.py):
+    #   --vision local (mac dinh): mat + cam xuc bang model local cua Thai; API chi "nhin" khi
+    #                              be hoi ve do vat ("day la con gi?").
+    #   --vision api:              bo model local, API phan tich ca mat + cam xuc (cham, ton quota).
+    #   --vision-cloud off:        KHONG BAO GIO gui anh camera len mang (rieng tu cho tre).
+    eyes = None
+    if arg("--vision-cloud", "on") != "off" and os.environ.get("GEMINI_API_KEY"):
+        import vision_api
+        eyes = vision_api.ApiVision(os.environ["GEMINI_API_KEY"])
+    elif arg("--vision-cloud") == "off":
+        print("Mat robot: KHONG gui anh len mang (--vision-cloud off), chi dung model local.")
+    use_api_eyes = arg("--vision", "local") == "api" and eyes is not None
+    for target, args in ((reader, (link, shared)), (ai_worker, (shared, eyes if use_api_eyes else None))):
         threading.Thread(target=target, args=args, daemon=True).start()
     voice = Voice(link, shared.mic_queue)
+    voice.shared, voice.eyes = shared, eyes
+    # Brain (tools/moon_brain.py): the lenh trong cau tra loi + tu chao / tu do bai. "--brain off" = tat.
+    if arg("--brain", "on") != "off":
+        import moon_brain as brain
+        words = brain.load_quiz_words(TEAM_REPO / "server" / "llm" / "data.json")
+        voice.brain = brain.Brain(voice, shared, words).start()
+        print(f"Brain: BAT (tu chao, tu do {len(words)} tu vung; bam B de bat/tat tu noi)")
 
     # Phan THAN (tuy chon): board DevKit C chay body-test.
     #   - cam day USB vao laptop  -> dieu khien qua day
@@ -917,6 +1256,15 @@ def main():
         body_port = find_body_port(exclude=port)  # (find_body_port bo qua board dau CH343 nho exclude)
         try:
             voice.body = Body(body_port, on_obstacle=voice.on_obstacle)
+            # mat lien lac voi than -> in kem "MOON dang noi?" (loa keo dien manh -> sut ap?)
+            voice.body.activity = lambda: voice.state
+            # Tu di dao (phim X / noi "Moon tu di dao di"). --auto-minutes 10, --auto-turn 0.45
+            # (giay xoay ~ 60 do; xe xoay it qua thi tang len) — xem tools/auto_drive.py.
+            import auto_drive
+            voice.auto = auto_drive.AutoDrive(
+                voice.body, minutes=float(arg("--auto-minutes", str(auto_drive.AUTO_MINUTES))),
+                turn_sec=float(arg("--auto-turn", str(auto_drive.SCAN_TURN_SEC))),
+                on_event=voice.on_auto_event)
             where = body_port or "WiFi (cho board than phat tin hieu...)"
             print(f"Phan than: {where}. Noi \"run\" de chay, \"stop\" de dung (phim W / L).")
         except (serial.SerialException, OSError) as e:
@@ -959,11 +1307,17 @@ def main():
     cv2.namedWindow(WINDOW, cv2.WINDOW_AUTOSIZE)
     link.send(b"cam natural\n")
     sent, last_send, last_shown = ("", ""), 0.0, -1
+    key_mode = None  # che do lai dang giu phim (held_drive_mode)
     started, last_placeholder, warned = time.time(), 0.0, False
-    print("\nPHIM (bam o cua so camera HOAC o cua so den nay): SPACE noi | T thu loa | V doi giong Fish/Gemini"
-          " | +/- am luong | Q thoat")
+    print("\nNGHE TU DONG: " + ("BAT - cu noi la Moon nghe (phim M de tat/bat)" if voice.auto_listening()
+                                 else "TAT - bam SPACE roi noi"))
+    print("PHIM (bam o cua so camera HOAC o cua so den nay): SPACE noi | M bat/tat nghe tu dong | T thu loa"
+          " | V doi giong Fish/Gemini | B bat/tat tu chao-do bai | +/- am luong | Q thoat")
     print("LAI THAN: W tien / S lui / A xoay trai / D xoay phai / L phanh | E tang toc / R giam toc"
           " | , . chinh lech khi di thang bi lech (, = keo sang trai, . = keo sang phai)")
+    if voice.auto:
+        print(f"TU DI DAO: phim X (hoac noi \"Moon tu di dao di\") -> tu chay {voice.auto.duration / 60:.0f} phut, "
+              "tu ne vat can. Tat: X lan nua / noi \"dung lai\" / bam phim lai bat ky. CHI CHAY DUOI SAN.")
     print("Lenh noi (bam SPACE roi noi): \"run\"/\"chay\" -> tien | \"back\"/\"lùi\" -> lui |"
           " \"left\"/\"trái\" -> re trai | \"right\"/\"phải\" -> re phai | \"stop\"/\"dừng\" -> dung\n")
     while True:
@@ -1012,14 +1366,35 @@ def main():
                 ch = c.lower()
         if key == 27 or ch == "q" or cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
             break
+        # Lai bang GIU PHIM (Windows): con giu thi moi vong goi lai drive(hold=True) de "gia han",
+        # tha het phim -> phanh ngay. Giu W roi bam them A = cua vong trai, xe khong dung lai.
+        if voice.body and _user32 is not None:
+            km = held_drive_mode()
+            if km:
+                voice.body_key(km, hold=True)
+            elif key_mode:
+                voice.body.stop()
+            key_mode = km
         if ch == " ":
             voice.talk()
         elif ch == "t":
             voice.say("Xin chào, mình là Moon. Loa của mình đã hoạt động rồi nhé!")
         elif ch == "v":
             voice.toggle_tts()
+        elif ch == "m" and voice.use_robot_mic:
+            voice.hands_free = not voice.hands_free
+            print(f"[M] Nghe tu dong: {'BAT - cu noi la Moon nghe' if voice.hands_free else 'TAT - bam SPACE de noi'}")
+        elif ch == "x":
+            voice.toggle_auto()
+        elif ch == "b" and voice.brain:
+            voice.brain.proactive = not voice.brain.proactive
+            print(f"[B] Brain tu chao / tu do bai: {'BAT' if voice.brain.proactive else 'TAT'}")
         # Lai than kieu game: W tien, S LUI, A/D xoay trai/phai, L dung.
+        # Tren Windows da lai bang GIU PHIM (held_drive_mode, ngay duoi vong lap nay) -> bo qua
+        # cac phim nay o day, khong thi 2 cach lai danh nhau.
         # "ư": bo go tieng Viet (Telex) dang bat thi phim W ra chu "ư".
+        elif ch in ("w", "ư", "s", "a", "d") and _user32 is not None:
+            pass
         elif ch in ("w", "ư"):
             voice.body_key("run")
         elif ch == "s":
@@ -1041,10 +1416,12 @@ def main():
             else:
                 b.nudge(0.02 if ch == "," else -0.02)
                 print(f"[THAN] chinh lech -> {b.trim_text()}")
-        elif ch in ("+", "="):
-            voice.volume = min(3.0, voice.volume + 0.25)
+        elif ch in ("+", "="):  # 1.0 = to het muc chua meo; toi 2.0 = to hon nua (meo nhe)
+            voice.volume = min(2.0, voice.volume + 0.25)
+            print(f"[+] am luong x{voice.volume:.2f}")
         elif ch == "-":
             voice.volume = max(0.25, voice.volume - 0.25)
+            print(f"[-] am luong x{voice.volume:.2f}")
     shared.stop = True
     if voice.body:
         voice.body.close()  # gui "m 0 0": banh dung truoc khi thoat
