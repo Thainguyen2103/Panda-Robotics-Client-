@@ -4,6 +4,7 @@
 #include <WiFiUdp.h>
 #include <driver/i2s.h>
 #include <freertos/stream_buffer.h>
+#include <esp_system.h> // esp_reset_reason(): vì sao board vừa khởi động lại
 #include "esp_camera.h"
 #include "face.h"
 
@@ -107,7 +108,41 @@ const uint16_t HEAD_BEACON_PORT = 4212; // laptop nghe "PANDA-HEAD" ở đây (t
 static WiFiServer server(HEAD_TCP_PORT);
 static WiFiClient client;         // laptop đang nối qua WiFi
 static volatile bool clientOn = false;
+
+// Lý do lần khởi động gần nhất, phát kèm tín hiệu "PANDA-HEAD" để laptop in ra.
+// BROWNOUT = sụt áp (motor thân / loa to kéo tụt đường 5V chung) → phải sửa NGUỒN.
+static const char *bootReason = "?";
+static const char *resetReasonText()
+{
+  switch (esp_reset_reason())
+  {
+  case ESP_RST_POWERON:
+    return "POWERON";
+  case ESP_RST_BROWNOUT:
+    return "BROWNOUT";
+  case ESP_RST_SW:
+    return "SW";
+  case ESP_RST_PANIC:
+    return "PANIC";
+  case ESP_RST_INT_WDT:
+  case ESP_RST_TASK_WDT:
+  case ESP_RST_WDT:
+    return "WDT";
+  case ESP_RST_EXT:
+    return "EXT";
+  default:
+    return "OTHER";
+  }
+}
 static volatile bool otaBusy = false; // đang nạp code qua WiFi → tạm ngừng gửi ảnh/mic
+
+// CAMERA CHỈ BẬT KHI CÓ LAPTOP (thêm 25/11 cho chế độ đua xe): bật nguồn robot mà không chạy
+// chay-demo.bat (vd chỉ lái thân bằng dua-xe.bat) → đầu chỉ sáng màn hình chờ, camera + WiFi
+// tiết kiệm điện → nhường điện của MT3608 cho motor. Laptop nối vào (WiFi hoặc dây USB) thì
+// mới bật camera. Không tắt camera lại khi laptop đi (tắt/bật camera giữa chừng dễ crash —
+// xem chú thích WIFI_CAM_FPS); muốn tắt hẳn thì tắt/bật lại nguồn robot.
+static bool camStarted = false;
+static bool camFailed = false;
 static WiFiUDP beacon;
 
 // Gửi lên laptop. Gọi khi ĐANG GIỮ serialLock. Laptop nối WiFi → gửi qua WiFi, không thì qua dây.
@@ -119,9 +154,16 @@ static void sendOut(const uint8_t *data, size_t len)
     Serial.write(data, len);
     return;
   }
-  if (client.write(data, len) != len)
+  // Gửi từng miếng 4KB thay vì cả ảnh ~40KB một lần: WiFi của ESP32 xin bộ nhớ đệm ít hơn mỗi
+  // lần → bớt hẳn lỗi "hết bộ nhớ" (ENOMEM) làm thư viện tự cắt kết nối giữa chừng.
+  const size_t CHUNK = 4096;
+  for (size_t off = 0; off < len && clientOn; off += CHUNK)
   {
-    clientOn = false; // gửi hỏng = laptop đã ngắt / WiFi rớt. loop() sẽ dọn và chờ laptop nối lại.
+    size_t n = min(CHUNK, len - off);
+    if (client.write(data + off, n) != n)
+    {
+      clientOn = false; // gửi hỏng = laptop đã ngắt / WiFi rớt. loop() sẽ dọn và chờ laptop nối lại.
+    }
   }
 }
 
@@ -158,7 +200,9 @@ static bool setupCamera()
   config.pixel_format = PIXFORMAT_JPEG;
   config.grab_mode = CAMERA_GRAB_LATEST;
   config.frame_size = FRAMESIZE_VGA;
-  config.jpeg_quality = 10;
+  // 12 (trước 10): ảnh nhẹ hơn ~20% cho WiFi, mắt thường gần như không thấy khác.
+  // Số càng LỚN ảnh càng nén mạnh / càng nhẹ.
+  config.jpeg_quality = 12;
   config.fb_count = 2;
   config.fb_location = CAMERA_FB_IN_PSRAM;
 
@@ -239,8 +283,16 @@ static bool setupMic()
          i2s_set_pin(I2S_NUM_0, &pins) == ESP_OK;
 }
 
+// Qua WiFi: tối đa WIFI_CAM_FPS ảnh/giây. Gửi hết tốc lực (~13 ảnh × ~40KB = ~500KB/giây) thì
+// hotspot laptop nghẽn, đi xa 1 chút là ảnh giật / mất kết nối, lệnh mặt + âm thanh tới trễ.
+// Qua dây USB vẫn chạy hết tốc lực như cũ.
+// (25/11 đã thử đổi độ nén lúc đang chạy bằng set_quality() khi laptop nối WiFi → board CRASH
+//  (PANIC) đúng lúc nối, khởi động lại liên tục → đã bỏ. Độ nén chỉ đặt 1 lần lúc khởi động.)
+const uint32_t WIFI_CAM_FPS = 10;
+
 static void cameraTask(void *)
 {
+  uint32_t lastFrameMs = 0;
   for (;;)
   {
     if (otaBusy)
@@ -248,6 +300,13 @@ static void cameraTask(void *)
       vTaskDelay(pdMS_TO_TICKS(100));
       continue;
     }
+    uint32_t since = millis() - lastFrameMs;
+    if (clientOn && since < 1000 / WIFI_CAM_FPS)
+    {
+      vTaskDelay(pdMS_TO_TICKS(1000 / WIFI_CAM_FPS - since));
+      continue;
+    }
+    lastFrameMs = millis();
     camera_fb_t *fb = esp_camera_fb_get();
     if (!fb)
     {
@@ -419,6 +478,91 @@ static void readCommands(Stream &in, CmdParser &p)
   }
 }
 
+// "Dòng chữ giả" đọc từ 1 mảng byte có sẵn — để readCommands() (vốn đọc từ Stream) đọc được phần
+// dữ liệu WiFi đã chép ra ngoài. Xem readWifi() bên dưới vì sao phải chép ra.
+struct ByteStream : public Stream
+{
+  const uint8_t *data;
+  size_t len, pos = 0;
+  ByteStream(const uint8_t *d, size_t n) : data(d), len(n) {}
+  int available() override { return len - pos; }
+  int read() override { return pos < len ? data[pos++] : -1; }
+  int peek() override { return pos < len ? data[pos] : -1; }
+  size_t readBytes(char *buf, size_t n) override
+  {
+    n = min(n, len - pos);
+    memcpy(buf, data + pos, n);
+    pos += n;
+    return n;
+  }
+  size_t write(uint8_t) override { return 0; }
+};
+
+// Đọc lệnh + âm thanh laptop gửi qua WiFi.
+// VÌ SAO KHÔNG đọc thẳng client như dây USB (lỗi PANIC 26/11): cameraTask / micTask đang GHI vào
+// cùng client ở luồng khác. Ghi hỏng 1 lần (WiFi chập 1 nhịp, hết bộ đệm...) thì thư viện tự gọi
+// client.stop() → XOÁ bộ đệm nhận, đúng lúc loop() đang đọc dở bộ đệm đó → đọc vào vùng nhớ vừa
+// bị xoá → chip crash, khởi động lại. Cách sửa: chỉ đụng tới client khi đang GIỮ serialLock
+// (2 luồng không bao giờ đụng cùng lúc), và chỉ giữ thật ngắn: chép byte ra mảng netBuf rồi nhả
+// khoá ngay, phân tích lệnh sau (phân tích có thể phải chờ loa phát bớt, không được giữ khoá lâu
+// làm ảnh/mic đứng). Byte thừa chưa dùng (vd nửa mẫu âm thanh) giữ lại cho lượt sau.
+static uint8_t netBuf[4096];
+static size_t netLen = 0;
+
+static void readWifi()
+{
+  if (netLen < sizeof(netBuf))
+  {
+    xSemaphoreTake(serialLock, portMAX_DELAY);
+    if (clientOn)
+    {
+      int a = client.available();
+      if (a > 0)
+      {
+        int got = client.read(netBuf + netLen, min((size_t)a, sizeof(netBuf) - netLen));
+        if (got > 0)
+        {
+          netLen += got;
+        }
+      }
+    }
+    xSemaphoreGive(serialLock);
+  }
+  if (netLen == 0)
+  {
+    return;
+  }
+  ByteStream bs(netBuf, netLen);
+  readCommands(bs, wifiParser);
+  // Dồn phần chưa đọc (thường 0 hoặc 1 byte) lên đầu mảng
+  size_t left = bs.len - bs.pos;
+  memmove(netBuf, netBuf + bs.pos, left);
+  netLen = left;
+}
+
+// Bật camera LẦN ĐẦU có laptop dùng tới (xem camStarted). Gọi lại nhiều lần cũng không sao.
+// Mất ~1 giây (mặt robot đứng hình 1 chút), chỉ 1 lần mỗi lần bật nguồn.
+static void startCameraIfNeeded()
+{
+  if (camStarted || camFailed)
+  {
+    return;
+  }
+  camStarted = true;
+  WiFi.setSleep(false); // có laptop → WiFi chạy hết tốc lực cho ảnh đi đều
+  if (!setupCamera())
+  {
+    camFailed = true;
+    logLine("LOI: camera init that bai - cam lai cap FPC");
+    faceSetExpression("dizzy");
+    faceSetCaption("LOI CAMERA");
+    return;
+  }
+  applyCameraPreset(false);
+  xTaskCreatePinnedToCore(cameraTask, "camera", 8192, nullptr, 1, nullptr, 0);
+  logLine("Camera bat (co laptop noi vao)");
+}
+
 // Giữ WiFi + kết nối với laptop. Gọi mỗi vòng loop(), không bao giờ đứng chờ lâu
 // (loop() còn phải vẽ mặt 33 khung/giây).
 static void serviceWifi()
@@ -471,7 +615,9 @@ static void serviceWifi()
     clientOn = true;
     xSemaphoreGive(serialLock);
     wifiParser = CmdParser(); // bỏ lệnh đọc dở của kết nối cũ
+    netLen = 0;               // + byte còn sót của kết nối cũ
     faceSetCaption("LAPTOP DA NOI WIFI");
+    startCameraIfNeeded();
   }
 
   // Laptop ngắt (tắt chương trình / ra khỏi vùng WiFi) → quay về gửi qua dây.
@@ -496,7 +642,8 @@ static void serviceWifi()
   {
     lastBeacon = millis();
     beacon.beginPacket(WiFi.broadcastIP(), HEAD_BEACON_PORT);
-    beacon.printf("PANDA-HEAD %u\n", HEAD_TCP_PORT);
+    // + lý do khởi động + số giây từ lúc bật: laptop thấy số giây nhỏ = board vừa reset
+    beacon.printf("PANDA-HEAD %u %s %lu\n", HEAD_TCP_PORT, bootReason, (unsigned long)(millis() / 1000));
     beacon.endPacket();
   }
 }
@@ -510,6 +657,7 @@ void setup()
   Serial.begin(SERIAL_BAUD);
   serialLock = xSemaphoreCreateMutex();
   audioBuf = xStreamBufferCreate(32768, 1);
+  bootReason = resetReasonText();
   delay(300);
 
   if (!faceBegin())
@@ -517,14 +665,16 @@ void setup()
     logLine("LOI: khong du RAM cho canvas mat");
   }
   faceSetExpression("sleepy");
-  faceSetCaption("CHO LAPTOP...");
+  faceSetCaption("CHO LAPTOP (CAM TAT)");
 
   if (strlen(WIFI_SSID) > 0)
   {
     // Không chờ WiFi ở đây: dây USB vẫn dùng được ngay, WiFi tự nối dần (serviceWifi()).
     WiFi.persistent(false); // không ghi tên/mật khẩu WiFi vào flash mỗi lần begin()
     WiFi.mode(WIFI_STA);
-    WiFi.setSleep(false); // tắt tiết kiệm điện WiFi: ảnh đi đều, lệnh tới nhanh
+    // Chưa có laptop: BẬT tiết kiệm điện WiFi (radio ngủ giữa các nhịp, ~30mA thay vì ~120mA).
+    // Laptop nối vào thì startCameraIfNeeded() tắt đi cho ảnh đi đều, lệnh tới nhanh.
+    WiFi.setSleep(true);
     WiFi.begin(WIFI_SSID, WIFI_PASS);
   }
 
@@ -552,29 +702,24 @@ void setup()
   {
     logLine("LOI: khong thay PSRAM - kiem tra board_build.arduino.memory_type trong platformio.ini");
     faceSetCaption("LOI PSRAM");
+    camFailed = true;
     return;
   }
-  if (!setupCamera())
-  {
-    logLine("LOI: camera init that bai - cam lai cap FPC");
-    faceSetExpression("dizzy");
-    faceSetCaption("LOI CAMERA");
-    return;
-  }
-  applyCameraPreset(false);
-  logLine(String("Camera + man hinh OK, loa ") + (ampReady ? "OK" : "LOI") +
-          ", mic " + (micReady ? "OK" : "LOI"));
-  xTaskCreatePinnedToCore(cameraTask, "camera", 8192, nullptr, 1, nullptr, 0);
+  // Camera CHƯA bật ở đây — chỉ bật khi có laptop dùng tới (startCameraIfNeeded()).
+  logLine(String("Man hinh OK, loa ") + (ampReady ? "OK" : "LOI") + ", mic " + (micReady ? "OK" : "LOI") +
+          ". Camera bat khi laptop noi vao.");
 }
 
 void loop()
 {
   serviceWifi();
-  readCommands(Serial, usbParser);
-  if (clientOn)
+  // Có byte nào tới qua dây USB = head_demo đang chạy qua dây → cần camera.
+  if (Serial.available())
   {
-    readCommands(client, wifiParser);
+    startCameraIfNeeded();
   }
+  readCommands(Serial, usbParser);
+  readWifi(); // (KHÔNG readCommands(client, ...) thẳng — xem readWifi())
   faceTick();
   delay(1);
 }
