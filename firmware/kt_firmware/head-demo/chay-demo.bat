@@ -1,5 +1,7 @@
-x`@echo off
+@echo off
 chcp 65001 >nul
+rem Ten cua so: head_demo.py chi nhan phim lai xe (giu W/A/S/D) khi cua so nay / cua so camera dang duoc chon
+title MOON head-demo
 cd /d "%~dp0"
 echo === PANDA head-demo: camera + man hinh + loa ===
 echo (Nho dong Serial Monitor truoc)
@@ -22,5 +24,5 @@ if not exist gemini-key.txt (
 pause
 exit /b
 :loi
-echo LOI cai dat. Xoa thu muc .venv roi chay lai.
+echo LOI cai dat. Xoa thu muc .venv roi chay lai. 
 pause

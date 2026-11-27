@@ -9,11 +9,13 @@ Duong dan:
   GET  /           trang tay cam (remote.html)
   GET  /cam.mjpg   video camera dau robot (MJPEG: chuoi anh JPEG lien tiep, the <img> tu hien)
   GET  /status     trang thai than (JSON)
-  POST /drive      {"mode": "run|back|left|right|stop"}  — nut dang GIU thi trang gui lai moi
+  POST /drive      {"mode": "run|back|left|right|fl|fr|bl|br|stop"}  — fl = giu ▲ + ◀ cung luc
+                   (tien + re trai, xe cua vong khong dung). Nut dang GIU thi trang gui lai moi
                    150ms; ngung gui 0,5 giay (tha nut, mat song) -> than tu phanh.
   POST /speed      {"step": 25 | -25}
   POST /trim       {"delta": 0.02 | -0.02}
   POST /talk       bat dau nghe (giong phim SPACE)
+  POST /auto       {"on": true|false} — bat/tat TU DI DAO (tools/auto_drive.py). /drive cung tat no.
 """
 import json
 import socket
@@ -23,6 +25,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import cv2
+
+from body_link import MODES  # run/back/left/right + fl/fr/bl/br (vua chay vua re)
 
 PAGE = Path(__file__).with_name("remote.html")
 PORT = 8080
@@ -96,10 +100,22 @@ def start(shared, voice, port=PORT):
                 return self._json({"ok": True})
             if not body:
                 return self._json({"ok": False, "error": "chua co phan than"}, 503)
+            auto = getattr(voice, "auto", None)
+            if self.path == "/auto":  # nut "Tu di dao" (bat/tat)
+                if not auto:
+                    return self._json({"ok": False, "error": "chua co che do tu di"}, 503)
+                why = ""
+                if req.get("on"):
+                    why = auto.start()
+                else:
+                    auto.stop("tay cam dien thoai")
+                return self._json({"ok": not why, "error": why, **status()})
             if self.path == "/drive":
                 mode = req.get("mode", "stop")
-                if mode not in ("run", "back", "left", "right", "stop"):
+                if mode not in MODES + ("stop",):
                     return self._json({"ok": False}, 400)
+                if auto:
+                    auto.stop("lai bang dien thoai")  # nguoi cam lai -> thoi tu di
                 ok = body.drive(mode, hold=True)
                 return self._json({"ok": ok, **status()})
             if self.path == "/speed":
@@ -143,7 +159,11 @@ def start(shared, voice, port=PORT):
             fps = shared.cam_fps
         if not b:
             return {"online": False, "text": "Chua noi phan than", "cam_fps": fps}
+        auto = getattr(voice, "auto", None)
+        left = int(auto.remaining()) if auto else 0
         return {
+            "auto_on": bool(auto and auto.running), "auto_state": auto.state if auto else "",
+            "auto_left": f"{left // 60}:{left % 60:02d}",
             "online": b.online, "mode": b.mode, "blocked": b.blocked,
             "dist": b.dist, "speed": b.speed, "trim": b.trim_text(),
             "wheels": list(b.wheels), "cam_fps": round(fps, 1),

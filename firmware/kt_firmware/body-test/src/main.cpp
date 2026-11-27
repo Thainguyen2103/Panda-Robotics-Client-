@@ -3,11 +3,12 @@
 // Nhận lệnh từ laptop theo 2 đường (đường nào cũng được, cùng 1 kiểu lệnh):
 //   - dây USB (Serial 115200)             : tools/lai_xe.py hoặc head-demo khi thân cắm laptop
 //   - WiFi (UDP, cổng 4211)               : head-demo khi thân cắm SẠC DỰ PHÒNG (chỉ có 1 dây USB)
-// Lệnh laptop → board, gửi liên tục ~20 lần/giây:
+// Lệnh laptop → board, gửi liên tục ~25 lần/giây:
 //     "m <trai> <phai>\n"      tốc độ mỗi bánh -255..255 (0 = đứng yên, số ÂM = quay LÙI)
 //                              vd "m 150 150" tới, "m -150 -150" lùi, "m -150 150" xoay trái tại chỗ
 // Board → laptop ~10 lần/giây (qua Serial, và qua WiFi tới cổng UDP 4210 của laptop):
-//     "S <cm> <trai> <phai> <chan>\n"   khoảng cách, tốc độ thật đang chạy, 1 = đang bị chặn
+//     "S <cm> <trai> <phai> <chan> <giay> <ly_do>\n"   khoảng cách, tốc độ thật đang chạy,
+//     1 = đang bị chặn, số giây từ lúc board bật, lý do lần khởi động gần nhất (BROWNOUT = sụt áp)
 //
 // Luật an toàn (chạy NGAY TRÊN BOARD, không phụ thuộc laptop):
 //   1. Vật cản gần hơn STOP_CM → cấm ĐI TỚI (cả 2 bánh cùng quay tới), nhưng vẫn cho LÙI và
@@ -21,6 +22,9 @@
 #include <ArduinoOTA.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
+#include <esp_system.h> // esp_reset_reason(): vì sao board vừa khởi động lại
+#include "soc/rtc_cntl_reg.h" // tắt mạch reset khi sụt áp (xem setup())
+#include "soc/soc.h"
 
 // Tên + mật khẩu WiFi nằm trong file riêng (không đưa lên git). Chưa có file thì tạo từ
 // wifi_secrets.example.h. Laptop và board phải vào CÙNG 1 mạng WiFi.
@@ -44,8 +48,16 @@ const bool INVERT_RIGHT = false;
 // 12cm vẫn đủ phanh: từ lúc vật vào ngưỡng tới lúc chặn mất ~250ms (3 lần đo × 60ms + lọc),
 // xe tốc độ 150 đi thêm khoảng 5-8cm → dừng cách vật vài cm. Xe chạy nhanh hơn (+ nhiều lần)
 // mà vẫn đâm vào vật thì tăng STOP_CM lên 15.
-const float STOP_CM = 12.0;  // gần hơn → cấm đi thẳng
+const float STOP_CM = 12.0;  // gần hơn → cấm đi thẳng (khi chạy chậm, tốc độ ≤ 150)
 const float CLEAR_CM = 16.0; // xa hơn → cho đi thẳng lại
+// Laptop giờ chạy mặc định 220 (nhanh gần gấp rưỡi): trong ~250ms phát hiện, xe đi xa hơn →
+// ngưỡng dừng TĂNG THEO TỐC ĐỘ: 150 → 12cm, 255 → ~22cm. Chạy chậm vẫn sát vật được như cũ.
+const float STOP_CM_PER_SPEED = 0.1; // mỗi 1 đơn vị tốc độ trên 150 → dừng sớm thêm 0,1cm
+// Đổi chiều ĐỘT NGỘT (đang tiến mà bấm lùi luôn): motor đang quay bị đảo điện áp → hút dòng
+// gần GẤP ĐÔI lúc khởi động → sụt áp mạnh nhất. Phanh REVERSE_BRAKE_MS cho bánh đứng hẳn rồi
+// mới quay chiều mới. (Từng thử "mồi" 255 lúc xuất phát cho xe bốc hơn: motor chung nguồn 5V
+// với ESP32 → sụt áp → board tự khởi động lại, mất WiFi vài giây mỗi lần bấm phím → đã bỏ.)
+const uint32_t REVERSE_BRAKE_MS = 80;
 // 500ms: WiFi thỉnh thoảng trễ 100-200ms, đặt quá ngắn bánh sẽ khựng vô cớ.
 const uint32_t CMD_TIMEOUT_MS = 500;
 
@@ -59,6 +71,7 @@ const int CH_LEFT = 0, CH_RIGHT = 1;
 int wantLeft = 0, wantRight = 0; // laptop muốn
 int runLeft = 0, runRight = 0;   // đang chạy thật (sau luật an toàn)
 bool blocked = false;
+bool obstacleOn = true;          // luật dừng trước vật cản (lệnh "safe 0/1")
 bool otaBusy = false;            // đang nạp code qua WiFi → khoá bánh, khỏi chạy lung tung
 float distCm = -1;               // -1 = không thấy vật nào trong tầm (~4m)
 uint32_t lastCmdMs = 0;
@@ -66,6 +79,11 @@ uint32_t lastCmdMs = 0;
 WiFiUDP udp;
 IPAddress laptopIp;         // laptop vừa gửi lệnh qua WiFi (để gửi trạng thái thẳng về)
 uint32_t lastUdpCmdMs = 0;
+// Chẩn đoán "mất kết nối" (gửi kèm trạng thái): số lần WiFi của thân bị rớt + mã lý do lần gần
+// nhất (do chip WiFi báo). Laptop so số lần rớt để biết: board RỚT MẠNG thật, hay WiFi vẫn nối
+// mà chỉ gói tin bị lạc trên sóng.
+volatile uint32_t wifiDrops = 0;
+volatile int lastDropReason = 0;
 
 // Chạy 1 bánh: speed -255..255. TB6612 chọn chiều bằng 2 chân IN:
 //   IN1=1,IN2=0 → tới;  IN1=0,IN2=1 → lùi;  cả 2 = 1 → PHANH (nối tắt 2 đầu motor).
@@ -86,6 +104,47 @@ void setWheel(int ch, int in1, int in2, int speed, bool invert)
   digitalWrite(in1, forward ? HIGH : LOW);
   digitalWrite(in2, forward ? LOW : HIGH);
   ledcWrite(ch, min(abs(speed), 255));
+}
+
+// 1 bánh đổi chiều → phanh REVERSE_BRAKE_MS trước. prev = tốc độ vòng lặp trước,
+// brakeUntil = phanh tới lúc nào (mỗi bánh 1 bộ riêng).
+int softReverse(int speed, int &prev, uint32_t &brakeUntil)
+{
+  bool reversing = speed != 0 && prev != 0 && (prev > 0) != (speed > 0);
+  if (reversing)
+  {
+    brakeUntil = millis() + REVERSE_BRAKE_MS;
+  }
+  prev = speed;
+  return millis() < brakeUntil ? 0 : speed;
+}
+
+// Lý do board khởi động lần này — gửi kèm trạng thái để laptop báo ra. Quan trọng nhất là
+// BROWNOUT: điện áp tụt quá thấp (motor hút dòng mạnh, nguồn yếu) → chip tự reset để khỏi
+// chạy sai → mất WiFi vài giây. Thấy chữ này = phải sửa NGUỒN, không phải sửa code.
+const char *bootReason = "?";
+
+const char *resetReasonText()
+{
+  switch (esp_reset_reason())
+  {
+  case ESP_RST_POWERON:
+    return "POWERON"; // vừa cắm nguồn
+  case ESP_RST_BROWNOUT:
+    return "BROWNOUT"; // sụt áp
+  case ESP_RST_SW:
+    return "SW"; // phần mềm tự reset (vd vừa nạp code qua WiFi)
+  case ESP_RST_PANIC:
+    return "PANIC"; // code bị lỗi nặng (crash)
+  case ESP_RST_INT_WDT:
+  case ESP_RST_TASK_WDT:
+  case ESP_RST_WDT:
+    return "WDT"; // code bị treo quá lâu
+  case ESP_RST_EXT:
+    return "EXT"; // bấm nút EN/RESET
+  default:
+    return "OTHER";
+  }
 }
 
 // Đo khoảng cách: phát xung 10µs ở TRIG, đo độ dài xung ECHO (thời gian sóng âm đi + về).
@@ -109,6 +168,14 @@ float readDistanceCm()
 // 1 dòng lệnh, đến từ dây USB hay WiFi đều xử lý giống nhau.
 bool handleLine(const char *line)
 {
+  // "safe 0" / "safe 1": tắt / bật luật dừng trước vật cản (chế độ ĐUA XE tắt: xe bạn chạy
+  // ngay phía trước cũng bị tính là vật cản). Laptop gửi lại mỗi giây; board khởi động lại thì
+  // mặc định BẬT cho an toàn.
+  if (strncmp(line, "safe ", 5) == 0)
+  {
+    obstacleOn = line[5] != '0';
+    return true;
+  }
   int l, r;
   if (sscanf(line, "m %d %d", &l, &r) != 2)
   {
@@ -164,8 +231,14 @@ void readUdp()
 
 void sendStatus()
 {
-  char msg[48];
-  snprintf(msg, sizeof(msg), "S %.1f %d %d %d\n", distCm, runLeft, runRight, blocked ? 1 : 0);
+  // 2 cột cuối (mới): số giây từ lúc board khởi động + lý do khởi động. Laptop thấy số giây
+  // tụt về gần 0 = board vừa reset → in lý do ra cửa sổ đen.
+  // 3 cột cuối nữa: độ mạnh sóng WiFi (dBm, -40 rất mạnh ... -80 rất yếu), số lần rớt WiFi,
+  // mã lý do lần rớt gần nhất. Laptop cũ chỉ đọc 7 cột đầu nên vẫn chạy được.
+  char msg[96];
+  snprintf(msg, sizeof(msg), "S %.1f %d %d %d %lu %s %d %lu %d\n", distCm, runLeft, runRight,
+           (obstacleOn && blocked) ? 1 : 0, (unsigned long)(millis() / 1000), bootReason,
+           (int)WiFi.RSSI(), (unsigned long)wifiDrops, lastDropReason);
   Serial.print(msg);
   if (WiFi.status() != WL_CONNECTED)
   {
@@ -189,6 +262,17 @@ void sendStatus()
   }
   udp.write((const uint8_t *)msg, strlen(msg));
   udp.endPacket();
+}
+
+// Công suất phát WiFi: để MẠNH NHẤT (19,5dBm).
+// (26/11 đã thử hạ xuống 11dBm cho bớt hút điện. 27/11 ở ITF: robot chạy dưới sàn, laptop trên
+//  bàn, phòng nhiều mạng WiFi → sóng chỉ còn -80..-87dBm, gói trạng thái THÂN GỬI VỀ laptop lạc
+//  liên tục — đúng chiều phụ thuộc công suất phát của thân → trả về mạnh nhất. Lỗi mất kết nối
+//  hôm 26/11 hoá ra do hotspot laptop 5GHz/2,4GHz chứ không do điện.)
+// Phải gọi SAU WiFi.begin() (trước đó chip WiFi chưa bật, lệnh bị bỏ qua).
+void setTxPowerMax()
+{
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
 }
 
 // Giữ WiFi luôn nối, gọi mỗi vòng loop().
@@ -221,6 +305,10 @@ void keepWifi()
                          setWheel(CH_RIGHT, BIN1, BIN2, 0, INVERT_RIGHT); });
     ArduinoOTA.onError([](ota_error_t)
                        { otaBusy = false; });
+    // Nạp code qua WiFi mất 10-20 giây ngay trong 1 lần gọi handle() → báo watchdog "vẫn sống"
+    // mỗi lần nhận thêm dữ liệu, không thì nó tưởng treo và reset giữa chừng.
+    ArduinoOTA.onProgress([](unsigned int, unsigned int)
+                          { feedLoopWDT(); });
     ArduinoOTA.begin();
     Serial.printf("# WiFi OK: %s, IP %s\n", WIFI_SSID, WiFi.localIP().toString().c_str());
   }
@@ -241,12 +329,24 @@ void keepWifi()
     Serial.printf("# WiFi: chua thay \"%s\" (hotspot da bat chua? phai la 2,4GHz), thu lai...\n", WIFI_SSID);
     WiFi.disconnect();
     WiFi.begin(WIFI_SSID, WIFI_PASS);
+    setTxPowerMax();
   }
 }
 
 void setup()
 {
   Serial.begin(115200);
+  bootReason = resetReasonText();
+  Serial.printf("# Khoi dong, ly do: %s\n", bootReason);
+  // TẠM THỜI (chờ tách nguồn motor riêng — README head-demo mục 4c "Nguồn"):
+  // ESP32 có mạch "brownout": điện áp tụt hơi thấp là tự reset ngay. Motor khởi động / loa to kéo
+  // 5V của MT3608 tụt trong vài phần nghìn giây → board reset, mất WiFi 5-15 giây (đo 25/11:
+  // 3 lần BROWNOUT / vài phút). Tắt mạch này → board chạy qua được các lần tụt ngắn đó.
+  // Đổi lại: tụt QUÁ sâu thì chip có thể chạy sai/treo thay vì reset gọn → bật bộ canh treo
+  // (watchdog) cho loop(): loop() đứng quá 5 giây là tự reset (motor không chạy mãi được).
+  // Tách nguồn motor xong thì xoá dòng WRITE_PERI_REG bên dưới.
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+  enableLoopWDT();
   pinMode(AIN1, OUTPUT);
   pinMode(AIN2, OUTPUT);
   pinMode(BIN1, OUTPUT);
@@ -267,7 +367,14 @@ void setup()
     WiFi.persistent(false); // không ghi tên/mật khẩu WiFi vào flash mỗi lần begin() → flash bền hơn
     WiFi.mode(WIFI_STA);
     WiFi.setSleep(false); // tắt tiết kiệm điện WiFi → lệnh tới nhanh, bánh không khựng
+    // Mỗi lần WiFi rớt, chip báo 1 "sự kiện" kèm mã lý do → đếm lại để gửi cho laptop.
+    // (Hàm này chạy ở luồng WiFi riêng, nên 2 biến trên khai báo volatile.)
+    WiFi.onEvent([](WiFiEvent_t, WiFiEventInfo_t info)
+                 { wifiDrops++;
+                   lastDropReason = info.wifi_sta_disconnected.reason; },
+                 ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     WiFi.begin(WIFI_SSID, WIFI_PASS);
+    setTxPowerMax();
   }
   Serial.println("# body-test san sang: day USB (lai_xe.py) hoac WiFi (head-demo)");
 }
@@ -299,8 +406,11 @@ void loop()
     // Trung vị 3 lần đo: 1 lần nhiễu lẻ (quá gần hoặc quá xa) bị 2 lần còn lại "át" đi.
     float a = last3[0], b = last3[1], c = last3[2];
     distCm = max(min(a, b), min(max(a, b), c));
-    bool near = distCm > 0 && distCm < STOP_CM;
-    bool clear = distCm < 0 || distCm > CLEAR_CM;
+    // Ngưỡng theo tốc độ đi tới hiện tại (bánh chậm hơn trong 2 bánh; xoay/lùi thì ≤ 0)
+    int fwd = min(wantLeft, wantRight);
+    float stopCm = STOP_CM + max(0, fwd - 150) * STOP_CM_PER_SPEED;
+    bool near = distCm > 0 && distCm < stopCm;
+    bool clear = distCm < 0 || distCm > stopCm + (CLEAR_CM - STOP_CM);
     // Cần 3 trung vị GẦN liên tiếp (~180ms) mới chặn. Xe chạy chậm nên vẫn kịp dừng trước vật.
     nearCount = near ? nearCount + 1 : 0;
     if (nearCount >= 3)
@@ -317,11 +427,13 @@ void loop()
   // Cả 2 bánh cùng quay TỚI = đang lao về phía trước → vật cản chặn. Lùi, xoay tại chỗ
   // (2 bánh ngược chiều) hay rẽ 1 bánh → vẫn cho, để xe thoát khỏi vật cản (luật 1 đầu file).
   bool goingStraight = wantLeft > 0 && wantRight > 0;
-  bool stopNow = otaBusy || lostLaptop || (blocked && goingStraight);
+  bool stopNow = otaBusy || lostLaptop || (obstacleOn && blocked && goingStraight);
   runLeft = stopNow ? 0 : wantLeft;
   runRight = stopNow ? 0 : wantRight;
-  setWheel(CH_LEFT, AIN1, AIN2, runLeft, INVERT_LEFT);
-  setWheel(CH_RIGHT, BIN1, BIN2, runRight, INVERT_RIGHT);
+  static int prevLeft = 0, prevRight = 0;
+  static uint32_t brakeLeft = 0, brakeRight = 0;
+  setWheel(CH_LEFT, AIN1, AIN2, softReverse(runLeft, prevLeft, brakeLeft), INVERT_LEFT);
+  setWheel(CH_RIGHT, BIN1, BIN2, softReverse(runRight, prevRight, brakeRight), INVERT_RIGHT);
 
   static uint32_t lastReport = 0;
   if (millis() - lastReport >= 100)

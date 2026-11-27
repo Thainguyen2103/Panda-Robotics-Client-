@@ -4,8 +4,8 @@ Bản demo cho thầy xem phần **đầu robot** chạy cùng **AI của Thái 
 
 - **Màn hình** (giống `cam-emotion`): camera robot nhìn mặt bạn, AI cảm xúc của Thái đoán bạn
   đang vui/buồn/giận/ngạc nhiên…, màn robot vẽ khuôn mặt tương ứng.
-- **Loa + mic**: bấm **phím cách (Space)**, nói vào **mic robot** (INMP441 trên đầu, dây nối ở
-  mục 3). AI của nhóm nghe, hiểu, trả lời, và **giọng trả lời phát ra loa robot**. Trong lúc đó
+- **Loa + mic**: **cứ nói** vào **mic robot** (INMP441 trên đầu, dây nối ở mục 3), không cần bấm
+  phím (nghe tự động, xem mục 4). AI của nhóm nghe, hiểu, trả lời, và **giọng trả lời phát ra loa robot**. Trong lúc đó
   mặt robot đổi theo: **đang nghe → đang nghĩ → đang nói**. Chưa gắn mic thật thì chạy
   `chay-demo.bat --laptop-mic` để quay lại nói vào mic laptop như bản cũ.
 
@@ -58,8 +58,9 @@ mặt robot theo trạng thái trò chuyện; xong thì quay lại "nhại" cả
 | Board có **task âm thanh riêng** | `i2s_write()` đứng chờ loa phát. Nếu chạy trong `loop()` thì mặt robot đứng hình lúc robot nói. |
 | Phát **stereo** (2 kênh cùng 1 mẫu) | Giống bài `hw-tests/speaker-only` đã test tốt. Chế độ mono `ONLY_LEFT` trên ESP32-S3 có lúc xếp sai khung, gây méo. |
 | Nghe bằng **Gemini Transcribe** | Giống hệt dashboard của nhóm (model `gemini-3.5-transcribe-live`, 3 thứ tiếng, từ vựng riêng Moon/Kanji…), nên kết quả nhận dạng giống khi Thái demo trên web. |
-| LLM **local** của Ngọc Anh (Ollama) | Đúng thiết kế trong `settings.py` của nhóm: LLM chạy trên laptop, không phụ thuộc mạng/quota. Chỉ khi chạy `--llm-online` mới dùng Groq/Gemini dự phòng. |
-| Bấm **Space** để nói, không dùng từ gọi "Moon ơi" | Lớp học ồn, bấm phím chắc ăn hơn. Robot cũng không tự nghe lại tiếng loa của mình. |
+| LLM qua **API miễn phí** (Gemini Flash-Lite), không dùng `qwen3.5:2b` local nữa | Nhóm tập trung vào computer vision nên thầy cho phép phần AI còn lại gọi API. qwen 2b chạy local vừa chậm vừa trả lời kém. `tools/llm_online.py` vẫn dùng nguyên `server/llm/engine.py` của Ngọc Anh (bài học RAG, đóng vai, sửa lỗi ngữ pháp...), chỉ đổi "bộ óc" và dùng prompt dành cho model mạnh. |
+| Mắt robot: **mặt + cảm xúc chạy local**, chỉ khi bé hỏi về đồ vật mới **gửi 1 ảnh lên API** | Camera chạy 13 hình/giây, còn bản API miễn phí chỉ cho khoảng 15 lần/phút, 500 lần/ngày. Gọi API liên tục thì vài phút là hết lượt. Model local nhanh, miễn phí, và ảnh không ra khỏi laptop. API (`tools/vision_api.py`) lo phần model local không làm được: nhận ra đồ vật bé đưa lên, gọi tên bằng 3 thứ tiếng. |
+| **Nghe tự động**: cứ nói là robot nghe, không cần bấm phím hay gọi "Moon ơi" | Robot rảnh thì mic luôn mở. Tiếng to hơn ồn nền của phòng kéo dài ít nhất 0,3 giây thì tính là bắt đầu nói, và robot giữ lại 0,6 giây trước đó để không mất chữ đầu câu. Ngừng 1,5 giây thì chốt câu. Câu ngắn dưới 0,5 giây (ho, gõ bàn) bị bỏ, không tốn lượt Gemini. Lúc robot đang nghĩ/nói và 0,8 giây sau đó thì không nghe, để robot không tự nghe tiếng loa của mình. Phòng ồn quá thì bấm **M** để tắt và quay về bấm Space. |
 
 ## 3. Chuẩn bị (1 lần)
 
@@ -70,15 +71,21 @@ mặt robot theo trạng thái trò chuyện; xong thì quay lại "nhại" cả
 2. **Gemini key** (bắt buộc cho phần nghe, miễn phí): vào https://aistudio.google.com/apikey →
    tạo key → dán vào file **`head-demo/gemini-key.txt`** (chỉ 1 dòng). Hoặc xin Thái key nhóm
    đang dùng cho dashboard (`GEMINI_API_KEY` trong `config/secrets.py`).
-   Tuỳ chọn: **`groq-key.txt`** (https://console.groq.com/keys) để LLM trả lời nhanh hơn.
-   Các file key **không** đưa lên git.
-3. **LLM local của Ngọc Anh (Ollama)**: `settings.py` của nhóm chạy LLM ngay trên laptop bằng
-   Ollama, model `qwen3.5:2b` (chạy trên card NVIDIA, không gửi câu hỏi lên mạng).
-   - Cài Ollama: https://ollama.com/download → bản Windows.
-   - Tải model (1 lần, ~2GB): mở cmd, gõ `ollama pull qwen3.5:2b`.
-   - Mỗi lần demo: mở app Ollama (biểu tượng ở khay hệ thống) **trước** khi chạy `.bat`.
-   - Chưa bật Ollama thì dải chữ báo `CHUA BAT OLLAMA`. Muốn tạm dùng LLM online (Groq/Gemini)
-     thì chạy `chay-demo.bat --llm-online`.
+   Tuỳ chọn: **`groq-key.txt`** (https://console.groq.com/keys), thêm một nguồn dự phòng nữa
+   khi Gemini hết lượt. Các file key **không** đưa lên git.
+3. **LLM (phần "suy nghĩ")**: mặc định gọi API miễn phí, dùng chung `gemini-key.txt`, không cần
+   cài thêm gì. Nếu một nguồn hết lượt miễn phí, quá tải hay lỗi thì tự chuyển sang nguồn kế tiếp
+   (nguồn bị lỗi được nghỉ 60 giây):
+   1. `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite` → `gemini-flash-lite-latest`. Bản miễn phí
+      giới hạn số lần gọi **theo từng model**, nên xoay vòng 3 model được gấp khoảng 3 lần số câu
+      hỏi mỗi ngày. Mỗi câu mất khoảng 0,5–1,5 giây. (Bản Flash thường mạnh hơn, nhưng lúc thử
+      tháng 11/2026 hay báo quá tải và phải chờ 7–25 giây, không hợp để nói chuyện.)
+   2. Groq, nếu có `groq-key.txt`.
+   3. Ollama `qwen3.5:2b` của Ngọc Anh, nếu đang bật app Ollama. Mất mạng vẫn trả lời được.
+
+   Cửa sổ đen in ra nguồn nào vừa trả lời, ví dụ `[LLM] gemini-3.5-flash-lite tra loi sau 1.1s`.
+   Muốn chạy hoàn toàn offline như bản cũ: mở Ollama rồi chạy `chay-demo.bat --llm local`
+   (cài Ollama ở https://ollama.com/download, rồi `ollama pull qwen3.5:2b` một lần).
 4. **Giọng robot (TTS)**: có **`fish-key.txt`** (API key tài khoản https://fish.audio → API Keys)
    thì dùng Fish Audio, không thì dùng giọng Gemini (cùng `gemini-key.txt`). File gồm:
    ```
@@ -96,10 +103,12 @@ mặt robot theo trạng thái trò chuyện; xong thì quay lại "nhại" cả
 
 | Phím (bấm khi cửa sổ đang được chọn) | Việc |
 |---|---|
-| **Space** | Bắt đầu nói. Nói xong ngừng ~1 giây là robot tự xử lý |
+| *(không bấm gì)* | **Cứ nói**: robot tự nghe (mặt hiện "DANG NGHE..."), ngừng khoảng 1,5 giây là robot trả lời |
+| **M** | Tắt/bật nghe tự động (phòng ồn quá, robot hay nghe nhầm thì tắt). Chạy `chay-demo.bat --ptt` thì tắt ngay từ đầu |
+| **Space** | Bắt đầu nói (dùng khi đã tắt nghe tự động, hoặc muốn ép robot nghe ngay) |
 | **V** | Đổi giọng robot Fish Audio ↔ Gemini |
 | **T** | Thử loa: robot nói "Xin chào, mình là Moon…" (không cần mic) |
-| **+ / -** | To / nhỏ giọng robot |
+| **+ / -** | To / nhỏ giọng robot. Mặc định **x1.00**: mỗi câu được chỉnh về mức to hết cỡ mà chưa méo. Lên tới x2.00 thì to hơn chút nữa nhưng méo nhẹ. Đổi mặc định bằng `chay-demo.bat --volume 0.8` |
 | **Q** hoặc Esc | Thoát |
 
 Thử loa không cần camera: `.venv\Scripts\python.exe tools\head_demo.py --say "Xin chào"`.
@@ -132,14 +141,64 @@ sẵn (body-test).
 
 | Phím (cửa sổ camera hoặc cửa sổ đen) | Việc |
 |---|---|
-| **W** | Tiến (tăng tốc dần trong ~0,5 giây như xe thật) |
-| **S** | Lùi (cảm biến chỉ nhìn phía trước — lùi thì tự nhìn đường) |
-| **A / D** | Xoay trái / phải tại chỗ (2 bánh quay ngược chiều) |
+| **Giữ W** | Tiến. **Thả là phanh** (kiểu xe điều khiển, chỉ chạy khi đang giữ phím) |
+| **Giữ W + A / W + D** | **Vừa tiến vừa rẽ** (cua vòng, bánh phía trong chậm còn 40%): đang chạy thẳng mà giữ thêm A thì xe cua luôn, **không dừng lại** |
+| **Giữ S** (+ A / D) | Lùi (+ rẽ). Cảm biến chỉ nhìn phía trước, lùi thì tự nhìn đường |
+| **Giữ A / D** (một mình) | Xoay trái / phải tại chỗ (2 bánh quay ngược chiều, lực ít nhất 140 để không khựng) |
 | **L** | Phanh: bánh đứng ngay (firmware nối tắt motor), không lăn thêm |
-| **E / R** | Tăng / giảm tốc độ (±25, từ 80 tới 255) |
+| **E / R** | Tăng / giảm tốc độ (±25, từ 110 tới 255). **Mặc định 170** |
+
+**Chạy nhanh và dứt khoát hơn (25/11):**
+- Tốc độ mặc định 150 lên **170**. Xe tăng tốc 100 → 170 trong khoảng 0,12 giây (trước là
+  90 → 150 trong 0,5 giây nên xe "ì ạch"). Đã thử mặc định 220 nhưng bị sụt áp (xem "Nguồn" bên
+  dưới). Tách nguồn motor riêng xong thì bấm **E** để chạy nhanh hơn.
+- **Đổi chiều đột ngột** (đang tiến mà bấm lùi): firmware phanh 80 ms rồi mới quay chiều mới,
+  để motor không hút dòng gấp đôi.
+- **Ngưỡng dừng trước vật cản tăng theo tốc độ:** 12 cm khi chạy ≤ 150, khoảng 14 cm ở 170,
+  khoảng 22 cm ở 255. Chạy nhanh vẫn phanh kịp, chạy chậm vẫn đi sát vật được.
+- Laptop gửi lệnh 25 lần/giây (trước 20), nên WiFi rớt vài gói thì xe không bị khựng.
+- **Cần nạp lại `body-test`.**
+
+**Nguồn: bấm chạy là thân mất WiFi vài giây = SỤT ÁP.** Khối pin (sơ đồ mục 02d: 2×18650 song
+song → TP4056 → công tắc → **1 mạch MT3608** lên 5,1V) đang nuôi **tất cả** qua cùng 1 đường 5V:
+ESP32-S3 đầu + camera + màn + loa, ESP32 thân, HC-SR04 **và 2 motor (chân VM của TB6612)**. Một
+mạch MT3608 tăng từ 3,7V lên 5V chỉ cho ra khoảng 1A ổn định. Motor đứng yên mà bắt đầu quay
+thì hút dòng rất lớn trong tích tắc, MT3608 không đáp kịp nên đường 5V tụt. ESP32 thân tưởng mất
+điện, tự khởi động lại (brownout) và mất WiFi khoảng 2–5 giây. Loa robot nói to cũng góp thêm.
+Firmware mới báo lý do khởi động: cửa sổ đen in
+`[THAN] !!! board than vua TU KHOI DONG LAI: BROWNOUT` là đúng bệnh này. Cách sửa, từ dễ đến chắc:
+1. **Kiểm tra tụ 1000µF** trên cả 2 breadboard: đã hàn/cắm, đúng chiều (chân dài vào +), sát
+   chân VM. Thêm 1 tụ 1000µF ngay ở **VOUT của MT3608** thì càng tốt.
+2. **Đo khi chạy:** đồng hồ để thang V DC, đo hàng 5V của thân rồi bấm W. Tụt dưới khoảng 4,3V
+   là đủ để ESP32 reset. Vặn biến trở MT3608 lên 5,2V cũng đỡ một chút (đừng quá 5,3V).
+3. **Chắc nhất: mạch MT3608 thứ 2 chỉ cho motor.** Sơ đồ đã ghi "KHUYẾN NGHỊ — boost riêng cho
+   motor": VIN của MT3608 #2 lấy từ sau công tắc (cùng chỗ với #1), VOUT+ nối **VM** của TB6612,
+   VOUT− nối GND chung, và **rút dây VM đang lấy từ hàng 5V**. Motor kéo sụt bao nhiêu cũng chỉ
+   ảnh hưởng mạch #2, còn 2 board giữ được 5V. Có mạch riêng thì vặn #2 lên **6V** (motor TT chịu
+   3–6V) để xe mạnh hơn hẳn.
+   Cách tạm nếu chưa có MT3608 thứ 2: nối VM thẳng vào **sau công tắc** (pin 3,7–4,2V). Motor yếu
+   hơn khoảng 20% nhưng không còn kéo sụt đường 5V của 2 board.
+4. **Sạc đầy pin.** Pin càng yếu thì MT3608 càng phải hút nhiều dòng từ pin, nên càng dễ sụt áp.
+
+**Phần mềm đang "chống đỡ" tạm (25/11), xoá khi đã tách nguồn motor:**
+- Firmware thân **tắt mạch tự reset khi sụt áp** (`WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0)` trong
+  `setup()`), nên thân chạy qua được những lần tụt áp ngắn thay vì mất WiFi 5–15 giây. Đổi lại,
+  nếu tụt quá sâu thì chip có thể treo, nên firmware bật thêm **watchdog**: `loop()` đứng quá 5 giây
+  là tự khởi động lại, motor không chạy mãi được.
+- Xe tăng tốc mềm hơn: 80 → 170 trong khoảng 0,2 giây.
+- Laptop chỉ báo "MAT LIEN LAC" khi 2,5 giây không nhận trạng thái (trước là 1,5 giây, hay báo
+  nhầm khi WiFi chỉ chậm một chút).
 | **, / .** | Đi thẳng mà xe lệch: `,` kéo sang trái, `.` kéo sang phải (mỗi lần 2%, tự lưu vào `body-trim.txt`) |
 
-Bấm 1 lần là chạy tiếp tới khi bấm phím khác / L, gặp vật cản khi đang tiến, hoặc quá 10 giây.
+Phím chỉ có tác dụng khi **cửa sổ camera hoặc cửa sổ đen "MOON head-demo"** đang được chọn, nên
+gõ chữ ở cửa sổ khác không làm xe chạy. Tay cầm điện thoại cũng vậy: **giữ ▲ rồi chạm thêm ◀**
+(2 ngón) là cua trái. Xe tự dừng khi gặp vật cản lúc đang tiến, hoặc khi chạy quá 10 giây.
+
+**Camera qua WiFi (25/11):** đầu robot gửi tối đa 10 hình/giây (trước khoảng 13) và nén 12 (trước
+10), dữ liệu ít hơn khoảng 40% nên hotspot đỡ nghẽn khi đi xa. (Đã thử đổi độ nén ngay lúc laptop
+nối WiFi: đầu robot crash và khởi động lại liên tục, nên đã bỏ cách đó.) Cần **nạp lại
+`head-demo`** (qua WiFi được: `pio run -e ota -t upload`). Đầu robot tự khởi động lại thì cửa sổ đen
+in `[WIFI] !!! board DAU vua TU KHOI DONG LAI: <ly do>`.
 
 **Chỉnh xe đi thẳng (làm 1 lần):** bấm W cho xe chạy ~1 m. Xe trôi sang **phải** → bấm `,` vài
 lần; trôi sang **trái** → bấm `.`. Lặp lại tới khi đi thẳng. Cửa sổ hiện "lech: giam banh trai 4%"...
@@ -188,11 +247,137 @@ khác, **tắt `chay-test.bat`** của body-test (2 chương trình không mở 
    Lần đầu Windows hỏi tường lửa cho Python → tick cả **Private** và **Public** → Allow.
 4. Cửa sổ đen in `[THAN] tim thay board than qua WiFi: 192.168.x.x` là xong.
 
+## 4d. Mắt robot: camera + API (tạm thời, chờ model của Thái/Anh)
+
+Bé giơ một đồ vật hoặc tranh lên trước camera rồi hỏi, ví dụ **"Moon ơi đây là con gì?"**,
+**"Cái này tiếng Nhật là gì?"**, **"What is this?"** hoặc "Moon nhìn thấy gì?". Robot chụp
+khung hình lúc đó và gửi Gemini (mất khoảng 2 giây). Gemini trả về: có mấy người, nét mặt, bé
+đang cầm gì, những đồ vật xung quanh (tên tiếng Việt / Anh / Nhật) và một câu mô tả cảnh. Mô tả
+này được gắn vào câu hỏi gửi LLM, nên robot trả lời đúng thứ đang thấy và dạy luôn từ vựng. Cửa
+sổ đen in dòng `[MAT] Camera của Moon đang thấy: ...`. Câu hỏi bình thường thì **không** gửi ảnh.
+
+| Chạy | Mắt robot |
+|---|---|
+| `chay-demo.bat` | Mặc định: mặt và cảm xúc dùng model local của Thái, API chỉ dùng khi bé hỏi về đồ vật |
+| `chay-demo.bat --vision api` | Bỏ hẳn model local: API phân tích mặt, cảm xúc và cảnh, 15 giây/lần (mặt robot đổi chậm). Panel bên phải hiện thêm dòng `Thay: ...`. Một giờ chạy tốn khoảng 240 lượt, tức khoảng nửa hạn mức một ngày của một model |
+| `chay-demo.bat --vision-cloud off` | **Không bao giờ** gửi ảnh lên mạng, chỉ dùng model local (bé hỏi "đây là gì" thì robot không nhìn được) |
+
+**Riêng tư:** với bản Gemini miễn phí, Google **được dùng dữ liệu gửi lên để cải thiện sản phẩm**.
+Ảnh camera có mặt trẻ em nên cần hỏi thầy trước khi demo với trẻ thật. Nếu không được phép thì
+chạy `--vision-cloud off`.
+
+**Khi Thái/Anh xong model:** viết một class có hàm `process(frame)` trả về dict gồm
+`face_detected`, `emotion`, `emotion_scores`, `face_box` (thêm `objects`, `holding`, `scene` nếu
+có), giống `VisionEngine` của Thái và `ApiVision` ở `tools/vision_api.py`. Sau đó đưa class đó
+vào `ai_worker()` trong `head_demo.py`. Phần còn lại (mặt robot, panel, LLM) không phải sửa.
+
+## 4e. Brain: robot tự biểu cảm, tự di chuyển, tự bắt chuyện
+
+`tools/moon_brain.py` nối tai, mắt, miệng và bánh xe lại với nhau. Mặc định bật, tắt bằng
+`chay-demo.bat --brain off`. Đang chạy thì bấm **B** để bật/tắt riêng phần tự nói.
+
+1. **Hành động theo câu trả lời.** LLM được phép thêm "thẻ lệnh" ở cuối câu, ví dụ
+   `[face:love]`, `[move:dance]`, `[word:CAT|NEKO]`. Brain cắt thẻ ra (loa không đọc) rồi làm theo:
+   đổi mặt robot trong lúc nói, hiện từ lên màn hình, cho bánh xe nhảy/xoay. Cách này không tốn
+   thêm lượt API. Cửa sổ đen in dòng `[BRAIN] the lenh: face=... word=... move=...`.
+   - Robot **chỉ di chuyển khi bé yêu cầu** ("nhảy đi", "xoay một vòng", "lại đây"...). Đã test
+     7 câu: 4 câu thường không di chuyển, 3 câu yêu cầu thì di chuyển đúng.
+   - Mỗi cử động ngắn (tối đa khoảng 2 giây) rồi tự phanh. Firmware thân vẫn tự dừng trước vật cản.
+     Bấm phím hoặc tay cầm giữa chừng thì brain nhường ngay.
+2. **Tự chủ động.** Phần này dùng camera local, không tốn lượt API:
+   - Có người đứng trước camera khoảng 1,5 giây thì robot **tự chào**. Người đó đi khỏi hơn
+     1 phút rồi quay lại thì chào lại (mỗi lần chào cách nhau ít nhất 2 phút).
+   - Có người mà **45 giây** không ai nói gì thì robot **đố một từ** lấy từ kho bài học của Ngọc
+     Anh (46 từ, ngẫu nhiên tiếng Anh hoặc tiếng Nhật). Bé cứ nói câu trả lời: LLM biết mình vừa đố
+     gì nên khen khi đúng, nói đáp án khi sai.
+
+## 4g. Tự đi dạo: chạy liên tục 10 phút, tự né vật cản
+
+Code ở `tools/auto_drive.py`. **Chỉ cho chạy dưới sàn**: HC-SR04 không nhìn thấy mép bàn hay bậc
+cầu thang.
+
+**Bật** bằng một trong các cách sau:
+- bấm phím **X**;
+- nói "Moon ơi **tự đi dạo** đi" (hoặc "tự chạy", "khám phá", "chạy quanh phòng"...);
+- bấm nút **🚗 Tự đi dạo** trên tay cầm điện thoại;
+- hoặc nói theo cách khác như "Moon đi tham quan căn phòng đi": LLM tự hiểu và gắn `[move:explore]`.
+
+**Tắt** bằng một trong các cách sau:
+- bấm **X** lần nữa, hoặc bấm nút trên điện thoại lần nữa;
+- nói "**dừng lại**" hoặc "thôi";
+- **lái tay bất kỳ** (W/A/S/D, L, nút trên điện thoại): người cầm lái thì robot thôi tự đi;
+- nhờ robot làm động tác khác (nhảy, xoay...);
+- hết 10 phút thì robot tự dừng và nói "Hết giờ đi dạo rồi".
+
+Cách né vật cản: HC-SR04 gắn cố định nhìn thẳng, nên muốn "nhìn" trái/phải thì phải xoay cả xe.
+1. Robot đi thẳng ở tốc độ 160 (chậm hơn lúc lái tay để kịp phanh và bớt sụt áp).
+2. Thấy vật gần hơn **30cm** thì phanh, xoay **trái ~60°** đo khoảng cách, rồi xoay sang **phải
+   ~60°** đo tiếp. Mặt robot hiện "TIM DUONG...".
+3. Bên nào trống hơn 45cm thì đi hướng đó (ưu tiên bên xa hơn).
+4. Cả 2 bên đều bị chặn thì **lùi** 0,6 giây, quay đầu rồi thử lại.
+5. Bị chặn **3 lần liền** (kẹt trong góc) thì dừng hẳn và nói "Moon bị kẹt rồi, bạn giúp Moon ra với!".
+6. Đang chạy mà khoảng cách phía trước **đứng yên 2 giây** nghĩa là xe sượt hông vào góc tủ / chân
+   ghế (HC-SR04 chỉ nhìn được một hình nón hẹp phía trước nên không thấy) và bánh quay mà xe không
+   đi. Robot sẽ lùi rồi quay hướng khác.
+
+Firmware thân vẫn tự phanh khi vật gần hơn khoảng 12cm. Đây là lớp bảo vệ thứ 2, phòng khi laptop
+phản ứng chậm. Mất WiFi thì thân tự dừng sau 0,5 giây; mất hơn 20 giây thì chế độ tự đi tự tắt.
+
+**Chỉnh:**
+- `chay-demo.bat --auto-minutes 5`: đổi thời gian (mặc định 10 phút).
+- `chay-demo.bat --auto-turn 0.6`: **góc xoay khi nhìn trái/phải**. Không có cảm biến đếm vòng bánh
+  nên góc xoay tính bằng thời gian (mặc định 0,45 giây, khoảng 60°). Xe xoay ít quá (sàn trơn,
+  thảm, pin yếu) thì tăng lên; xoay quá đà thì giảm.
+
+**Giới hạn:**
+- Không có cảm biến phía sau, nên khi lùi là lùi "mù" (chỉ 0,6 giây).
+- Vật thấp hơn HC-SR04 hoặc nằm chéo hông xe thì robot không thấy trước, chỉ gỡ được nhờ bước 6.
+
+Đã test trên mô phỏng (phòng 2,5m × 1,8m có thùng giữa phòng, robot ảo nhận đúng lệnh bánh như
+thân thật):
+- chạy 40 giây, né 6–9 lần, **không đâm thẳng lần nào**; lần sượt hông vào góc thùng lâu nhất
+  1,8 giây thì tự gỡ;
+- tắt giữa chừng thì bánh dừng ngay;
+- nhốt trong hộp kín 40cm thì báo "bị kẹt" rồi dừng.
+
+LLM thật: "Moon đi tham quan căn phòng một mình đi" → `explore`, "Con chó tiếng Anh là gì?" →
+không di chuyển.
+
+## 4f. Chế độ ĐUA XE: chỉ lái thân, nhanh hết mức
+
+Bấm đúp **`dua-xe.bat`** (tắt `chay-demo.bat` trước). Chương trình chỉ nối với thân: không camera,
+không AI, không giọng nói.
+
+| | Chế độ thường (`chay-demo.bat`) | Đua xe (`dua-xe.bat`) |
+|---|---|---|
+| Tốc độ | 170 | **255** (E/R để chỉnh) |
+| Xuất phát | 80 → 170 trong ~0,2 giây | **120 → 255 trong ~0,15 giây** |
+| Tự phanh trước vật cản | Bật | **Tắt** (xe bạn chạy phía trước cũng bị tính là vật cản). Bấm **O** để bật lại |
+| Chạy liên tục tối đa | 10 giây | 2 phút |
+
+Lái: giữ **W/S/A/D** ở cửa sổ đen "MOON dua xe" (W+A = cua trái), hoặc dùng tay cầm điện thoại ở
+địa chỉ in ra. **L** phanh, **Q** thoát.
+
+**Đầu robot khi đua:**
+- **Cách tốt nhất: rút dây nguồn lên đầu** (dây 2 sợi từ đế lên bo đầu). Đầu và thân không có dây
+  tín hiệu nào nối nhau, nên rút ra thì thân vẫn chạy bình thường, và cả mạch MT3608 chỉ còn nuôi
+  thân + motor, nên ít sụt áp nhất. **Tắt công tắc trước khi rút/cắm**, và quấn băng dính đầu dây
+  vừa rút để 2 chân không chạm vào nhau hay chạm kim loại.
+- Không rút dây cũng được: firmware `head-demo` mới **chỉ bật camera khi laptop kết nối**. Chạy
+  `dua-xe.bat` thì đầu chỉ sáng màn hình chờ ("CHO LAPTOP (CAM TAT)"), WiFi để chế độ tiết kiệm
+  điện, nên nhẹ hơn nhiều so với lúc chạy demo (cần nạp `head-demo` bản mới một lần).
+- **Đừng vặn MT3608 cao hơn 5,2V cho nhanh.** Mạch này còn nuôi board đầu, loa MAX98357 (tối đa
+  5,5V) và HC-SR04. Muốn motor chạy 6V thì dùng MT3608 thứ 2 chỉ cho motor (mục 4c "Nguồn").
+
 ## 5. Gợi ý câu hỏi khi demo
 
 | Hỏi | Robot làm gì |
 |---|---|
 | "Xin chào Moon, bạn là ai?" | Giới thiệu bản thân |
+| Giơ quả táo (hoặc tranh con mèo): "Moon ơi đây là gì?" | Nhìn camera, nói tên đồ vật + dạy từ tiếng Anh / Nhật |
+| "Moon ơi nhảy cho mình xem đi!" | Nói vui + lắc trái phải (cần phần thân đang nối) |
+| "Mình yêu Moon lắm" | Mặt chuyển sang "love" trong lúc trả lời |
+| Đứng im trước robot 45 giây | Robot tự đố một từ tiếng Anh/Nhật |
 | "Con mèo tiếng Nhật là gì?" | Đọc 猫 (neko), màn hiện `CAT / NE-KO` |
 | "Quả táo tiếng Anh là gì?" | Đọc "apple" |
 | "Kể cho mình một câu đố vui" | Lấy từ kho câu đố của Ngọc Anh |
