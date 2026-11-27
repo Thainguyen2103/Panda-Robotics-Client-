@@ -74,7 +74,7 @@ def main():
             while b"\n" in buf:
                 raw, buf = buf.split(b"\n", 1)
                 parts = raw.decode(errors="replace").split()
-                if len(parts) == 5 and parts[0] == "S":
+                if len(parts) >= 5 and parts[0] == "S":  # (firmware moi them 2 cot: giay + ly do khoi dong)
                     cm, run_l, run_r, blocked = float(parts[1]), parts[2], parts[3], parts[4] == "1"
                     dist = "khong co vat" if cm < 0 else f"{cm:5.1f} cm"
                     want = f"giu: {'L' if left else '-'}{'R' if right else '-'}"

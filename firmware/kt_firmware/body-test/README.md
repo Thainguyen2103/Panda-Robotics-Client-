@@ -29,7 +29,10 @@ Bật hotspot trước hay cấp nguồn board trước đều được: board t
 `upload_port` trong `platformio.ini` thành IP board). Đang nạp thì bánh tự khoá.
 
 Luật an toàn chạy **trên board**:
-- Vật cản gần hơn **12cm** → cấm đi thẳng (giữ L+R cũng không quay), nhưng vẫn rẽ được (giữ 1 phím, chỉ 1 bánh quay) để xe xoay mặt khỏi vật cản. Vật ra xa hơn **16cm** thì đi thẳng lại được.
+- Đổi chiều đột ngột (đang tiến mà lùi) → phanh 80ms trước rồi mới quay chiều mới (giảm dòng đỉnh, đỡ sụt áp).
+- Trạng thái gửi kèm lý do lần khởi động gần nhất: `BROWNOUT` = sụt áp (motor chung nguồn 5V với ESP32) → xem mục "Nguồn" trong `head-demo/README.md` 4c.
+- Kèm thêm độ mạnh sóng WiFi (dBm), số lần WiFi của thân bị rớt và mã lý do. Mất liên lạc rồi có lại, cửa sổ đen head-demo in ra 1 trong 3 nguyên nhân: board **khởi động lại**, WiFi của thân **rớt thật** (mã 200 = mất sóng hotspot, hay do sụt áp), hoặc WiFi **vẫn nối**, chỉ gói tin bị lạc (sóng nghẽn). WiFi thân phát mạnh nhất (19,5dBm): đã thử hạ xuống 11dBm nhưng ở chỗ nhiều mạng WiFi, robot xa laptop thì gói tin thân gửi về bị lạc liên tục.
+- Vật cản gần hơn **12cm** (chạy ≤ 150; nhanh hơn thì dừng sớm hơn: ~14cm ở 170, ~22cm ở 255) → cấm đi thẳng (giữ L+R cũng không quay), nhưng vẫn rẽ được (giữ 1 phím, chỉ 1 bánh quay) để xe xoay mặt khỏi vật cản. Vật ra xa hơn **16cm** thì đi thẳng lại được.
 - Mất lệnh từ laptop quá **0,5 giây** (tắt chương trình, rút cáp) → dừng.
 
 | Hiện tượng | Sửa |
